@@ -3,14 +3,13 @@
 -- Multi-tenant country club management
 -- ============================================
 
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- gen_random_uuid() is built into Postgres 17+, no extension needed
 
 -- ============================================
 -- CLUBS (Multi-tenant root)
 -- ============================================
 CREATE TABLE clubs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   slug TEXT UNIQUE NOT NULL,
   logo_url TEXT,
@@ -28,7 +27,7 @@ CREATE TABLE clubs (
 -- MEMBERSHIP TIERS
 -- ============================================
 CREATE TABLE membership_tiers (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   club_id UUID NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   level TEXT NOT NULL CHECK (level IN ('standard', 'premium', 'vip', 'honorary')),
@@ -44,7 +43,7 @@ CREATE TABLE membership_tiers (
 -- FAMILIES
 -- ============================================
 CREATE TABLE families (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   club_id UUID NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   primary_member_id UUID, -- Set after members table exists
@@ -55,7 +54,7 @@ CREATE TABLE families (
 -- MEMBERS
 -- ============================================
 CREATE TABLE members (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   club_id UUID NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   member_number TEXT,
@@ -85,7 +84,7 @@ ALTER TABLE families
 -- FACILITIES
 -- ============================================
 CREATE TABLE facilities (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   club_id UUID NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   type TEXT NOT NULL CHECK (type IN ('golf', 'tennis', 'dining', 'pool', 'fitness', 'other')),
@@ -99,7 +98,7 @@ CREATE TABLE facilities (
 -- BOOKING SLOTS (weekly recurring availability)
 -- ============================================
 CREATE TABLE booking_slots (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   facility_id UUID NOT NULL REFERENCES facilities(id) ON DELETE CASCADE,
   day_of_week SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
   start_time TIME NOT NULL,
@@ -113,7 +112,7 @@ CREATE TABLE booking_slots (
 -- BOOKINGS
 -- ============================================
 CREATE TABLE bookings (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   club_id UUID NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
   facility_id UUID NOT NULL REFERENCES facilities(id) ON DELETE CASCADE,
   member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
@@ -131,7 +130,7 @@ CREATE TABLE bookings (
 -- EVENTS
 -- ============================================
 CREATE TABLE events (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   club_id UUID NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   description TEXT,
@@ -151,7 +150,7 @@ CREATE TABLE events (
 -- EVENT RSVPs
 -- ============================================
 CREATE TABLE event_rsvps (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
   status TEXT NOT NULL DEFAULT 'attending' CHECK (status IN ('attending', 'declined', 'maybe', 'waitlisted')),
@@ -165,7 +164,7 @@ CREATE TABLE event_rsvps (
 -- INVOICES
 -- ============================================
 CREATE TABLE invoices (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   club_id UUID NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
   member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
   stripe_invoice_id TEXT,
@@ -181,7 +180,7 @@ CREATE TABLE invoices (
 -- PAYMENTS
 -- ============================================
 CREATE TABLE payments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   club_id UUID NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
   member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
   invoice_id UUID REFERENCES invoices(id) ON DELETE SET NULL,
@@ -196,7 +195,7 @@ CREATE TABLE payments (
 -- ANNOUNCEMENTS
 -- ============================================
 CREATE TABLE announcements (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   club_id UUID NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   content TEXT NOT NULL,
@@ -211,7 +210,7 @@ CREATE TABLE announcements (
 -- CHAT CONVERSATIONS & MESSAGES
 -- ============================================
 CREATE TABLE chat_conversations (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   club_id UUID NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
   member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
   title TEXT,
@@ -220,7 +219,7 @@ CREATE TABLE chat_conversations (
 );
 
 CREATE TABLE chat_messages (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   conversation_id UUID NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
   role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
   content TEXT NOT NULL,
