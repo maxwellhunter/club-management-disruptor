@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.light.border,
     borderRadius: 16,
     padding: 16,
-    backgroundColor: Colors.light.card,
+    backgroundColor: Colors.light.background,
   },
   titleRow: {
     flexDirection: "row",

@@ -42,6 +42,7 @@ export async function POST(request: Request) {
       .from("facilities")
       .select("id, type")
       .eq("id", facility_id)
+      .eq("club_id", result.member.club_id)
       .single();
 
     if (!facility) {
@@ -78,6 +79,7 @@ export async function POST(request: Request) {
       .eq("facility_id", facility_id)
       .eq("date", date)
       .eq("start_time", start_time)
+      .eq("club_id", result.member.club_id)
       .in("status", ["confirmed", "pending"])
       .maybeSingle();
 
