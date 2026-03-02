@@ -15,21 +15,6 @@ interface TeeTimeBookingProps {
   onClose: () => void;
 }
 
-const GOLF_FACILITIES: Facility[] = [
-  {
-    id: "00000000-0000-0000-0000-000000000101",
-    name: "Championship Course",
-    type: "golf",
-    description: "18-hole championship course",
-  },
-  {
-    id: "00000000-0000-0000-0000-000000000102",
-    name: "Executive 9",
-    type: "golf",
-    description: "9-hole executive course",
-  },
-];
-
 type Step = "course" | "date" | "time";
 
 export default function TeeTimeBooking({
@@ -37,6 +22,8 @@ export default function TeeTimeBooking({
   onClose,
 }: TeeTimeBookingProps) {
   const [step, setStep] = useState<Step>("course");
+  const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [loadingFacilities, setLoadingFacilities] = useState(true);
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(
     null
   );
@@ -61,6 +48,24 @@ export default function TeeTimeBooking({
     const d = new Date();
     return { year: d.getFullYear(), month: d.getMonth() };
   });
+
+  // Fetch golf facilities dynamically
+  useEffect(() => {
+    async function fetchFacilities() {
+      try {
+        const res = await fetch("/api/facilities?type=golf");
+        if (res.ok) {
+          const data = await res.json();
+          setFacilities(data.facilities);
+        }
+      } catch {
+        setError("Failed to load golf courses");
+      } finally {
+        setLoadingFacilities(false);
+      }
+    }
+    fetchFacilities();
+  }, []);
 
   useEffect(() => {
     if (selectedFacility && selectedDate) {
@@ -301,26 +306,36 @@ export default function TeeTimeBooking({
           <p className="text-sm text-[var(--muted-foreground)]">
             Select a golf course
           </p>
-          <div className="grid grid-cols-2 gap-3">
-            {GOLF_FACILITIES.map((f) => (
-              <button
-                key={f.id}
-                onClick={() => {
-                  setSelectedFacility(f);
-                  setStep("date");
-                }}
-                className="rounded-xl border border-[var(--border)] p-4 text-left transition-all hover:border-[var(--primary)] hover:shadow-sm"
-              >
-                <p className="text-2xl mb-2">⛳</p>
-                <p className="text-sm font-semibold text-[var(--foreground)]">
-                  {f.name}
-                </p>
-                <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
-                  {f.description}
-                </p>
-              </button>
-            ))}
-          </div>
+          {loadingFacilities ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin h-6 w-6 border-2 border-[var(--primary)] border-t-transparent rounded-full" />
+            </div>
+          ) : facilities.length === 0 ? (
+            <p className="text-sm text-[var(--muted-foreground)] py-4">
+              No golf courses available.
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {facilities.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => {
+                    setSelectedFacility(f);
+                    setStep("date");
+                  }}
+                  className="rounded-xl border border-[var(--border)] p-4 text-left transition-all hover:border-[var(--primary)] hover:shadow-sm"
+                >
+                  <p className="text-2xl mb-2">⛳</p>
+                  <p className="text-sm font-semibold text-[var(--foreground)]">
+                    {f.name}
+                  </p>
+                  <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+                    {f.description}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
