@@ -1,40 +1,72 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { BillingMember } from "./billing-member";
+import { BillingAdmin } from "./billing-admin";
+import type { BillingStatus } from "@club/shared";
+
 export default function BillingPage() {
+  const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(
+    null
+  );
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchStatus() {
+      try {
+        const res = await fetch("/api/billing/status");
+        if (res.ok) {
+          const data: BillingStatus = await res.json();
+          setBillingStatus(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch billing status:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchStatus();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">Billing</h1>
+          <p className="text-[var(--muted-foreground)]">
+            Manage dues, invoices, and payment processing.
+          </p>
+        </div>
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-32 rounded-xl border border-[var(--border)] bg-[var(--muted)] animate-pulse"
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const isAdmin = billingStatus?.role === "admin";
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Billing</h1>
         <p className="text-[var(--muted-foreground)]">
-          Manage dues, invoices, and payment processing.
+          {isAdmin
+            ? "Manage club billing, invoices, and payment processing."
+            : "Manage your subscription and view invoices."}
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-[var(--border)] p-6">
-          <p className="text-sm text-[var(--muted-foreground)]">
-            Outstanding Balance
-          </p>
-          <p className="text-3xl font-bold mt-1">$0</p>
-        </div>
-        <div className="rounded-xl border border-[var(--border)] p-6">
-          <p className="text-sm text-[var(--muted-foreground)]">
-            Collected (MTD)
-          </p>
-          <p className="text-3xl font-bold mt-1">$0</p>
-        </div>
-        <div className="rounded-xl border border-[var(--border)] p-6">
-          <p className="text-sm text-[var(--muted-foreground)]">
-            Overdue Invoices
-          </p>
-          <p className="text-3xl font-bold mt-1">0</p>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-[var(--border)] p-6">
-        <h2 className="font-semibold mb-4">Recent Invoices</h2>
-        <p className="text-sm text-[var(--muted-foreground)]">
-          Connect Stripe to start processing payments and generating invoices.
-        </p>
-      </div>
+      {isAdmin ? (
+        <BillingAdmin />
+      ) : (
+        <BillingMember billingStatus={billingStatus} />
+      )}
     </div>
   );
 }
