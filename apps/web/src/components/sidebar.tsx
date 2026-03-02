@@ -5,26 +5,26 @@ import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
+import {
+  LayoutGrid,
+  Users,
+  CreditCard,
+  Calendar,
+  PartyPopper,
+  Mail,
+  Bot,
+  type LucideIcon,
+} from "lucide-react";
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: "grid" },
-  { name: "Members", href: "/dashboard/members", icon: "users" },
-  { name: "Billing", href: "/dashboard/billing", icon: "credit-card" },
-  { name: "Bookings", href: "/dashboard/bookings", icon: "calendar" },
-  { name: "Events", href: "/dashboard/events", icon: "party-popper" },
-  { name: "Messages", href: "/dashboard/messages", icon: "mail" },
-  { name: "AI Chat", href: "/dashboard/chat", icon: "bot" },
-];
-
-const icons: Record<string, string> = {
-  grid: "⊞",
-  users: "👥",
-  "credit-card": "💳",
-  calendar: "📅",
-  "party-popper": "🎉",
-  mail: "✉️",
-  bot: "🤖",
-};
+  { name: "Dashboard", href: "/dashboard", icon: LayoutGrid },
+  { name: "Members", href: "/dashboard/members", icon: Users },
+  { name: "Billing", href: "/dashboard/billing", icon: CreditCard },
+  { name: "Bookings", href: "/dashboard/bookings", icon: Calendar },
+  { name: "Events", href: "/dashboard/events", icon: PartyPopper },
+  { name: "Messages", href: "/dashboard/messages", icon: Mail },
+  { name: "AI Chat", href: "/dashboard/chat", icon: Bot },
+] satisfies { name: string; href: string; icon: LucideIcon }[];
 
 export function Sidebar({ user }: { user: User }) {
   const pathname = usePathname();
@@ -50,6 +50,7 @@ export function Sidebar({ user }: { user: User }) {
             item.href === "/dashboard"
               ? pathname === "/dashboard"
               : pathname.startsWith(item.href);
+          const Icon = item.icon;
 
           return (
             <Link
@@ -61,7 +62,7 @@ export function Sidebar({ user }: { user: User }) {
                   : "text-[var(--muted-foreground)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
               }`}
             >
-              <span className="text-base">{icons[item.icon]}</span>
+              <Icon className="h-4 w-4" />
               {item.name}
             </Link>
           );

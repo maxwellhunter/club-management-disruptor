@@ -6,14 +6,27 @@
     "dev": "turbo dev",
     "lint": "turbo lint",
     "clean": "turbo clean",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "test": "turbo run test",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "husky": "^9.1.7",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.2",
     "turbo": "^2.3.0",
     "typescript": "^5.7.0"
   },
   "packageManager": "pnpm@9.15.0",
   "engines": {
     "node": ">=20"
+  },
+  "pnpm": {
+    "overrides": {
+      "react": "19.1.0",
+      "react-dom": "19.1.0"
+    }
   }
 }

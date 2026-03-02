@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Wrench } from "lucide-react";
 
 const DEV_ACCOUNTS = [
   {
@@ -88,7 +89,7 @@ export default function LoginPage() {
         {isDev && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
             <div className="flex items-center gap-2">
-              <span className="text-sm">🔧</span>
+              <Wrench className="h-4 w-4 text-amber-600" />
               <p className="text-xs font-semibold text-amber-800">
                 Dev Mode — Greenfield Country Club
               </p>
