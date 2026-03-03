@@ -260,6 +260,90 @@ export interface Announcement {
   created_at: string;
 }
 
+// Dining & Menu types
+export type DiningOrderStatus =
+  | "pending"
+  | "confirmed"
+  | "preparing"
+  | "ready"
+  | "delivered"
+  | "cancelled";
+
+export interface MenuCategory {
+  id: string;
+  club_id: string;
+  facility_id: string;
+  name: string;
+  description: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface MenuItem {
+  id: string;
+  club_id: string;
+  category_id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  image_url: string | null;
+  is_available: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiningOrder {
+  id: string;
+  club_id: string;
+  member_id: string;
+  facility_id: string;
+  booking_id: string | null;
+  invoice_id: string | null;
+  status: DiningOrderStatus;
+  table_number: string | null;
+  subtotal: number;
+  tax: number;
+  total: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiningOrderItem {
+  id: string;
+  order_id: string;
+  menu_item_id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  special_instructions: string | null;
+  created_at: string;
+}
+
+// Menu with categories and items (API response)
+export interface MenuWithItems {
+  facility: { id: string; name: string; type: string };
+  categories: (MenuCategory & { items: MenuItem[] })[];
+}
+
+// Order with line items (API response)
+export interface DiningOrderWithItems extends DiningOrder {
+  items: DiningOrderItem[];
+  facility_name: string;
+  member_first_name: string;
+  member_last_name: string;
+}
+
+// Dining slot for availability display
+export interface DiningSlot {
+  start_time: string;
+  end_time: string;
+  is_available: boolean;
+  bookings_remaining: number;
+}
+
 // Chat types
 export interface ChatConversation {
   id: string;

@@ -556,3 +556,252 @@ describe("createClubSchema", () => {
     expect(result.success).toBe(false);
   });
 });
+
+// ─── Dining Schemas ──────────────────────────────────────────────────
+
+import {
+  createMenuCategorySchema,
+  createMenuItemSchema,
+  updateMenuItemSchema,
+  createDiningOrderSchema,
+  updateDiningOrderStatusSchema,
+} from "../schemas";
+
+describe("createMenuCategorySchema", () => {
+  const validCategory = {
+    facility_id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+    name: "Appetizers",
+  };
+
+  it("accepts a valid category with required fields", () => {
+    const result = createMenuCategorySchema.safeParse(validCategory);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sort_order).toBe(0); // default
+    }
+  });
+
+  it("accepts all optional fields", () => {
+    const result = createMenuCategorySchema.safeParse({
+      ...validCategory,
+      description: "Starters and small plates",
+      sort_order: 3,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty name", () => {
+    const result = createMenuCategorySchema.safeParse({
+      ...validCategory,
+      name: "",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects invalid facility_id (not UUID)", () => {
+    const result = createMenuCategorySchema.safeParse({
+      ...validCategory,
+      facility_id: "not-a-uuid",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects negative sort_order", () => {
+    const result = createMenuCategorySchema.safeParse({
+      ...validCategory,
+      sort_order: -1,
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("createMenuItemSchema", () => {
+  const validItem = {
+    category_id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+    name: "Caesar Salad",
+    price: 14.5,
+  };
+
+  it("accepts a valid item with required fields", () => {
+    const result = createMenuItemSchema.safeParse(validItem);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.is_available).toBe(true); // default
+      expect(result.data.sort_order).toBe(0); // default
+    }
+  });
+
+  it("accepts all optional fields", () => {
+    const result = createMenuItemSchema.safeParse({
+      ...validItem,
+      description: "Romaine, croutons, parmesan",
+      image_url: "https://example.com/caesar.jpg",
+      is_available: false,
+      sort_order: 5,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty name", () => {
+    const result = createMenuItemSchema.safeParse({ ...validItem, name: "" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects negative price", () => {
+    const result = createMenuItemSchema.safeParse({ ...validItem, price: -5 });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts zero price (e.g., complimentary items)", () => {
+    const result = createMenuItemSchema.safeParse({ ...validItem, price: 0 });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects invalid category_id", () => {
+    const result = createMenuItemSchema.safeParse({
+      ...validItem,
+      category_id: "abc",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects invalid image_url", () => {
+    const result = createMenuItemSchema.safeParse({
+      ...validItem,
+      image_url: "not-a-url",
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("updateMenuItemSchema", () => {
+  it("accepts an empty object (all fields optional)", () => {
+    const result = updateMenuItemSchema.safeParse({});
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts partial updates", () => {
+    const result = updateMenuItemSchema.safeParse({ price: 18.0 });
+    expect(result.success).toBe(true);
+  });
+
+  it("validates field values when provided", () => {
+    expect(updateMenuItemSchema.safeParse({ name: "" }).success).toBe(false);
+    expect(updateMenuItemSchema.safeParse({ price: -1 }).success).toBe(false);
+  });
+});
+
+describe("createDiningOrderSchema", () => {
+  const validOrder = {
+    facility_id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+    items: [
+      { menu_item_id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11", quantity: 2 },
+    ],
+  };
+
+  it("accepts a valid order with required fields", () => {
+    const result = createDiningOrderSchema.safeParse(validOrder);
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts all optional fields", () => {
+    const result = createDiningOrderSchema.safeParse({
+      ...validOrder,
+      booking_id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+      table_number: "A5",
+      notes: "No rush",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty items array", () => {
+    const result = createDiningOrderSchema.safeParse({
+      ...validOrder,
+      items: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects items with quantity below 1", () => {
+    const result = createDiningOrderSchema.safeParse({
+      ...validOrder,
+      items: [
+        {
+          menu_item_id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+          quantity: 0,
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects items with quantity above 50", () => {
+    const result = createDiningOrderSchema.safeParse({
+      ...validOrder,
+      items: [
+        {
+          menu_item_id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+          quantity: 51,
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects invalid facility_id", () => {
+    const result = createDiningOrderSchema.safeParse({
+      ...validOrder,
+      facility_id: "invalid",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects invalid menu_item_id in items", () => {
+    const result = createDiningOrderSchema.safeParse({
+      facility_id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+      items: [{ menu_item_id: "invalid", quantity: 1 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts items with special instructions", () => {
+    const result = createDiningOrderSchema.safeParse({
+      ...validOrder,
+      items: [
+        {
+          menu_item_id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+          quantity: 1,
+          special_instructions: "No onions please",
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("updateDiningOrderStatusSchema", () => {
+  it("accepts all valid status values", () => {
+    for (const status of [
+      "confirmed",
+      "preparing",
+      "ready",
+      "delivered",
+      "cancelled",
+    ]) {
+      const result = updateDiningOrderStatusSchema.safeParse({ status });
+      expect(result.success).toBe(true);
+    }
+  });
+
+  it("rejects invalid status", () => {
+    const result = updateDiningOrderStatusSchema.safeParse({
+      status: "pending",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects missing status", () => {
+    const result = updateDiningOrderStatusSchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+});

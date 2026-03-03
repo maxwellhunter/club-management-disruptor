@@ -93,3 +93,124 @@ INSERT INTO events (id, club_id, title, description, location, start_date, end_d
    '2026-04-05T10:00:00-05:00', '2026-04-05T14:00:00-05:00',
    60, 35.00, 'published',
    (SELECT id FROM members WHERE role = 'admin' AND club_id = '00000000-0000-0000-0000-000000000001' LIMIT 1));
+
+-- ============================================
+-- Generate booking slots for dining facilities
+-- Main Dining Room: dinner 5:00 PM - 9:30 PM, 30-min slots, 10 tables/slot
+-- Grill Room: lunch 11:30 AM - 2:00 PM + dinner 5:00 PM - 9:30 PM, 8 tables/slot
+-- ============================================
+DO $$
+DECLARE
+  dow INT;
+  slot_start TIME;
+  slot_end TIME;
+BEGIN
+  -- Main Dining Room: dinner only
+  FOR dow IN 0..6 LOOP
+    slot_start := '17:00:00'::TIME;
+    WHILE slot_start < '21:30:00'::TIME LOOP
+      slot_end := slot_start + INTERVAL '30 minutes';
+      INSERT INTO booking_slots (facility_id, day_of_week, start_time, end_time, max_bookings, is_active)
+      VALUES ('00000000-0000-0000-0000-000000000103', dow, slot_start, slot_end, 10, TRUE);
+      slot_start := slot_end;
+    END LOOP;
+  END LOOP;
+
+  -- Grill Room: lunch
+  FOR dow IN 0..6 LOOP
+    slot_start := '11:30:00'::TIME;
+    WHILE slot_start < '14:00:00'::TIME LOOP
+      slot_end := slot_start + INTERVAL '30 minutes';
+      INSERT INTO booking_slots (facility_id, day_of_week, start_time, end_time, max_bookings, is_active)
+      VALUES ('00000000-0000-0000-0000-000000000104', dow, slot_start, slot_end, 8, TRUE);
+      slot_start := slot_end;
+    END LOOP;
+  END LOOP;
+
+  -- Grill Room: dinner
+  FOR dow IN 0..6 LOOP
+    slot_start := '17:00:00'::TIME;
+    WHILE slot_start < '21:30:00'::TIME LOOP
+      slot_end := slot_start + INTERVAL '30 minutes';
+      INSERT INTO booking_slots (facility_id, day_of_week, start_time, end_time, max_bookings, is_active)
+      VALUES ('00000000-0000-0000-0000-000000000104', dow, slot_start, slot_end, 8, TRUE);
+      slot_start := slot_end;
+    END LOOP;
+  END LOOP;
+END $$;
+
+-- ============================================
+-- Menu categories
+-- ============================================
+INSERT INTO menu_categories (id, club_id, facility_id, name, description, sort_order) VALUES
+  -- Main Dining Room
+  ('00000000-0000-0000-0000-000000000401', '00000000-0000-0000-0000-000000000001',
+   '00000000-0000-0000-0000-000000000103', 'Appetizers', 'Starters and small plates', 1),
+  ('00000000-0000-0000-0000-000000000402', '00000000-0000-0000-0000-000000000001',
+   '00000000-0000-0000-0000-000000000103', 'Entrees', 'Main courses', 2),
+  ('00000000-0000-0000-0000-000000000403', '00000000-0000-0000-0000-000000000001',
+   '00000000-0000-0000-0000-000000000103', 'Desserts', 'Sweet endings', 3),
+  ('00000000-0000-0000-0000-000000000404', '00000000-0000-0000-0000-000000000001',
+   '00000000-0000-0000-0000-000000000103', 'Beverages', 'Wines, cocktails, and soft drinks', 4),
+  -- Grill Room
+  ('00000000-0000-0000-0000-000000000405', '00000000-0000-0000-0000-000000000001',
+   '00000000-0000-0000-0000-000000000104', 'Starters', 'Appetizers and shareable plates', 1),
+  ('00000000-0000-0000-0000-000000000406', '00000000-0000-0000-0000-000000000001',
+   '00000000-0000-0000-0000-000000000104', 'From the Grill', 'Burgers, steaks, and grilled favorites', 2),
+  ('00000000-0000-0000-0000-000000000407', '00000000-0000-0000-0000-000000000001',
+   '00000000-0000-0000-0000-000000000104', 'Sandwiches & Salads', 'Lighter fare', 3),
+  ('00000000-0000-0000-0000-000000000408', '00000000-0000-0000-0000-000000000001',
+   '00000000-0000-0000-0000-000000000104', 'Bar Menu', 'Cocktails, beer, and wine', 4);
+
+-- ============================================
+-- Menu items
+-- ============================================
+INSERT INTO menu_items (club_id, category_id, name, description, price, sort_order) VALUES
+  -- Main Dining Room: Appetizers
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000401',
+   'Shrimp Cocktail', 'Jumbo shrimp with classic cocktail sauce', 18.00, 1),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000401',
+   'Caesar Salad', 'Crisp romaine, parmesan, croutons, house-made dressing', 14.00, 2),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000401',
+   'Lobster Bisque', 'Rich and creamy with cognac finish', 16.00, 3),
+  -- Main Dining Room: Entrees
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000402',
+   'Filet Mignon', '8oz center-cut with truffle butter, seasonal vegetables', 52.00, 1),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000402',
+   'Pan-Seared Salmon', 'Atlantic salmon with lemon-dill sauce, wild rice', 38.00, 2),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000402',
+   'Roasted Chicken', 'Free-range half chicken, herb jus, mashed potatoes', 32.00, 3),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000402',
+   'Grilled Lamb Chops', 'New Zealand rack with rosemary mint sauce', 48.00, 4),
+  -- Main Dining Room: Desserts
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000403',
+   'Creme Brulee', 'Classic vanilla custard with caramelized sugar', 12.00, 1),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000403',
+   'Chocolate Lava Cake', 'Warm center, vanilla bean ice cream', 14.00, 2),
+  -- Main Dining Room: Beverages
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000404',
+   'Glass of House Red', 'Cabernet Sauvignon, Napa Valley', 15.00, 1),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000404',
+   'Glass of House White', 'Chardonnay, Sonoma County', 14.00, 2),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000404',
+   'Classic Martini', 'Gin or vodka, dry vermouth, olive', 16.00, 3),
+  -- Grill Room: Starters
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000405',
+   'Wings', 'Buffalo or BBQ, served with celery and blue cheese', 14.00, 1),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000405',
+   'Nachos Supreme', 'Loaded with cheese, jalapenos, sour cream, guacamole', 16.00, 2),
+  -- Grill Room: From the Grill
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000406',
+   'Club Burger', '8oz angus beef, cheddar, lettuce, tomato, fries', 22.00, 1),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000406',
+   'NY Strip Steak', '12oz with loaded baked potato', 42.00, 2),
+  -- Grill Room: Sandwiches & Salads
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000407',
+   'Club Sandwich', 'Triple-decker with turkey, bacon, avocado', 18.00, 1),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000407',
+   'Cobb Salad', 'Grilled chicken, bacon, egg, avocado, blue cheese', 20.00, 2),
+  -- Grill Room: Bar Menu
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000408',
+   'IPA Draft', 'Local craft IPA, 16oz', 9.00, 1),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000408',
+   'Old Fashioned', 'Bourbon, bitters, orange peel, cherry', 15.00, 2);

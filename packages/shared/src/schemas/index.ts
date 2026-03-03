@@ -97,6 +97,63 @@ export const createClubSchema = z.object({
   timezone: z.string().default("America/New_York"),
 });
 
+// Dining reservation schema
+export const createDiningReservationSchema = z.object({
+  facility_id: z.string().uuid("Invalid facility"),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format"),
+  start_time: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time format"),
+  end_time: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time format"),
+  party_size: z.number().int().min(1).max(20).default(2),
+  notes: z.string().optional(),
+});
+
+// Menu management schemas (admin)
+export const createMenuCategorySchema = z.object({
+  facility_id: z.string().uuid(),
+  name: z.string().min(1, "Category name is required").max(100),
+  description: z.string().optional(),
+  sort_order: z.number().int().min(0).default(0),
+});
+
+export const createMenuItemSchema = z.object({
+  category_id: z.string().uuid(),
+  name: z.string().min(1, "Item name is required").max(200),
+  description: z.string().optional(),
+  price: z.number().min(0, "Price must be non-negative"),
+  image_url: z.string().url().optional(),
+  is_available: z.boolean().default(true),
+  sort_order: z.number().int().min(0).default(0),
+});
+
+export const updateMenuItemSchema = createMenuItemSchema.partial();
+
+// Ordering schemas
+export const createDiningOrderSchema = z.object({
+  facility_id: z.string().uuid(),
+  booking_id: z.string().uuid().optional(),
+  table_number: z.string().optional(),
+  notes: z.string().optional(),
+  items: z
+    .array(
+      z.object({
+        menu_item_id: z.string().uuid(),
+        quantity: z.number().int().min(1).max(50).default(1),
+        special_instructions: z.string().optional(),
+      })
+    )
+    .min(1, "Order must have at least one item"),
+});
+
+export const updateDiningOrderStatusSchema = z.object({
+  status: z.enum([
+    "confirmed",
+    "preparing",
+    "ready",
+    "delivered",
+    "cancelled",
+  ]),
+});
+
 // Export inferred types from schemas
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
@@ -109,3 +166,13 @@ export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
 export type CreateAnnouncementInput = z.infer<typeof createAnnouncementSchema>;
 export type ChatMessageInput = z.infer<typeof chatMessageSchema>;
 export type CreateClubInput = z.infer<typeof createClubSchema>;
+export type CreateDiningReservationInput = z.infer<
+  typeof createDiningReservationSchema
+>;
+export type CreateMenuCategoryInput = z.infer<typeof createMenuCategorySchema>;
+export type CreateMenuItemInput = z.infer<typeof createMenuItemSchema>;
+export type UpdateMenuItemInput = z.infer<typeof updateMenuItemSchema>;
+export type CreateDiningOrderInput = z.infer<typeof createDiningOrderSchema>;
+export type UpdateDiningOrderStatusInput = z.infer<
+  typeof updateDiningOrderStatusSchema
+>;
