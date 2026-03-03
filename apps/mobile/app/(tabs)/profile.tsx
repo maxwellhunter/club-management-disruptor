@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Linking,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth-context";
 import { Colors } from "@/constants/theme";
 
@@ -197,7 +198,7 @@ export default function ProfileScreen() {
               activeOpacity={0.6}
             >
               <Text style={styles.actionText}>Manage Billing</Text>
-              <Text style={styles.actionArrow}>→</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.light.mutedForeground} />
             </TouchableOpacity>
           </>
         ) : (
@@ -220,8 +221,8 @@ export default function ProfileScreen() {
 
       {/* Other actions */}
       <View style={styles.section}>
-        <ProfileRow label="Notifications" value="→" />
-        <ProfileRow label="Family Members" value="→" />
+        <ProfileRow label="Notifications" showChevron />
+        <ProfileRow label="Family Members" showChevron />
       </View>
 
       <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
@@ -235,17 +236,23 @@ function ProfileRow({
   label,
   value,
   valueColor,
+  showChevron,
 }: {
   label: string;
-  value: string;
+  value?: string;
   valueColor?: string;
+  showChevron?: boolean;
 }) {
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={[styles.rowValue, valueColor ? { color: valueColor } : undefined]}>
-        {value}
-      </Text>
+      {showChevron ? (
+        <Ionicons name="chevron-forward" size={16} color={Colors.light.mutedForeground} />
+      ) : (
+        <Text style={[styles.rowValue, valueColor ? { color: valueColor } : undefined]}>
+          {value}
+        </Text>
+      )}
     </View>
   );
 }

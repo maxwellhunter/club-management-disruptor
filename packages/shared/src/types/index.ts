@@ -169,6 +169,30 @@ export interface EventWithRsvp extends ClubEvent {
   user_rsvp_status: RsvpStatus | null;
 }
 
+// Events API response (includes role for conditional UI)
+export interface EventsResponse {
+  events: EventWithRsvp[];
+  role: MemberRole;
+}
+
+// Event attendee (RSVP joined with member info, for admin attendee list)
+export interface EventAttendee {
+  rsvp_id: string;
+  member_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  status: RsvpStatus;
+  guest_count: number;
+  rsvp_created_at: string;
+}
+
+export interface EventAttendeesResponse {
+  attendees: EventAttendee[];
+  event_id: string;
+  total_guests: number;
+}
+
 // Billing types
 export type InvoiceStatus = "draft" | "sent" | "paid" | "overdue" | "cancelled" | "void";
 export type PaymentMethod = "card" | "ach" | "check" | "cash" | "other";

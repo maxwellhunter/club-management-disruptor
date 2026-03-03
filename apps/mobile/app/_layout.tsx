@@ -1,7 +1,8 @@
-import { Slot, useRouter, useSegments } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { Colors } from "@/constants/theme";
 
 function RootLayoutNav() {
   const { user, loading } = useAuth();
@@ -25,7 +26,18 @@ function RootLayoutNav() {
   return (
     <>
       <StatusBar style="auto" />
-      <Slot />
+      <Stack>
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="event/[id]"
+          options={{
+            headerTitle: "Event Details",
+            headerBackTitle: "Back",
+            headerTintColor: Colors.light.primary,
+          }}
+        />
+      </Stack>
     </>
   );
 }

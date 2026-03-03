@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth-context";
 import { Colors } from "@/constants/theme";
 
@@ -54,7 +55,7 @@ function QuickAction({ label, onPress }: { label: string; onPress: () => void })
   return (
     <TouchableOpacity style={styles.quickAction} onPress={onPress}>
       <Text style={styles.quickActionText}>{label}</Text>
-      <Text style={styles.quickActionArrow}>→</Text>
+      <Ionicons name="chevron-forward" size={16} color={Colors.light.mutedForeground} />
     </TouchableOpacity>
   );
 }

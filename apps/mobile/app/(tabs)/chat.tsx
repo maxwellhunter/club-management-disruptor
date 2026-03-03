@@ -9,10 +9,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ActivityIndicator,
 } from "react-native";
+import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth-context";
 import { Colors } from "@/constants/theme";
 import type { RsvpStatus } from "@club/shared";
+import { ChatMarkdown } from "@/components/markdown";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -32,9 +36,32 @@ interface ChatEventData {
   user_rsvp_status: RsvpStatus | null;
 }
 
+interface ChatTeeTimeSlot {
+  facility_id: string;
+  facility_name: string;
+  date: string;
+  day_label: string;
+  start_time: string;
+  end_time: string;
+}
+
+interface ChatBookingData {
+  id: string;
+  facility_name: string;
+  date: string;
+  day_label: string;
+  start_time: string;
+  end_time: string;
+  party_size: number;
+  status: string;
+}
+
 type ChatAttachment =
   | { type: "event_list"; events: ChatEventData[] }
-  | { type: "event_cancel"; events: ChatEventData[] };
+  | { type: "event_cancel"; events: ChatEventData[] }
+  | { type: "tee_time_list"; slots: ChatTeeTimeSlot[] }
+  | { type: "tee_time_booking_confirm"; booking: ChatBookingData }
+  | { type: "tee_time_my_bookings"; bookings: ChatBookingData[] };
 
 interface Message {
   id: string;
@@ -67,6 +94,14 @@ function formatTimeRange(start: string, end: string | null) {
   const startTime = formatTime(start);
   if (!end) return startTime;
   return `${startTime} – ${formatTime(end)}`;
+}
+
+function formatTeeTime(time: string) {
+  const [h, m] = time.split(":");
+  const hour = parseInt(h, 10);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  return `${h12}:${m} ${ampm}`;
 }
 
 const SUGGESTIONS = [
@@ -142,7 +177,10 @@ function EventCard({
       {mode === "cancel" ? (
         cancelled ? (
           <View style={[cardStyles.rsvpButton, cardStyles.cancelledButton]}>
-            <Text style={cardStyles.cancelledText}>✕ Cancelled</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <Ionicons name="close" size={14} color="#a3a3a3" />
+              <Text style={cardStyles.cancelledText}>Cancelled</Text>
+            </View>
           </View>
         ) : (
           <TouchableOpacity
@@ -171,14 +209,16 @@ function EventCard({
           disabled={rsvpLoading}
           activeOpacity={0.7}
         >
-          <Text
-            style={[
-              cardStyles.rsvpText,
-              isAttending ? cardStyles.attendingText : cardStyles.defaultText,
-            ]}
-          >
-            {rsvpLoading ? "..." : isAttending ? "✓ Attending" : "RSVP"}
-          </Text>
+          {rsvpLoading ? (
+            <Text style={[cardStyles.rsvpText, isAttending ? cardStyles.attendingText : cardStyles.defaultText]}>...</Text>
+          ) : isAttending ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <Ionicons name="checkmark" size={16} color="#166534" />
+              <Text style={[cardStyles.rsvpText, cardStyles.attendingText]}>Attending</Text>
+            </View>
+          ) : (
+            <Text style={[cardStyles.rsvpText, cardStyles.defaultText]}>RSVP</Text>
+          )}
         </TouchableOpacity>
       )}
     </View>
@@ -295,11 +335,17 @@ const cardStyles = StyleSheet.create({
 
 export default function ChatScreen() {
   const { session } = useAuth();
+  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [rsvpLoading, setRsvpLoading] = useState<string | null>(null);
   const [cancelledEvents, setCancelledEvents] = useState<Set<string>>(new Set());
+  const [bookingLoading, setBookingLoading] = useState<string | null>(null);
+  const [hiddenSearches, setHiddenSearches] = useState<Set<string>>(new Set());
+  const [cancelledBookings, setCancelledBookings] = useState<Set<string>>(new Set());
+  const [selectedPartySize, setSelectedPartySize] = useState(1);
+  const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   async function handleSend() {
@@ -357,13 +403,35 @@ export default function ChatScreen() {
     }
   }
 
-  async function handleChatRsvp(
+  function handleChatRsvp(
     messageId: string,
     eventId: string,
     currentStatus: RsvpStatus | null
   ) {
+    if (currentStatus === "attending") {
+      Alert.alert(
+        "Cancel RSVP",
+        "Are you sure you want to cancel your RSVP?",
+        [
+          { text: "Keep RSVP", style: "cancel" },
+          {
+            text: "Cancel RSVP",
+            style: "destructive",
+            onPress: () => executeChatRsvp(messageId, eventId, "declined"),
+          },
+        ]
+      );
+    } else {
+      executeChatRsvp(messageId, eventId, "attending");
+    }
+  }
+
+  async function executeChatRsvp(
+    messageId: string,
+    eventId: string,
+    newStatus: string
+  ) {
     setRsvpLoading(eventId);
-    const newStatus = currentStatus === "attending" ? "declined" : "attending";
 
     try {
       const headers: Record<string, string> = {
@@ -463,6 +531,93 @@ export default function ChatScreen() {
     }
   }
 
+  async function handleBookTeeTime(
+    slot: ChatTeeTimeSlot,
+    partySize: number,
+    messageId: string
+  ) {
+    const slotKey = `${slot.facility_id}|${slot.date}|${slot.start_time}`;
+    setBookingLoading(slotKey);
+
+    try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch(`${API_URL}/api/bookings`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          facility_id: slot.facility_id,
+          date: slot.date,
+          start_time: slot.start_time,
+          end_time: slot.end_time,
+          party_size: partySize,
+        }),
+      });
+
+      if (res.ok) {
+        setHiddenSearches((prev) => new Set(prev).add(messageId));
+        setSelectedPartySize(1);
+        setSelectedCourse(null);
+        const playerLabel = partySize === 1 ? "1 player" : `${partySize} players`;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 2).toString(),
+            role: "assistant",
+            content: `Your tee time at **${slot.facility_name}** on **${slot.day_label}** at **${formatTeeTime(slot.start_time)}** has been booked for **${playerLabel}**.`,
+          },
+        ]);
+      } else {
+        const data = await res.json();
+        Alert.alert("Booking Failed", data.error || "Please try again.");
+      }
+    } catch {
+      Alert.alert("Booking Failed", "Please check your connection and try again.");
+    } finally {
+      setBookingLoading(null);
+    }
+  }
+
+  async function handleCancelBooking(bookingId: string, description: string) {
+    setBookingLoading(bookingId);
+
+    try {
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch(`${API_URL}/api/bookings/${bookingId}/cancel`, {
+        method: "PATCH",
+        headers,
+      });
+
+      if (res.ok) {
+        setCancelledBookings((prev) => new Set(prev).add(bookingId));
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 2).toString(),
+            role: "assistant",
+            content: `Your tee time (${description}) has been cancelled.`,
+          },
+        ]);
+      } else {
+        const data = await res.json();
+        Alert.alert("Cancel Failed", data.error || "Please try again.");
+      }
+    } catch {
+      Alert.alert("Cancel Failed", "Please check your connection and try again.");
+    } finally {
+      setBookingLoading(null);
+    }
+  }
+
   function renderMessage({ item }: { item: Message }) {
     const isUser = item.role === "user";
 
@@ -476,9 +631,13 @@ export default function ChatScreen() {
               isUser ? styles.userBubble : styles.assistantBubble,
             ]}
           >
-            <Text style={[styles.messageText, isUser && styles.userText]}>
-              {item.content}
-            </Text>
+            {isUser ? (
+              <Text style={[styles.messageText, styles.userText]}>
+                {item.content}
+              </Text>
+            ) : (
+              <ChatMarkdown>{item.content}</ChatMarkdown>
+            )}
           </View>
         ) : null}
 
@@ -488,14 +647,19 @@ export default function ChatScreen() {
             return (
               <View key={attIdx} style={styles.attachmentContainer}>
                 {att.events.map((event) => (
-                  <EventCard
+                  <TouchableOpacity
                     key={event.id}
-                    event={event}
-                    onRsvp={(eventId, status) =>
-                      handleChatRsvp(item.id, eventId, status)
-                    }
-                    rsvpLoading={rsvpLoading === event.id}
-                  />
+                    activeOpacity={0.8}
+                    onPress={() => router.push(`/event/${event.id}`)}
+                  >
+                    <EventCard
+                      event={event}
+                      onRsvp={(eventId, status) =>
+                        handleChatRsvp(item.id, eventId, status)
+                      }
+                      rsvpLoading={rsvpLoading === event.id}
+                    />
+                  </TouchableOpacity>
                 ))}
               </View>
             );
@@ -504,15 +668,288 @@ export default function ChatScreen() {
             return (
               <View key={attIdx} style={styles.attachmentContainer}>
                 {att.events.map((event) => (
-                  <EventCard
+                  <TouchableOpacity
                     key={event.id}
-                    event={event}
-                    mode="cancel"
-                    cancelled={cancelledEvents.has(event.id)}
-                    onRsvp={() => handleCancelRsvp(event.id, event.title)}
-                    rsvpLoading={rsvpLoading === event.id}
-                  />
+                    activeOpacity={0.8}
+                    onPress={() => router.push(`/event/${event.id}`)}
+                  >
+                    <EventCard
+                      event={event}
+                      mode="cancel"
+                      cancelled={cancelledEvents.has(event.id)}
+                      onRsvp={() => handleCancelRsvp(event.id, event.title)}
+                      rsvpLoading={rsvpLoading === event.id}
+                    />
+                  </TouchableOpacity>
                 ))}
+              </View>
+            );
+          }
+          if (att.type === "tee_time_list") {
+            // Hide once a booking has been made from this message
+            if (hiddenSearches.has(item.id)) return null;
+
+            // Compute unique courses
+            const courses = [...new Set(att.slots.map((s) => s.facility_name))];
+            const hasMultipleCourses = courses.length > 1;
+
+            // Filter slots by selected course
+            const filteredSlots = selectedCourse
+              ? att.slots.filter((s) => s.facility_name === selectedCourse)
+              : att.slots;
+
+            // Group filtered slots by date
+            const grouped = new Map<string, ChatTeeTimeSlot[]>();
+            for (const slot of filteredSlots) {
+              const existing = grouped.get(slot.date) ?? [];
+              existing.push(slot);
+              grouped.set(slot.date, existing);
+            }
+            return (
+              <View key={attIdx} style={styles.attachmentContainer}>
+                {/* Party size selector */}
+                <View style={teeStyles.partySizeRow}>
+                  <Ionicons name="people-outline" size={14} color={Colors.light.mutedForeground} />
+                  <Text style={teeStyles.partySizeLabel}>Players:</Text>
+                  <View style={teeStyles.partySizePills}>
+                    {[1, 2, 3, 4].map((size) => (
+                      <TouchableOpacity
+                        key={size}
+                        style={[
+                          teeStyles.partySizePill,
+                          selectedPartySize === size && teeStyles.partySizePillActive,
+                        ]}
+                        onPress={() => setSelectedPartySize(size)}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            teeStyles.partySizePillText,
+                            selectedPartySize === size && teeStyles.partySizePillTextActive,
+                          ]}
+                        >
+                          {size}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+                {/* Course selector */}
+                {hasMultipleCourses && (
+                  <View style={teeStyles.courseSelectorRow}>
+                    <Ionicons name="golf-outline" size={14} color={Colors.light.mutedForeground} />
+                    <Text style={teeStyles.partySizeLabel}>Course:</Text>
+                    <View style={teeStyles.coursePills}>
+                      <TouchableOpacity
+                        style={[
+                          teeStyles.coursePill,
+                          selectedCourse === null && teeStyles.coursePillActive,
+                        ]}
+                        onPress={() => setSelectedCourse(null)}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            teeStyles.coursePillText,
+                            selectedCourse === null && teeStyles.coursePillTextActive,
+                          ]}
+                        >
+                          All
+                        </Text>
+                      </TouchableOpacity>
+                      {courses.map((course) => (
+                        <TouchableOpacity
+                          key={course}
+                          style={[
+                            teeStyles.coursePill,
+                            selectedCourse === course && teeStyles.coursePillActive,
+                          ]}
+                          onPress={() => setSelectedCourse(course)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              teeStyles.coursePillText,
+                              selectedCourse === course && teeStyles.coursePillTextActive,
+                            ]}
+                          >
+                            {course}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
+                {Array.from(grouped.entries()).map(([date, slots]) => {
+                  // Sub-group by facility when showing all courses
+                  const facilityGroups =
+                    hasMultipleCourses && !selectedCourse
+                      ? [...new Set(slots.map((s) => s.facility_name))].map(
+                          (name) => ({
+                            name,
+                            slots: slots.filter(
+                              (s) => s.facility_name === name
+                            ),
+                          })
+                        )
+                      : [{ name: null as string | null, slots }];
+
+                  return (
+                    <View key={date} style={teeStyles.dateGroup}>
+                      <Text style={teeStyles.dateHeader}>
+                        {slots[0].day_label}
+                      </Text>
+                      {facilityGroups.map((group) => (
+                        <View
+                          key={group.name ?? "all"}
+                          style={group.name ? { marginBottom: 8 } : undefined}
+                        >
+                          {group.name && (
+                            <Text style={teeStyles.facilitySubLabel}>
+                              {group.name}
+                            </Text>
+                          )}
+                          <View style={teeStyles.slotsRow}>
+                            {group.slots.map((slot) => {
+                              const slotKey = `${slot.facility_id}|${slot.date}|${slot.start_time}`;
+                              const isLoading = bookingLoading === slotKey;
+                              return (
+                                <TouchableOpacity
+                                  key={slotKey}
+                                  style={teeStyles.slotChip}
+                                  onPress={() => {
+                                    const ps = selectedPartySize;
+                                    const msgId = item.id;
+                                    const playerLabel =
+                                      ps === 1 ? "1 player" : `${ps} players`;
+                                    Alert.alert(
+                                      "Confirm Tee Time",
+                                      `${playerLabel}\n${slot.day_label} at ${formatTeeTime(slot.start_time)}\n${slot.facility_name}`,
+                                      [
+                                        { text: "Cancel", style: "cancel" },
+                                        {
+                                          text: "Confirm",
+                                          onPress: () =>
+                                            handleBookTeeTime(
+                                              slot,
+                                              ps,
+                                              msgId
+                                            ),
+                                        },
+                                      ]
+                                    );
+                                  }}
+                                  disabled={isLoading}
+                                  activeOpacity={0.7}
+                                >
+                                  <View style={teeStyles.slotChipContent}>
+                                    <Ionicons
+                                      name="time-outline"
+                                      size={14}
+                                      color={Colors.light.mutedForeground}
+                                    />
+                                    <Text style={teeStyles.slotTime}>
+                                      {isLoading
+                                        ? "..."
+                                        : formatTeeTime(slot.start_time)}
+                                    </Text>
+                                  </View>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  );
+                })}
+              </View>
+            );
+          }
+          if (att.type === "tee_time_booking_confirm") {
+            const b = att.booking;
+            return (
+              <View key={attIdx} style={[styles.attachmentContainer, teeStyles.confirmCard]}>
+                <View style={teeStyles.confirmHeader}>
+                  <Ionicons name="checkmark-circle" size={18} color="#16a34a" />
+                  <Text style={teeStyles.confirmTitle}>Tee Time Confirmed</Text>
+                </View>
+                <View style={teeStyles.confirmDetails}>
+                  <View style={teeStyles.confirmRow}>
+                    <Ionicons name="golf-outline" size={14} color="#166534" />
+                    <Text style={teeStyles.confirmText}>{b.facility_name}</Text>
+                  </View>
+                  <View style={teeStyles.confirmRow}>
+                    <Ionicons name="time-outline" size={14} color="#166534" />
+                    <Text style={teeStyles.confirmText}>
+                      {b.day_label} at {formatTeeTime(b.start_time)}
+                    </Text>
+                  </View>
+                  <View style={teeStyles.confirmRow}>
+                    <Ionicons name="people-outline" size={14} color="#166534" />
+                    <Text style={teeStyles.confirmText}>
+                      {b.party_size} {b.party_size === 1 ? "player" : "players"}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
+          }
+          if (att.type === "tee_time_my_bookings") {
+            return (
+              <View key={attIdx} style={styles.attachmentContainer}>
+                {att.bookings.map((b) => {
+                  const isCancelled =
+                    cancelledBookings.has(b.id) || b.status === "cancelled";
+                  const isLoading = bookingLoading === b.id;
+                  return (
+                    <View
+                      key={b.id}
+                      style={[
+                        teeStyles.bookingCard,
+                        isCancelled && teeStyles.bookingCardCancelled,
+                      ]}
+                    >
+                      <Text style={teeStyles.bookingFacility}>{b.facility_name}</Text>
+                      <View style={teeStyles.bookingMeta}>
+                        <View style={teeStyles.confirmRow}>
+                          <Ionicons name="time-outline" size={13} color={Colors.light.mutedForeground} />
+                          <Text style={teeStyles.bookingMetaText}>
+                            {b.day_label} at {formatTeeTime(b.start_time)}
+                          </Text>
+                        </View>
+                        <View style={teeStyles.confirmRow}>
+                          <Ionicons name="people-outline" size={13} color={Colors.light.mutedForeground} />
+                          <Text style={teeStyles.bookingMetaText}>
+                            {b.party_size} {b.party_size === 1 ? "player" : "players"}
+                          </Text>
+                        </View>
+                      </View>
+                      {isCancelled ? (
+                        <View style={teeStyles.cancelledBadge}>
+                          <Ionicons name="close" size={13} color="#a3a3a3" />
+                          <Text style={teeStyles.cancelledText}>Cancelled</Text>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          style={[
+                            teeStyles.cancelButton,
+                            isLoading && { opacity: 0.5 },
+                          ]}
+                          onPress={() =>
+                            handleCancelBooking(b.id, `${b.facility_name} on ${b.day_label}`)
+                          }
+                          disabled={isLoading}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={teeStyles.cancelButtonText}>
+                            {isLoading ? "..." : "Cancel Booking"}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  );
+                })}
               </View>
             );
           }
@@ -530,7 +967,7 @@ export default function ChatScreen() {
     >
       {messages.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>🤖</Text>
+          <Ionicons name="chatbubble-ellipses-outline" size={48} color={Colors.light.mutedForeground} />
           <Text style={styles.emptyText}>
             Hi! I'm your club assistant. Try asking:
           </Text>
@@ -556,13 +993,14 @@ export default function ChatScreen() {
             flatListRef.current?.scrollToEnd({ animated: true })
           }
           renderItem={renderMessage}
+          ListFooterComponent={
+            loading ? (
+              <View style={styles.typingIndicator}>
+                <ActivityIndicator size="small" color={Colors.light.mutedForeground} />
+              </View>
+            ) : null
+          }
         />
-      )}
-
-      {loading && (
-        <View style={styles.typingIndicator}>
-          <Text style={styles.typingText}>Thinking...</Text>
-        </View>
       )}
 
       <View style={styles.inputBar}>
@@ -582,7 +1020,7 @@ export default function ChatScreen() {
           onPress={handleSend}
           disabled={!input.trim() || loading}
         >
-          <Text style={styles.sendText}>↑</Text>
+          <Ionicons name="arrow-up" size={18} color={Colors.light.primaryForeground} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -657,12 +1095,9 @@ const styles = StyleSheet.create({
     maxWidth: "90%",
   },
   typingIndicator: {
+    alignSelf: "flex-start",
     paddingHorizontal: 20,
-    paddingBottom: 4,
-  },
-  typingText: {
-    fontSize: 13,
-    color: Colors.light.mutedForeground,
+    paddingVertical: 8,
   },
   inputBar: {
     flexDirection: "row",
@@ -698,5 +1133,206 @@ const styles = StyleSheet.create({
     color: Colors.light.primaryForeground,
     fontSize: 18,
     fontWeight: "bold",
+  },
+});
+
+const teeStyles = StyleSheet.create({
+  partySizeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  partySizeLabel: {
+    fontSize: 12,
+    color: Colors.light.mutedForeground,
+  },
+  partySizePills: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  partySizePill: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  partySizePillActive: {
+    backgroundColor: Colors.light.primary,
+    borderColor: Colors.light.primary,
+  },
+  partySizePillText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: Colors.light.mutedForeground,
+  },
+  partySizePillTextActive: {
+    color: Colors.light.primaryForeground,
+  },
+  courseSelectorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
+  coursePills: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+  },
+  coursePill: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  coursePillActive: {
+    backgroundColor: Colors.light.primary,
+    borderColor: Colors.light.primary,
+  },
+  coursePillText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: Colors.light.mutedForeground,
+  },
+  coursePillTextActive: {
+    color: Colors.light.primaryForeground,
+  },
+  facilitySubLabel: {
+    fontSize: 11,
+    color: Colors.light.mutedForeground,
+    marginBottom: 4,
+    marginLeft: 2,
+  },
+  dateGroup: {
+    marginTop: 8,
+  },
+  dateHeader: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: Colors.light.mutedForeground,
+    marginBottom: 6,
+  },
+  slotsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  slotChip: {
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  slotChipBooked: {
+    borderColor: "#86efac",
+    backgroundColor: "#dcfce7",
+  },
+  slotChipContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  slotTime: {
+    fontSize: 13,
+    color: Colors.light.foreground,
+  },
+  slotTimeBooked: {
+    fontSize: 13,
+    color: "#166534",
+  },
+  confirmCard: {
+    borderWidth: 1,
+    borderColor: "#86efac",
+    backgroundColor: "#f0fdf4",
+    borderRadius: 12,
+    padding: 12,
+  },
+  confirmHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 8,
+  },
+  confirmTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#166534",
+  },
+  confirmDetails: {
+    gap: 4,
+  },
+  confirmRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  confirmText: {
+    fontSize: 13,
+    color: "#166534",
+  },
+  bookingCard: {
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+    backgroundColor: Colors.light.background,
+  },
+  bookingCardCancelled: {
+    borderColor: "#e5e5e5",
+    backgroundColor: "#f5f5f5",
+  },
+  bookingFacility: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.light.foreground,
+  },
+  bookingMeta: {
+    marginTop: 6,
+    gap: 3,
+  },
+  bookingMetaText: {
+    fontSize: 12,
+    color: Colors.light.mutedForeground,
+  },
+  cancelButton: {
+    marginTop: 8,
+    backgroundColor: "#fef2f2",
+    borderWidth: 1,
+    borderColor: "#fca5a5",
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    alignSelf: "flex-start",
+  },
+  cancelButtonText: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#b91c1c",
+  },
+  cancelledBadge: {
+    marginTop: 8,
+    backgroundColor: "#f5f5f5",
+    borderWidth: 1,
+    borderColor: "#e5e5e5",
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  cancelledText: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#a3a3a3",
   },
 });

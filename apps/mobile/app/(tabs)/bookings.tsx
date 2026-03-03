@@ -9,6 +9,7 @@ import {
   Alert,
   RefreshControl,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/lib/auth-context";
 
@@ -250,7 +251,7 @@ export default function BookingsScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.upgradeContainer}>
-          <Text style={styles.upgradeIcon}>🏌️</Text>
+          <Ionicons name="golf-outline" size={48} color="#92400e" />
           <Text style={styles.upgradeTitle}>
             Golf Booking Requires an Upgrade
           </Text>
@@ -276,8 +277,10 @@ export default function BookingsScreen() {
               resetBookingFlow();
               setView("list");
             }}
+            style={styles.backBtn}
           >
-            <Text style={styles.backText}>← Back</Text>
+            <Ionicons name="chevron-back" size={16} color={Colors.light.primary} />
+            <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Select Course</Text>
         </View>
@@ -301,7 +304,7 @@ export default function BookingsScreen() {
                 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.courseIcon}>⛳</Text>
+                <Ionicons name="flag-outline" size={32} color={Colors.light.primary} />
                 <Text style={styles.courseName}>{f.name}</Text>
                 <Text style={styles.courseDesc}>{f.description}</Text>
               </TouchableOpacity>
@@ -317,8 +320,9 @@ export default function BookingsScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => setView("course")}>
-            <Text style={styles.backText}>← Back</Text>
+          <TouchableOpacity onPress={() => setView("course")} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={16} color={Colors.light.primary} />
+            <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>
             {selectedFacility?.name}
@@ -388,8 +392,10 @@ export default function BookingsScreen() {
               setSelectedTime(null);
               setSlots([]);
             }}
+            style={styles.backBtn}
           >
-            <Text style={styles.backText}>← Back</Text>
+            <Ionicons name="chevron-back" size={16} color={Colors.light.primary} />
+            <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>
             {selectedFacility?.name} — {formatDate(selectedDate)}
@@ -500,7 +506,7 @@ export default function BookingsScreen() {
           </View>
         ) : bookings.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📅</Text>
+            <Ionicons name="calendar-outline" size={48} color={Colors.light.mutedForeground} />
             <Text style={styles.emptyTitle}>No upcoming bookings</Text>
             <Text style={styles.emptyText}>
               Book your next tee time to get started.
@@ -513,7 +519,7 @@ export default function BookingsScreen() {
               <View key={b.id} style={styles.bookingCard}>
                 <View style={styles.bookingCardLeft}>
                   <View style={styles.bookingIcon}>
-                    <Text>⛳</Text>
+                    <Ionicons name="flag-outline" size={16} color={Colors.light.primary} />
                   </View>
                   <View>
                     <Text style={styles.bookingFacility}>
@@ -566,6 +572,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.light.border,
+  },
+  backBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
   },
   backText: {
     fontSize: 14,
