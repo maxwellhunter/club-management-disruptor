@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { EventWithRsvp } from "@club/shared";
-import { PartyPopper } from "lucide-react";
-import { EventCard } from "@/components/event-card";
+import type { EventWithRsvp, MemberRole } from "@club/shared";
+import { EventsMember } from "./events-member";
+import { EventsAdmin } from "./events-admin";
 
 export default function EventsPage() {
   const [events, setEvents] = useState<EventWithRsvp[]>([]);
+  const [role, setRole] = useState<MemberRole>("member");
   const [loading, setLoading] = useState(true);
   const [rsvpLoading, setRsvpLoading] = useState<string | null>(null);
 
@@ -16,6 +17,7 @@ export default function EventsPage() {
       if (res.ok) {
         const data = await res.json();
         setEvents(data.events);
+        if (data.role) setRole(data.role);
       }
     } catch (err) {
       console.error("Failed to fetch events:", err);
@@ -31,7 +33,8 @@ export default function EventsPage() {
   async function handleRsvp(eventId: string, currentStatus: string | null) {
     setRsvpLoading(eventId);
     try {
-      const newStatus = currentStatus === "attending" ? "declined" : "attending";
+      const newStatus =
+        currentStatus === "attending" ? "declined" : "attending";
       const res = await fetch("/api/events/rsvp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -43,7 +46,6 @@ export default function EventsPage() {
       });
 
       if (res.ok) {
-        // Refresh events to get updated counts
         await fetchEvents();
       } else {
         const data = await res.json();
@@ -55,6 +57,8 @@ export default function EventsPage() {
       setRsvpLoading(null);
     }
   }
+
+  const isAdmin = role === "admin";
 
   if (loading) {
     return (
@@ -82,29 +86,20 @@ export default function EventsPage() {
       <div>
         <h1 className="text-2xl font-bold">Events</h1>
         <p className="text-[var(--muted-foreground)]">
-          Club events, tournaments, and social gatherings.
+          {isAdmin
+            ? "Create, manage, and publish club events."
+            : "Club events, tournaments, and social gatherings."}
         </p>
       </div>
 
-      {events.length === 0 ? (
-        <div className="rounded-xl border border-[var(--border)] p-12 text-center">
-          <PartyPopper className="h-10 w-10 mx-auto mb-3 text-[var(--muted-foreground)]" />
-          <p className="font-semibold text-lg">No upcoming events</p>
-          <p className="text-sm text-[var(--muted-foreground)] mt-1">
-            Check back soon for club events and social gatherings.
-          </p>
-        </div>
+      {isAdmin ? (
+        <EventsAdmin events={events} onRefresh={fetchEvents} />
       ) : (
-        <div className="space-y-4">
-          {events.map((event) => (
-            <EventCard
-              key={event.id}
-              {...event}
-              onRsvp={(eventId, status) => handleRsvp(eventId, status)}
-              rsvpLoading={rsvpLoading === event.id}
-            />
-          ))}
-        </div>
+        <EventsMember
+          events={events}
+          onRsvp={handleRsvp}
+          rsvpLoading={rsvpLoading}
+        />
       )}
     </div>
   );

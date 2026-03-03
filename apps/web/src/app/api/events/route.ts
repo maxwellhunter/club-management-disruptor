@@ -23,14 +23,22 @@ export async function GET(request: Request) {
       );
     }
 
-    // Fetch upcoming published events for this club
-    const { data: events, error } = await supabase
+    const isAdmin = result.member.role === "admin";
+
+    // Admins see all events; members see only published upcoming events
+    let query = supabase
       .from("events")
       .select("*")
       .eq("club_id", result.member.club_id)
-      .eq("status", "published")
-      .gte("start_date", new Date().toISOString())
       .order("start_date", { ascending: true });
+
+    if (!isAdmin) {
+      query = query
+        .eq("status", "published")
+        .gte("start_date", new Date().toISOString());
+    }
+
+    const { data: events, error } = await query;
 
     if (error) {
       console.error("Events query error:", error);
@@ -66,7 +74,7 @@ export async function GET(request: Request) {
       })
     );
 
-    return NextResponse.json({ events: eventsWithRsvp });
+    return NextResponse.json({ events: eventsWithRsvp, role: result.member.role });
   } catch (error) {
     console.error("Events API error:", error);
     return NextResponse.json(

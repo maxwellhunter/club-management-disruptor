@@ -11,6 +11,7 @@ import {
   ScrollView,
 } from "react-native";
 import { Link } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth-context";
 import { Colors } from "@/constants/theme";
 
@@ -86,7 +87,7 @@ export default function LoginScreen() {
         {isDev && (
           <View style={styles.devPanel}>
             <View style={styles.devHeader}>
-              <Text style={styles.devHeaderIcon}>🔧</Text>
+              <Ionicons name="build-outline" size={13} color="#92400e" />
               <Text style={styles.devHeaderText}>
                 Dev Mode — Greenfield CC
               </Text>

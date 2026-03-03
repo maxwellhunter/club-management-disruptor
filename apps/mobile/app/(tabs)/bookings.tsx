@@ -9,24 +9,19 @@ import {
   Alert,
   RefreshControl,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/lib/auth-context";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
 
-const GOLF_FACILITIES = [
-  {
-    id: "00000000-0000-0000-0000-000000000101",
-    name: "Championship Course",
-    description: "18-hole championship course",
-  },
-  {
-    id: "00000000-0000-0000-0000-000000000102",
-    name: "Executive 9",
-    description: "9-hole executive course",
-  },
-];
+interface GolfFacility {
+  id: string;
+  name: string;
+  type: string;
+  description: string | null;
+}
 
 interface TeeTimeSlot {
   start_time: string;
@@ -55,11 +50,13 @@ export default function BookingsScreen() {
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isEligible, setIsEligible] = useState<boolean | null>(null);
+  const [facilities, setFacilities] = useState<GolfFacility[]>([]);
+  const [loadingFacilities, setLoadingFacilities] = useState(true);
 
   // Booking flow state
-  const [selectedFacility, setSelectedFacility] = useState<
-    (typeof GOLF_FACILITIES)[number] | null
-  >(null);
+  const [selectedFacility, setSelectedFacility] = useState<GolfFacility | null>(
+    null
+  );
   const [selectedDate, setSelectedDate] = useState("");
   const [slots, setSlots] = useState<TeeTimeSlot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -95,22 +92,37 @@ export default function BookingsScreen() {
   }, [session?.access_token]);
 
   useEffect(() => {
-    checkEligibility();
+    fetchFacilities();
     fetchBookings();
   }, [fetchBookings]);
 
-  async function checkEligibility() {
+  async function fetchFacilities() {
     try {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const dateStr = tomorrow.toISOString().split("T")[0];
-      const res = await fetch(
-        `${API_URL}/api/bookings/tee-times?facility_id=00000000-0000-0000-0000-000000000101&date=${dateStr}`,
-        { headers }
-      );
-      setIsEligible(res.status !== 403);
+      const res = await fetch(`${API_URL}/api/facilities?type=golf`, {
+        headers,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setFacilities(data.facilities);
+
+        // Check golf eligibility using the first facility
+        if (data.facilities.length > 0) {
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          const dateStr = tomorrow.toISOString().split("T")[0];
+          const eligRes = await fetch(
+            `${API_URL}/api/bookings/tee-times?facility_id=${data.facilities[0].id}&date=${dateStr}`,
+            { headers }
+          );
+          setIsEligible(eligRes.status !== 403);
+        } else {
+          setIsEligible(true);
+        }
+      }
     } catch {
       setIsEligible(true);
+    } finally {
+      setLoadingFacilities(false);
     }
   }
 
@@ -239,7 +251,7 @@ export default function BookingsScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.upgradeContainer}>
-          <Text style={styles.upgradeIcon}>🏌️</Text>
+          <Ionicons name="golf-outline" size={48} color="#92400e" />
           <Text style={styles.upgradeTitle}>
             Golf Booking Requires an Upgrade
           </Text>
@@ -265,28 +277,40 @@ export default function BookingsScreen() {
               resetBookingFlow();
               setView("list");
             }}
+            style={styles.backBtn}
           >
-            <Text style={styles.backText}>← Back</Text>
+            <Ionicons name="chevron-back" size={16} color={Colors.light.primary} />
+            <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Select Course</Text>
         </View>
-        <View style={styles.courseGrid}>
-          {GOLF_FACILITIES.map((f) => (
-            <TouchableOpacity
-              key={f.id}
-              style={styles.courseCard}
-              onPress={() => {
-                setSelectedFacility(f);
-                setView("date");
-              }}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.courseIcon}>⛳</Text>
-              <Text style={styles.courseName}>{f.name}</Text>
-              <Text style={styles.courseDesc}>{f.description}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {loadingFacilities ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color={Colors.light.primary} />
+          </View>
+        ) : facilities.length === 0 ? (
+          <View style={styles.centered}>
+            <Text style={styles.emptyText}>No golf courses available.</Text>
+          </View>
+        ) : (
+          <View style={styles.courseGrid}>
+            {facilities.map((f) => (
+              <TouchableOpacity
+                key={f.id}
+                style={styles.courseCard}
+                onPress={() => {
+                  setSelectedFacility(f);
+                  setView("date");
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="flag-outline" size={32} color={Colors.light.primary} />
+                <Text style={styles.courseName}>{f.name}</Text>
+                <Text style={styles.courseDesc}>{f.description}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
     );
   }
@@ -296,8 +320,9 @@ export default function BookingsScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => setView("course")}>
-            <Text style={styles.backText}>← Back</Text>
+          <TouchableOpacity onPress={() => setView("course")} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={16} color={Colors.light.primary} />
+            <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>
             {selectedFacility?.name}
@@ -367,8 +392,10 @@ export default function BookingsScreen() {
               setSelectedTime(null);
               setSlots([]);
             }}
+            style={styles.backBtn}
           >
-            <Text style={styles.backText}>← Back</Text>
+            <Ionicons name="chevron-back" size={16} color={Colors.light.primary} />
+            <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>
             {selectedFacility?.name} — {formatDate(selectedDate)}
@@ -479,7 +506,7 @@ export default function BookingsScreen() {
           </View>
         ) : bookings.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📅</Text>
+            <Ionicons name="calendar-outline" size={48} color={Colors.light.mutedForeground} />
             <Text style={styles.emptyTitle}>No upcoming bookings</Text>
             <Text style={styles.emptyText}>
               Book your next tee time to get started.
@@ -492,7 +519,7 @@ export default function BookingsScreen() {
               <View key={b.id} style={styles.bookingCard}>
                 <View style={styles.bookingCardLeft}>
                   <View style={styles.bookingIcon}>
-                    <Text>⛳</Text>
+                    <Ionicons name="flag-outline" size={16} color={Colors.light.primary} />
                   </View>
                   <View>
                     <Text style={styles.bookingFacility}>
@@ -545,6 +572,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.light.border,
+  },
+  backBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
   },
   backText: {
     fontSize: 14,

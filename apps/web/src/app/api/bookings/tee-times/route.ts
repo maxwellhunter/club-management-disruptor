@@ -55,6 +55,7 @@ export async function GET(request: Request) {
       .from("facilities")
       .select("id, name, type, description")
       .eq("id", facilityId)
+      .eq("club_id", result.member.club_id)
       .single();
 
     if (!facility) {
@@ -82,6 +83,7 @@ export async function GET(request: Request) {
       .select("id, start_time")
       .eq("facility_id", facilityId)
       .eq("date", date)
+      .eq("club_id", result.member.club_id)
       .in("status", ["confirmed", "pending"]);
 
     // Build a set of booked start times for fast lookup

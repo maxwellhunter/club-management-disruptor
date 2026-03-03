@@ -49,6 +49,12 @@ export const createEventSchema = z.object({
   price: z.number().min(0).optional(),
 });
 
+export const updateEventSchema = createEventSchema.partial().extend({
+  status: z
+    .enum(["draft", "published", "cancelled", "completed"])
+    .optional(),
+});
+
 export const rsvpSchema = z.object({
   event_id: z.string().uuid(),
   status: z.enum(["attending", "declined", "maybe"]),
@@ -97,6 +103,7 @@ export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
 export type CreateTierInput = z.infer<typeof createTierSchema>;
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 export type CreateEventInput = z.infer<typeof createEventSchema>;
+export type UpdateEventInput = z.infer<typeof updateEventSchema>;
 export type RsvpInput = z.infer<typeof rsvpSchema>;
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
 export type CreateAnnouncementInput = z.infer<typeof createAnnouncementSchema>;

@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "/Users/maxhunter/.nvm/versions/node/v21.7.3/bin/npx",
+      "runtimeArgs": ["next", "dev"],
+      "port": 3000,
+      "cwd": "apps/web"
+    }
+  ]
+}

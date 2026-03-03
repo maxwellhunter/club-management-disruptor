@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Calendar, MapPin, Users, Check, X } from "lucide-react";
 import type { RsvpStatus } from "@club/shared";
 
@@ -67,7 +68,10 @@ export function EventCard({
   const isFree = !price || price === 0;
 
   return (
-    <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+    <Link
+      href={`/dashboard/events/${id}`}
+      className="block rounded-xl border border-[var(--border)] overflow-hidden hover:border-[var(--primary)] hover:shadow-sm transition-all"
+    >
       <div className={compact ? "p-4" : "p-5"}>
         {/* Title row */}
         <div className="flex items-start justify-between gap-4">
@@ -131,7 +135,11 @@ export function EventCard({
               </span>
             ) : (
               <button
-                onClick={() => onRsvp(id, user_rsvp_status)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onRsvp(id, user_rsvp_status);
+                }}
                 disabled={rsvpLoading}
                 className={`inline-flex items-center gap-1.5 rounded-lg px-5 py-2 text-sm font-medium transition-all bg-red-50 text-red-700 border border-red-300 hover:bg-red-100 ${
                   rsvpLoading ? "opacity-50 cursor-not-allowed" : ""
@@ -142,7 +150,14 @@ export function EventCard({
             )
           ) : (
             <button
-              onClick={() => onRsvp(id, user_rsvp_status)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (isAttending) {
+                  if (!window.confirm("Are you sure you want to cancel your RSVP?")) return;
+                }
+                onRsvp(id, user_rsvp_status);
+              }}
               disabled={rsvpLoading}
               className={`inline-flex items-center gap-1.5 rounded-lg px-5 py-2 text-sm font-medium transition-all ${
                 isAttending
@@ -163,6 +178,6 @@ export function EventCard({
           )}
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

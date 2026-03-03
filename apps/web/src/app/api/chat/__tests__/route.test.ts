@@ -109,7 +109,9 @@ describe("handleGetUpcomingEvents", () => {
     expect(result.events).toHaveLength(1);
     expect(result.events[0].rsvp_count).toBe(5);
     expect(result.events[0].title).toBe("Wine Tasting Evening");
-    expect(JSON.parse(result.toolResult)).toHaveLength(1);
+    const toolData = JSON.parse(result.toolResult);
+    expect(toolData.count).toBe(1);
+    expect(toolData.event_titles).toEqual(["Wine Tasting Evening"]);
   });
 
   it("returns empty arrays when no events found", async () => {
@@ -120,7 +122,8 @@ describe("handleGetUpcomingEvents", () => {
     const result = await handleGetUpcomingEvents(supabase, mockMember);
 
     expect(result.events).toEqual([]);
-    expect(JSON.parse(result.toolResult)).toEqual([]);
+    const toolData = JSON.parse(result.toolResult);
+    expect(toolData.count).toBe(0);
   });
 
   it("returns empty arrays when data is null", async () => {
@@ -245,7 +248,8 @@ describe("handleGetMyRsvps", () => {
     const result = await handleGetMyRsvps(supabase, mockMember);
 
     expect(result.events).toEqual([]);
-    expect(JSON.parse(result.toolResult)).toEqual([]);
+    const toolData = JSON.parse(result.toolResult);
+    expect(toolData.count).toBe(0);
   });
 
   it("returns empty when RSVP'd events are no longer published", async () => {

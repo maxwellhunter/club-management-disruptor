@@ -4,6 +4,7 @@ import {
   createTierSchema,
   createBookingSchema,
   createEventSchema,
+  updateEventSchema,
   rsvpSchema,
   createInvoiceSchema,
   createAnnouncementSchema,
@@ -336,6 +337,43 @@ describe("rsvpSchema", () => {
       event_id: "abc",
     });
     expect(result.success).toBe(false);
+  });
+});
+
+// ─── updateEventSchema ──────────────────────────────────────────────
+
+describe("updateEventSchema", () => {
+  it("accepts an empty object (all fields optional)", () => {
+    const result = updateEventSchema.safeParse({});
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts partial updates (title only)", () => {
+    const result = updateEventSchema.safeParse({ title: "New Title" });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts status field", () => {
+    const result = updateEventSchema.safeParse({ status: "published" });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts all valid status values", () => {
+    for (const status of ["draft", "published", "cancelled", "completed"]) {
+      const result = updateEventSchema.safeParse({ status });
+      expect(result.success).toBe(true);
+    }
+  });
+
+  it("rejects invalid status value", () => {
+    const result = updateEventSchema.safeParse({ status: "open" });
+    expect(result.success).toBe(false);
+  });
+
+  it("validates field values when provided", () => {
+    expect(updateEventSchema.safeParse({ title: "" }).success).toBe(false);
+    expect(updateEventSchema.safeParse({ price: -5 }).success).toBe(false);
+    expect(updateEventSchema.safeParse({ capacity: 0 }).success).toBe(false);
   });
 });
 

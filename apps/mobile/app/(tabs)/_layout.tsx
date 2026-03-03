@@ -1,5 +1,7 @@
+import { Platform } from "react-native";
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { Colors } from "@/constants/theme";
 
 export default function TabLayout() {
@@ -10,14 +12,33 @@ export default function TabLayout() {
         tabBarInactiveTintColor: Colors.light.mutedForeground,
         tabBarStyle: {
           borderTopColor: Colors.light.border,
+          height: Platform.OS === "ios" ? 84 : 60,
+          paddingBottom: Platform.OS === "ios" ? 28 : 8,
+          paddingTop: 8,
         },
-        headerStyle: {
-          backgroundColor: Colors.light.background,
-        },
+        headerStyle: { backgroundColor: Colors.light.background },
         headerTintColor: Colors.light.foreground,
         headerShadowVisible: false,
       }}
+      screenListeners={{
+        tabPress: () => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        },
+      }}
     >
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: "Chat",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons
+              name="chatbubble-ellipses-outline"
+              size={size}
+              color={color}
+            />
+          ),
+        }}
+      />
       <Tabs.Screen
         name="index"
         options={{
@@ -30,9 +51,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="bookings"
         options={{
-          title: "Bookings",
+          title: "Golf",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calendar-outline" size={size} color={color} />
+            <Ionicons name="golf-outline" size={size} color={color} />
           ),
         }}
       />
@@ -42,15 +63,6 @@ export default function TabLayout() {
           title: "Events",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="sparkles-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="chat"
-        options={{
-          title: "AI Chat",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubble-ellipses-outline" size={size} color={color} />
           ),
         }}
       />

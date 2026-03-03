@@ -32,6 +32,7 @@ export async function PATCH(
       .from("bookings")
       .select("id, member_id, date, status")
       .eq("id", bookingId)
+      .eq("club_id", result.member.club_id)
       .single();
 
     if (fetchError || !booking) {
