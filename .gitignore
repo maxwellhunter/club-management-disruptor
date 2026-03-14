@@ -32,3 +32,22 @@ coverage/
 
 # Supabase
 packages/supabase/.temp/
+packages/supabase/apply_dining.sql
+
+# Claude Code
+.claude/
+.claude-flow/
+.mcp.json
+
+# Playwright MCP
+.playwright-mcp/
+
+# Expo
+apps/mobile/.expo/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Branding assets
+branding/
+*.png
