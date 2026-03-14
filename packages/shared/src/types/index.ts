@@ -344,6 +344,28 @@ export interface DiningSlot {
   bookings_remaining: number;
 }
 
+// Member directory types
+export interface DirectoryMember {
+  id: string;
+  member_number: string | null;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+  avatar_url: string | null;
+  role: MemberRole;
+  status: MemberStatus;
+  join_date: string;
+  tier_name: string | null;
+  tier_level: MembershipTierLevel | null;
+}
+
+export interface MemberDirectoryResponse {
+  members: DirectoryMember[];
+  tiers: { id: string; name: string; level: MembershipTierLevel }[];
+  role: MemberRole;
+}
+
 // Chat types
 export interface ChatConversation {
   id: string;

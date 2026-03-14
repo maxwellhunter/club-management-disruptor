@@ -34,6 +34,10 @@ export default function HomeScreen() {
           onPress={() => router.push("/(tabs)/events")}
         />
         <QuickAction
+          label="Member Directory"
+          onPress={() => router.push("/(tabs)/members")}
+        />
+        <QuickAction
           label="Ask AI Assistant"
           onPress={() => router.push("/(tabs)/chat")}
         />
