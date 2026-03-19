@@ -27,10 +27,10 @@ export async function PATCH(
       );
     }
 
-    // Fetch the booking
+    // Fetch the booking (include facility_id and start_time for waitlist promotion)
     const { data: booking, error: fetchError } = await supabase
       .from("bookings")
-      .select("id, member_id, date, status")
+      .select("id, member_id, facility_id, date, start_time, end_time, status")
       .eq("id", bookingId)
       .eq("club_id", result.member.club_id)
       .single();
@@ -86,7 +86,76 @@ export async function PATCH(
       );
     }
 
-    return NextResponse.json({ booking: updated });
+    // === Auto-promote first person on waitlist ===
+    let promoted = null;
+    try {
+      const { data: nextInLine } = await supabase
+        .from("booking_waitlist")
+        .select("id, member_id, party_size, end_time")
+        .eq("facility_id", booking.facility_id)
+        .eq("date", booking.date)
+        .eq("start_time", booking.start_time)
+        .eq("status", "waiting")
+        .order("position", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (nextInLine) {
+        // Create a new booking for the promoted member
+        const { data: newBooking, error: bookError } = await supabase
+          .from("bookings")
+          .insert({
+            club_id: result.member.club_id,
+            facility_id: booking.facility_id,
+            member_id: nextInLine.member_id,
+            date: booking.date,
+            start_time: booking.start_time,
+            end_time: nextInLine.end_time || booking.end_time,
+            party_size: nextInLine.party_size,
+            status: "confirmed",
+            notes: "Auto-promoted from waitlist",
+          })
+          .select()
+          .single();
+
+        if (!bookError && newBooking) {
+          // Mark waitlist entry as promoted
+          await supabase
+            .from("booking_waitlist")
+            .update({ status: "promoted", notified_at: new Date().toISOString() })
+            .eq("id", nextInLine.id);
+
+          // Reorder remaining waitlist positions
+          const { data: remaining } = await supabase
+            .from("booking_waitlist")
+            .select("id")
+            .eq("facility_id", booking.facility_id)
+            .eq("date", booking.date)
+            .eq("start_time", booking.start_time)
+            .eq("status", "waiting")
+            .order("position", { ascending: true });
+
+          if (remaining) {
+            for (let i = 0; i < remaining.length; i++) {
+              await supabase
+                .from("booking_waitlist")
+                .update({ position: i + 1 })
+                .eq("id", remaining[i].id);
+            }
+          }
+
+          promoted = {
+            member_id: nextInLine.member_id,
+            booking_id: newBooking.id,
+          };
+        }
+      }
+    } catch (promoteError) {
+      // Log but don't fail the cancellation if promotion fails
+      console.error("Waitlist promotion error:", promoteError);
+    }
+
+    return NextResponse.json({ booking: updated, waitlist_promoted: promoted });
   } catch (error) {
     console.error("Cancel booking API error:", error);
     return NextResponse.json(

@@ -38,6 +38,14 @@ export const createBookingSchema = z.object({
   notes: z.string().optional(),
 });
 
+export const modifyBookingSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format").optional(),
+  start_time: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time format").optional(),
+  end_time: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time format").optional(),
+  party_size: z.number().int().min(1).max(4).optional(),
+  notes: z.string().optional(),
+});
+
 // Event schemas
 export const createEventSchema = z.object({
   title: z.string().min(1, "Event title is required").max(200),
@@ -154,11 +162,22 @@ export const updateDiningOrderStatusSchema = z.object({
   ]),
 });
 
+// Schedule configuration schema (admin — generate booking slots)
+export const scheduleConfigSchema = z.object({
+  facility_id: z.string().uuid(),
+  days_of_week: z.array(z.number().int().min(0).max(6)).min(1, "Select at least one day"),
+  start_time: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time format (HH:MM)"),
+  end_time: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time format (HH:MM)"),
+  interval_minutes: z.number().int().min(5).max(120).default(10),
+  max_bookings: z.number().int().min(1).max(100).default(1),
+});
+
 // Export inferred types from schemas
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
 export type CreateTierInput = z.infer<typeof createTierSchema>;
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
+export type ModifyBookingInput = z.infer<typeof modifyBookingSchema>;
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 export type UpdateEventInput = z.infer<typeof updateEventSchema>;
 export type RsvpInput = z.infer<typeof rsvpSchema>;
@@ -176,3 +195,4 @@ export type CreateDiningOrderInput = z.infer<typeof createDiningOrderSchema>;
 export type UpdateDiningOrderStatusInput = z.infer<
   typeof updateDiningOrderStatusSchema
 >;
+export type ScheduleConfigInput = z.infer<typeof scheduleConfigSchema>;

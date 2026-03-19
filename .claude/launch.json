@@ -7,6 +7,14 @@
       "runtimeArgs": ["next", "dev"],
       "port": 3000,
       "cwd": "apps/web"
+    },
+    {
+      "name": "mobile",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "source /Users/maxhunter/.nvm/nvm.sh && nvm use 21 && npx expo start --web --port 8081"],
+      "port": 8081,
+      "autoPort": false,
+      "cwd": "apps/mobile"
     }
   ]
 }

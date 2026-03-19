@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Calendar } from "react-native-calendars";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/lib/auth-context";
 
@@ -28,10 +29,13 @@ interface TeeTimeSlot {
   end_time: string;
   is_available: boolean;
   booking_id?: string;
+  waitlist_count?: number;
+  on_waitlist?: boolean;
 }
 
 interface BookingWithDetails {
   id: string;
+  facility_id: string;
   facility_name: string;
   facility_type: string;
   date: string;
@@ -41,7 +45,7 @@ interface BookingWithDetails {
   status: string;
 }
 
-type ScreenView = "list" | "course" | "date" | "time";
+type ScreenView = "list" | "course" | "date" | "time" | "editDate" | "editTime";
 
 export default function BookingsScreen() {
   const { session } = useAuth();
@@ -64,6 +68,86 @@ export default function BookingsScreen() {
   const [partySize, setPartySize] = useState(4);
   const [booking, setBooking] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [joiningWaitlist, setJoiningWaitlist] = useState<string | null>(null);
+  const [leavingWaitlist, setLeavingWaitlist] = useState<string | null>(null);
+
+  // Edit flow state
+  const [editingBooking, setEditingBooking] = useState<BookingWithDetails | null>(null);
+  const [editDate, setEditDate] = useState("");
+  const [editTime, setEditTime] = useState("");
+  const [editPartySize, setEditPartySize] = useState(4);
+  const [editSlots, setEditSlots] = useState<TeeTimeSlot[]>([]);
+  const [loadingEditSlots, setLoadingEditSlots] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Memoize calendar props to prevent re-renders that drop touch events
+  const calendarMinDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split("T")[0];
+  }, []);
+
+  const calendarMaxDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d.toISOString().split("T")[0];
+  }, []);
+
+  const markedDates = useMemo(
+    () =>
+      selectedDate
+        ? { [selectedDate]: { selected: true, selectedColor: Colors.light.primary } }
+        : {},
+    [selectedDate]
+  );
+
+  const calendarTheme = useMemo(
+    () => ({
+      backgroundColor: Colors.light.background,
+      calendarBackground: Colors.light.background,
+      todayTextColor: Colors.light.primary,
+      selectedDayBackgroundColor: Colors.light.primary,
+      selectedDayTextColor: Colors.light.primaryForeground,
+      arrowColor: Colors.light.primary,
+      monthTextColor: Colors.light.foreground,
+      dayTextColor: Colors.light.foreground,
+      textDisabledColor: Colors.light.mutedForeground,
+      textSectionTitleColor: Colors.light.mutedForeground,
+    }),
+    []
+  );
+
+  const handleDayPress = useCallback(
+    (day: { dateString: string }) => {
+      setSelectedDate(day.dateString);
+      if (selectedFacility) {
+        fetchSlots(selectedFacility.id, day.dateString);
+      }
+      setView("time");
+    },
+    [selectedFacility]
+  );
+
+  // Edit calendar marked dates
+  const editMarkedDates = useMemo(
+    () =>
+      editDate
+        ? { [editDate]: { selected: true, selectedColor: Colors.light.primary } }
+        : {},
+    [editDate]
+  );
+
+  const handleEditDayPress = useCallback(
+    (day: { dateString: string }) => {
+      setEditDate(day.dateString);
+      setEditTime("");
+      if (editingBooking) {
+        fetchEditSlots(editingBooking.facility_id, day.dateString);
+      }
+      setView("editTime");
+    },
+    [editingBooking]
+  );
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -209,12 +293,153 @@ export default function BookingsScreen() {
     );
   }
 
+  async function handleJoinWaitlist(slot: TeeTimeSlot) {
+    if (!selectedFacility || !selectedDate) return;
+    setJoiningWaitlist(slot.start_time);
+    try {
+      const res = await fetch(`${API_URL}/api/bookings/waitlist`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          facility_id: selectedFacility.id,
+          date: selectedDate,
+          start_time: slot.start_time,
+          end_time: slot.end_time,
+          party_size: partySize,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        Alert.alert(
+          "On the Waitlist!",
+          `You're #${data.position} in line. We'll auto-book you if this slot opens up.`
+        );
+        // Refresh slots to update waitlist state
+        fetchSlots(selectedFacility.id, selectedDate);
+      } else {
+        Alert.alert("Error", data.error || "Failed to join waitlist");
+      }
+    } catch {
+      Alert.alert("Error", "Failed to join waitlist");
+    } finally {
+      setJoiningWaitlist(null);
+    }
+  }
+
+  async function handleLeaveWaitlist(slot: TeeTimeSlot) {
+    if (!selectedFacility || !selectedDate) return;
+    setLeavingWaitlist(slot.start_time);
+    try {
+      // First get the entry ID
+      const infoRes = await fetch(
+        `${API_URL}/api/bookings/waitlist?facility_id=${selectedFacility.id}&date=${selectedDate}&start_time=${slot.start_time}`,
+        { headers }
+      );
+      const info = await infoRes.json();
+      if (!info.my_entry_id) {
+        Alert.alert("Error", "Waitlist entry not found");
+        return;
+      }
+
+      const res = await fetch(
+        `${API_URL}/api/bookings/waitlist?id=${info.my_entry_id}`,
+        { method: "DELETE", headers }
+      );
+      if (res.ok) {
+        Alert.alert("Removed", "You've been removed from the waitlist.");
+        fetchSlots(selectedFacility.id, selectedDate);
+      } else {
+        const data = await res.json();
+        Alert.alert("Error", data.error || "Failed to leave waitlist");
+      }
+    } catch {
+      Alert.alert("Error", "Failed to leave waitlist");
+    } finally {
+      setLeavingWaitlist(null);
+    }
+  }
+
   function resetBookingFlow() {
     setSelectedFacility(null);
     setSelectedDate("");
     setSelectedTime(null);
     setSlots([]);
     setPartySize(4);
+  }
+
+  function startEdit(b: BookingWithDetails) {
+    setEditingBooking(b);
+    setEditDate(b.date);
+    setEditTime(b.start_time);
+    setEditPartySize(b.party_size);
+    setEditSlots([]);
+    setView("editDate");
+  }
+
+  function cancelEdit() {
+    setEditingBooking(null);
+    setEditDate("");
+    setEditTime("");
+    setEditSlots([]);
+    setView("list");
+  }
+
+  async function fetchEditSlots(facilityId: string, date: string) {
+    setLoadingEditSlots(true);
+    try {
+      const res = await fetch(
+        `${API_URL}/api/bookings/tee-times?facility_id=${facilityId}&date=${date}`,
+        { headers }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setEditSlots(data.slots);
+      }
+    } catch {
+      setEditSlots([]);
+    } finally {
+      setLoadingEditSlots(false);
+    }
+  }
+
+  async function handleSaveEdit() {
+    if (!editingBooking || !editTime) return;
+    setSaving(true);
+
+    const changes: Record<string, string | number> = {};
+    if (editDate !== editingBooking.date) changes.date = editDate;
+    if (editTime !== editingBooking.start_time) changes.start_time = editTime;
+    if (editPartySize !== editingBooking.party_size) changes.party_size = editPartySize;
+
+    if (Object.keys(changes).length === 0) {
+      cancelEdit();
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `${API_URL}/api/bookings/${editingBooking.id}/modify`,
+        {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify(changes),
+        }
+      );
+
+      if (res.ok) {
+        Alert.alert("Updated!", "Your tee time has been modified.");
+        cancelEdit();
+        setLoadingBookings(true);
+        fetchBookings();
+      } else {
+        const data = await res.json();
+        Alert.alert("Error", data.error || "Failed to modify booking");
+      }
+    } catch {
+      Alert.alert("Error", "Failed to modify booking");
+    } finally {
+      setSaving(false);
+    }
   }
 
   function formatTime(timeStr: string) {
@@ -233,18 +458,6 @@ export default function BookingsScreen() {
       day: "numeric",
     });
   }
-
-  // Generate next 14 days
-  const dates = Array.from({ length: 14 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() + i + 1);
-    return {
-      value: d.toISOString().split("T")[0],
-      dayName: d.toLocaleDateString("en-US", { weekday: "short" }),
-      dayNum: d.getDate(),
-      month: d.toLocaleDateString("en-US", { month: "short" }),
-    };
-  });
 
   // === Non-eligible view ===
   if (isEligible === false) {
@@ -328,55 +541,15 @@ export default function BookingsScreen() {
             {selectedFacility?.name}
           </Text>
         </View>
-        <Text style={styles.sectionLabel}>Select a Date</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.dateStrip}
-        >
-          {dates.map((d) => {
-            const isSelected = d.value === selectedDate;
-            return (
-              <TouchableOpacity
-                key={d.value}
-                style={[styles.dateCard, isSelected && styles.dateCardSelected]}
-                onPress={() => {
-                  setSelectedDate(d.value);
-                  if (selectedFacility) {
-                    fetchSlots(selectedFacility.id, d.value);
-                  }
-                  setView("time");
-                }}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[
-                    styles.dateDayName,
-                    isSelected && styles.dateTextSelected,
-                  ]}
-                >
-                  {d.dayName}
-                </Text>
-                <Text
-                  style={[
-                    styles.dateDayNum,
-                    isSelected && styles.dateTextSelected,
-                  ]}
-                >
-                  {d.dayNum}
-                </Text>
-                <Text
-                  style={[
-                    styles.dateMonth,
-                    isSelected && styles.dateTextSelected,
-                  ]}
-                >
-                  {d.month}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        <View style={styles.calendarContainer}>
+          <Calendar
+            minDate={calendarMinDate}
+            maxDate={calendarMaxDate}
+            markedDates={markedDates}
+            onDayPress={handleDayPress}
+            theme={calendarTheme}
+          />
+        </View>
       </View>
     );
   }
@@ -409,32 +582,73 @@ export default function BookingsScreen() {
         ) : (
           <ScrollView contentContainerStyle={styles.timeContent}>
             <Text style={styles.sectionLabel}>Available Tee Times</Text>
-            <View style={styles.timeGrid}>
+            <View style={styles.timeList}>
               {slots.map((slot) => {
                 const isSelected =
                   selectedTime?.start_time === slot.start_time;
+                const isJoining = joiningWaitlist === slot.start_time;
+                const isLeaving = leavingWaitlist === slot.start_time;
+
                 return (
-                  <TouchableOpacity
-                    key={slot.start_time}
-                    disabled={!slot.is_available}
-                    onPress={() => setSelectedTime(slot)}
-                    style={[
-                      styles.timeChip,
-                      isSelected && styles.timeChipSelected,
-                      !slot.is_available && styles.timeChipDisabled,
-                    ]}
-                    activeOpacity={0.7}
-                  >
-                    <Text
+                  <View key={slot.start_time} style={styles.timeRow}>
+                    <TouchableOpacity
+                      disabled={!slot.is_available}
+                      onPress={() => setSelectedTime(slot)}
                       style={[
-                        styles.timeChipText,
-                        isSelected && styles.timeChipTextSelected,
-                        !slot.is_available && styles.timeChipTextDisabled,
+                        styles.timeChip,
+                        { flex: 1 },
+                        isSelected && styles.timeChipSelected,
+                        !slot.is_available && styles.timeChipDisabled,
                       ]}
+                      activeOpacity={0.7}
                     >
-                      {formatTime(slot.start_time)}
-                    </Text>
-                  </TouchableOpacity>
+                      <Text
+                        style={[
+                          styles.timeChipText,
+                          isSelected && styles.timeChipTextSelected,
+                          !slot.is_available && styles.timeChipTextDisabled,
+                        ]}
+                      >
+                        {formatTime(slot.start_time)}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Waitlist button for booked slots */}
+                    {!slot.is_available && !slot.on_waitlist && (
+                      <TouchableOpacity
+                        style={styles.waitlistBtn}
+                        onPress={() => handleJoinWaitlist(slot)}
+                        disabled={isJoining}
+                        activeOpacity={0.7}
+                      >
+                        {isJoining ? (
+                          <ActivityIndicator size="small" color={Colors.light.primary} />
+                        ) : (
+                          <Text style={styles.waitlistBtnText}>
+                            Waitlist{slot.waitlist_count ? ` (${slot.waitlist_count})` : ""}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Already on waitlist */}
+                    {!slot.is_available && slot.on_waitlist && (
+                      <TouchableOpacity
+                        style={styles.onWaitlistBtn}
+                        onPress={() => handleLeaveWaitlist(slot)}
+                        disabled={isLeaving}
+                        activeOpacity={0.7}
+                      >
+                        {isLeaving ? (
+                          <ActivityIndicator size="small" color="#b91c1c" />
+                        ) : (
+                          <Text style={styles.onWaitlistBtnText}>
+                            On List{slot.waitlist_count ? ` (${slot.waitlist_count})` : ""}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 );
               })}
             </View>
@@ -478,6 +692,139 @@ export default function BookingsScreen() {
                 </TouchableOpacity>
               </View>
             )}
+          </ScrollView>
+        )}
+      </View>
+    );
+  }
+
+  // === Edit date selection ===
+  if (view === "editDate" && editingBooking) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={cancelEdit} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={16} color={Colors.light.primary} />
+            <Text style={styles.backText}>Cancel</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>
+            Edit — {editingBooking.facility_name}
+          </Text>
+        </View>
+        <Text style={styles.sectionLabel}>Select New Date</Text>
+        <View style={styles.calendarContainer}>
+          <Calendar
+            minDate={calendarMinDate}
+            maxDate={calendarMaxDate}
+            markedDates={editMarkedDates}
+            onDayPress={handleEditDayPress}
+            theme={calendarTheme}
+          />
+        </View>
+      </View>
+    );
+  }
+
+  // === Edit time selection ===
+  if (view === "editTime" && editingBooking) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => {
+              setEditTime("");
+              setEditSlots([]);
+              setView("editDate");
+            }}
+            style={styles.backBtn}
+          >
+            <Ionicons name="chevron-back" size={16} color={Colors.light.primary} />
+            <Text style={styles.backText}>Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>
+            Edit — {formatDate(editDate)}
+          </Text>
+        </View>
+
+        {loadingEditSlots ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color={Colors.light.primary} />
+          </View>
+        ) : (
+          <ScrollView contentContainerStyle={styles.timeContent}>
+            <Text style={styles.sectionLabel}>Select New Time</Text>
+            <View style={styles.timeGrid}>
+              {editSlots.map((slot) => {
+                const isCurrentSlot =
+                  editingBooking.start_time === slot.start_time &&
+                  editDate === editingBooking.date;
+                const available = slot.is_available || isCurrentSlot;
+                const isSelected = editTime === slot.start_time;
+                return (
+                  <TouchableOpacity
+                    key={slot.start_time}
+                    disabled={!available}
+                    onPress={() => setEditTime(slot.start_time)}
+                    style={[
+                      styles.timeChip,
+                      isSelected && styles.timeChipSelected,
+                      !available && styles.timeChipDisabled,
+                    ]}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.timeChipText,
+                        isSelected && styles.timeChipTextSelected,
+                        !available && styles.timeChipTextDisabled,
+                      ]}
+                    >
+                      {formatTime(slot.start_time)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {editTime ? (
+              <View style={styles.confirmSection}>
+                <Text style={styles.sectionLabel}>Party Size</Text>
+                <View style={styles.partySizeRow}>
+                  {[1, 2, 3, 4].map((n) => (
+                    <TouchableOpacity
+                      key={n}
+                      onPress={() => setEditPartySize(n)}
+                      style={[
+                        styles.partySizeBtn,
+                        editPartySize === n && styles.partySizeBtnSelected,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.partySizeText,
+                          editPartySize === n && styles.partySizeTextSelected,
+                        ]}
+                      >
+                        {n}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.confirmBtn, saving && { opacity: 0.5 }]}
+                  onPress={handleSaveEdit}
+                  disabled={saving}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.confirmBtnText}>
+                    {saving
+                      ? "Saving..."
+                      : `Save Changes — ${formatTime(editTime)} · ${editPartySize} ${editPartySize === 1 ? "player" : "players"}`}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
           </ScrollView>
         )}
       </View>
@@ -531,15 +878,25 @@ export default function BookingsScreen() {
                     </Text>
                   </View>
                 </View>
-                <TouchableOpacity
-                  style={styles.cancelBtn}
-                  onPress={() => handleCancel(b.id)}
-                  disabled={cancellingId === b.id}
-                >
-                  <Text style={styles.cancelBtnText}>
-                    {cancellingId === b.id ? "..." : "Cancel"}
-                  </Text>
-                </TouchableOpacity>
+                <View style={styles.bookingActions}>
+                  <TouchableOpacity
+                    style={styles.editBtn}
+                    onPress={() => startEdit(b)}
+                  >
+                    <Text style={styles.editBtnText}>Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.cancelBtn, cancellingId === b.id && styles.cancelBtnDisabled]}
+                    onPress={() => handleCancel(b.id)}
+                    disabled={cancellingId === b.id}
+                  >
+                    {cancellingId === b.id ? (
+                      <ActivityIndicator size="small" color="#b91c1c" />
+                    ) : (
+                      <Text style={styles.cancelBtnText}>Cancel</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
             ))}
           </View>
@@ -633,41 +990,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textAlign: "center",
   },
-  // Date strip
-  dateStrip: {
-    paddingHorizontal: 16,
-    gap: 8,
-    paddingBottom: 16,
-  },
-  dateCard: {
-    width: 60,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    alignItems: "center",
-  },
-  dateCardSelected: {
-    backgroundColor: Colors.light.primary,
-    borderColor: Colors.light.primary,
-  },
-  dateDayName: {
-    fontSize: 11,
-    fontWeight: "500",
-    color: Colors.light.mutedForeground,
-  },
-  dateDayNum: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: Colors.light.foreground,
-    marginVertical: 2,
-  },
-  dateMonth: {
-    fontSize: 10,
-    color: Colors.light.mutedForeground,
-  },
-  dateTextSelected: {
-    color: Colors.light.primaryForeground,
+  // Calendar
+  calendarContainer: {
+    paddingHorizontal: 8,
+    paddingTop: 8,
   },
   // Time grid
   timeContent: {
@@ -678,6 +1004,46 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
     paddingHorizontal: 16,
+  },
+  timeList: {
+    gap: 6,
+    paddingHorizontal: 16,
+  },
+  timeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  waitlistBtn: {
+    borderWidth: 1,
+    borderColor: Colors.light.primary,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    minWidth: 80,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  waitlistBtnText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: Colors.light.primary,
+  },
+  onWaitlistBtn: {
+    borderWidth: 1,
+    borderColor: "#fbbf24",
+    backgroundColor: "#fffbeb",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    minWidth: 80,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  onWaitlistBtnText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#92400e",
   },
   timeChip: {
     borderWidth: 1,
@@ -801,6 +1167,23 @@ const styles = StyleSheet.create({
     color: Colors.light.mutedForeground,
     marginTop: 1,
   },
+  bookingActions: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  editBtn: {
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    backgroundColor: Colors.light.background,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  editBtnText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: Colors.light.foreground,
+  },
   cancelBtn: {
     borderWidth: 1,
     borderColor: "#fecaca",
@@ -808,6 +1191,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 5,
+    minWidth: 52,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cancelBtnDisabled: {
+    opacity: 0.7,
   },
   cancelBtnText: {
     fontSize: 11,

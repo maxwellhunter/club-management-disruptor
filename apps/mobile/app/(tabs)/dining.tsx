@@ -153,9 +153,9 @@ export default function DiningScreen() {
   useEffect(() => {
     fetchHomeData();
     fetchFacilities();
-  }, [fetchHomeData]);
+  }, [fetchHomeData, fetchFacilities]);
 
-  async function fetchFacilities() {
+  const fetchFacilities = useCallback(async () => {
     try {
       const res = await fetch(`${API_URL}/api/facilities?type=dining`, { headers });
       if (res.ok) {
@@ -167,7 +167,7 @@ export default function DiningScreen() {
     } finally {
       setLoadingFacilities(false);
     }
-  }
+  }, [session?.access_token]);
 
   async function fetchSlots(facilityId: string, date: string) {
     setLoadingSlots(true);

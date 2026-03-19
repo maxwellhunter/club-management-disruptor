@@ -213,4 +213,94 @@ INSERT INTO menu_items (club_id, category_id, name, description, price, sort_ord
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000408',
    'IPA Draft', 'Local craft IPA, 16oz', 9.00, 1),
   ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000408',
-   'Old Fashioned', 'Bourbon, bitters, orange peel, cherry', 15.00, 2);
+   'Old Fashioned', 'Bourbon, bitters, orange peel, cherry', 15.00, 2),
+
+  -- =============================================
+  -- Additional Main Dining Room items
+  -- =============================================
+  -- Appetizers
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000401',
+   'Tuna Tartare', 'Ahi tuna, avocado, sesame soy, wonton crisps', 19.00, 4),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000401',
+   'Burrata & Heirloom Tomato', 'Fresh burrata, basil, aged balsamic, olive oil', 16.00, 5),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000401',
+   'French Onion Soup', 'Caramelized onion broth, gruyere crouton', 13.00, 6),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000401',
+   'Beef Carpaccio', 'Thinly sliced tenderloin, arugula, capers, shaved parmesan', 20.00, 7),
+  -- Entrees
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000402',
+   'Lobster Tail', 'Broiled 8oz tail, drawn butter, asparagus, fingerling potatoes', 58.00, 5),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000402',
+   'Duck Breast', 'Pan-seared with cherry port reduction, wild mushroom risotto', 44.00, 6),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000402',
+   'Seared Sea Scallops', 'Day-boat scallops, cauliflower puree, brown butter, capers', 46.00, 7),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000402',
+   'Mushroom Ravioli', 'House-made pasta, wild mushrooms, truffle cream sauce', 28.00, 8),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000402',
+   'Rack of Lamb', 'Herb-crusted, roasted garlic, mint chimichurri', 54.00, 9),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000402',
+   'Chilean Sea Bass', 'Miso-glazed, bok choy, jasmine rice, ginger broth', 48.00, 10),
+  -- Desserts
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000403',
+   'Tiramisu', 'Espresso-soaked ladyfingers, mascarpone, cocoa', 13.00, 3),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000403',
+   'New York Cheesecake', 'Classic with berry compote and whipped cream', 12.00, 4),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000403',
+   'Seasonal Sorbet Trio', 'Three house-made sorbets, fresh berries', 10.00, 5),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000403',
+   'Bananas Foster', 'Flambeed tableside, rum caramel, vanilla ice cream', 15.00, 6),
+  -- Beverages
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000404',
+   'Espresso Martini', 'Vodka, Kahlua, fresh espresso, vanilla', 17.00, 4),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000404',
+   'Negroni', 'Gin, Campari, sweet vermouth, orange twist', 16.00, 5),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000404',
+   'Sparkling Water', 'San Pellegrino, 750ml', 8.00, 6),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000404',
+   'Bottle of Pinot Noir', 'Willamette Valley, Oregon', 62.00, 7),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000404',
+   'Champagne by the Glass', 'Veuve Clicquot Yellow Label', 22.00, 8),
+
+  -- =============================================
+  -- Additional Grill Room items
+  -- =============================================
+  -- Starters
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000405',
+   'Fried Calamari', 'Lightly breaded, marinara and aioli', 15.00, 3),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000405',
+   'Spinach & Artichoke Dip', 'Warm and creamy, served with tortilla chips', 13.00, 4),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000405',
+   'Soup of the Day', 'Ask your server for today''s selection', 10.00, 5),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000405',
+   'Sliders Trio', 'Three mini burgers with assorted toppings, fries', 16.00, 6),
+  -- From the Grill
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000406',
+   'BBQ Bacon Burger', 'Smoked cheddar, crispy onions, BBQ sauce, fries', 24.00, 3),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000406',
+   'Grilled Chicken Breast', 'Herb-marinated, seasonal vegetables, rice pilaf', 26.00, 4),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000406',
+   'Fish Tacos', 'Blackened mahi-mahi, slaw, chipotle crema, flour tortillas', 22.00, 5),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000406',
+   'Ribeye Steak', '16oz bone-in, garlic butter, baked potato', 48.00, 6),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000406',
+   'Veggie Burger', 'House-made black bean patty, avocado, sprouts, sweet potato fries', 20.00, 7),
+  -- Sandwiches & Salads
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000407',
+   'Grilled Chicken Caesar Wrap', 'Romaine, parmesan, caesar dressing, flour tortilla', 17.00, 3),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000407',
+   'BLT', 'Thick-cut bacon, lettuce, tomato, mayo, sourdough, fries', 16.00, 4),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000407',
+   'Asian Chicken Salad', 'Mandarin oranges, crispy wontons, sesame ginger dressing', 19.00, 5),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000407',
+   'Philly Cheesesteak', 'Shaved ribeye, peppers, onions, provolone, hoagie roll', 21.00, 6),
+  -- Bar Menu
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000408',
+   'Margarita', 'House tequila, fresh lime, triple sec, salted rim', 14.00, 3),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000408',
+   'Moscow Mule', 'Vodka, ginger beer, fresh lime, copper mug', 14.00, 4),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000408',
+   'Craft Lager', 'Seasonal local lager, 16oz', 8.00, 5),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000408',
+   'Glass of Cabernet', 'Alexander Valley, Sonoma', 15.00, 6),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000408',
+   'Whiskey Sour', 'Bourbon, fresh lemon, egg white, Angostura bitters', 15.00, 7);

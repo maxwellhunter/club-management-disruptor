@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createApiClient } from "@/lib/supabase/api";
 import { getMemberWithTier } from "@/lib/golf-eligibility";
-import type { TeeTimeSlot } from "@club/shared";
 
 export async function GET(request: Request) {
   try {
@@ -96,8 +95,29 @@ export async function GET(request: Request) {
       }
     }
 
-    // Merge slots with booking data
-    const teeTimeSlots: TeeTimeSlot[] = (slots ?? []).map((slot) => {
+    // Get waitlist counts for booked slots
+    const { data: waitlistEntries } = await supabase
+      .from("booking_waitlist")
+      .select("start_time, member_id")
+      .eq("facility_id", facilityId)
+      .eq("date", date)
+      .eq("status", "waiting");
+
+    // Build waitlist count map and check if current member is on waitlist
+    const waitlistCounts = new Map<string, number>();
+    const memberOnWaitlist = new Map<string, boolean>();
+    if (waitlistEntries) {
+      for (const entry of waitlistEntries) {
+        const timeKey = entry.start_time.substring(0, 5);
+        waitlistCounts.set(timeKey, (waitlistCounts.get(timeKey) ?? 0) + 1);
+        if (entry.member_id === result.member.id) {
+          memberOnWaitlist.set(timeKey, true);
+        }
+      }
+    }
+
+    // Merge slots with booking data + waitlist info
+    const teeTimeSlots = (slots ?? []).map((slot) => {
       const startKey = slot.start_time.substring(0, 5);
       const bookingId = bookedTimes.get(startKey);
       return {
@@ -105,6 +125,8 @@ export async function GET(request: Request) {
         end_time: slot.end_time.substring(0, 5),
         is_available: !bookingId,
         booking_id: bookingId,
+        waitlist_count: waitlistCounts.get(startKey) ?? 0,
+        on_waitlist: memberOnWaitlist.get(startKey) ?? false,
       };
     });
 
