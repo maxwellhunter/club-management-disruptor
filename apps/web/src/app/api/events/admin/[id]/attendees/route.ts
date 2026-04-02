@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createApiClient } from "@/lib/supabase/api";
 import { getMemberWithTier } from "@/lib/golf-eligibility";
 import type { EventAttendee, RsvpStatus } from "@club/shared";
-
-// Service role client for admin reads (joins across tables, bypasses RLS)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export async function GET(
   request: Request,
@@ -42,7 +36,7 @@ export async function GET(
     const { id: eventId } = await params;
 
     // Verify event belongs to admin's club (cross-tenant isolation)
-    const { data: event, error: eventError } = await supabaseAdmin
+    const { data: event, error: eventError } = await getSupabaseAdmin()
       .from("events")
       .select("id")
       .eq("id", eventId)
@@ -57,7 +51,7 @@ export async function GET(
     }
 
     // Fetch RSVPs joined with member info
-    const { data: rsvps, error: rsvpError } = await supabaseAdmin
+    const { data: rsvps, error: rsvpError } = await getSupabaseAdmin()
       .from("event_rsvps")
       .select(
         `
@@ -161,7 +155,7 @@ export async function DELETE(
     }
 
     // Verify event belongs to admin's club (cross-tenant isolation)
-    const { data: event, error: eventError } = await supabaseAdmin
+    const { data: event, error: eventError } = await getSupabaseAdmin()
       .from("events")
       .select("id")
       .eq("id", eventId)
@@ -176,7 +170,7 @@ export async function DELETE(
     }
 
     // Delete the RSVP — scoped to both event and rsvp ID for safety
-    const { error: deleteError } = await supabaseAdmin
+    const { error: deleteError } = await getSupabaseAdmin()
       .from("event_rsvps")
       .delete()
       .eq("id", rsvpId)

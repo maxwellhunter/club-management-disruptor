@@ -101,7 +101,7 @@ export default function LoginScreen() {
             <View style={styles.devHeader}>
               <Ionicons name="build-outline" size={13} color="#92400e" />
               <Text style={styles.devHeaderText}>
-                Dev Mode — Greenfield CC
+                Dev Mode — The Lakes
               </Text>
             </View>
             {DEV_ACCOUNTS.map((account) => {

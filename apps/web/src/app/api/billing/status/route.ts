@@ -1,14 +1,9 @@
 import { NextResponse } from "next/server";
 import { createApiClient } from "@/lib/supabase/api";
-import { createClient } from "@supabase/supabase-js";
 import { getMemberWithTier } from "@/lib/golf-eligibility";
 import { getSubscription } from "@/lib/stripe";
 import type { BillingStatus } from "@club/shared";
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export async function GET(request: Request) {
   try {
@@ -30,7 +25,7 @@ export async function GET(request: Request) {
     }
 
     // Get stripe fields from members
-    const { data: memberData } = await supabaseAdmin
+    const { data: memberData } = await getSupabaseAdmin()
       .from("members")
       .select("stripe_customer_id, stripe_subscription_id, subscription_status")
       .eq("id", result.member.id)

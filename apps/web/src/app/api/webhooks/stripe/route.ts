@@ -1,13 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { getStripe } from "@/lib/stripe";
 import type Stripe from "stripe";
-
-// Service role client — webhooks come from Stripe, not authenticated users
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 // Disable Next.js body parsing — we need the raw body for signature verification
 export const runtime = "nodejs";
@@ -93,7 +87,7 @@ export async function POST(request: Request) {
 // ─── Helpers to resolve Stripe objects to our member records ────────────
 
 async function getMemberByStripeCustomer(customerId: string) {
-  const { data } = await supabaseAdmin
+  const { data } = await getSupabaseAdmin()
     .from("members")
     .select("id, club_id")
     .eq("stripe_customer_id", customerId)
@@ -103,7 +97,7 @@ async function getMemberByStripeCustomer(customerId: string) {
 
 async function getMemberByMetadata(metadata: Stripe.Metadata | null) {
   if (!metadata?.member_id) return null;
-  const { data } = await supabaseAdmin
+  const { data } = await getSupabaseAdmin()
     .from("members")
     .select("id, club_id, stripe_customer_id")
     .eq("id", metadata.member_id)
@@ -128,7 +122,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       : session.subscription?.id;
 
   if (subscriptionId) {
-    await supabaseAdmin
+    await getSupabaseAdmin()
       .from("members")
       .update({
         stripe_subscription_id: subscriptionId,
@@ -153,7 +147,7 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
     return;
   }
 
-  await supabaseAdmin
+  await getSupabaseAdmin()
     .from("members")
     .update({
       stripe_subscription_id: subscription.id,
@@ -171,7 +165,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const member = await getMemberByStripeCustomer(customerId);
   if (!member) return;
 
-  await supabaseAdmin
+  await getSupabaseAdmin()
     .from("members")
     .update({
       subscription_status: "canceled",
@@ -196,7 +190,7 @@ async function handleInvoiceCreated(invoice: Stripe.Invoice) {
     : new Date().toISOString();
 
   // Upsert — avoid duplicates if webhook fires twice
-  await supabaseAdmin.from("invoices").upsert(
+  await getSupabaseAdmin().from("invoices").upsert(
     {
       club_id: member.club_id,
       member_id: member.id,
@@ -224,7 +218,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 
   // Update invoice status
   if (invoice.id) {
-    await supabaseAdmin
+    await getSupabaseAdmin()
       .from("invoices")
       .update({
         status: "paid",
@@ -235,7 +229,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 
   // Insert payment record
   const amount = (invoice.amount_paid ?? 0) / 100;
-  await supabaseAdmin.from("payments").insert({
+  await getSupabaseAdmin().from("payments").insert({
     club_id: member.club_id,
     member_id: member.id,
     invoice_id: null, // We could look up the invoice row, but keeping it simple
@@ -253,7 +247,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   if (!invoice.id) return;
 
-  await supabaseAdmin
+  await getSupabaseAdmin()
     .from("invoices")
     .update({ status: "overdue" })
     .eq("stripe_invoice_id", invoice.id);

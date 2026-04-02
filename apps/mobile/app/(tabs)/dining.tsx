@@ -9,8 +9,11 @@ import {
   Alert,
   RefreshControl,
   TextInput,
+  Image,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/lib/auth-context";
 
@@ -18,6 +21,53 @@ const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
 
 const TAX_RATE = 0.08;
+const SERVICE_CHARGE_RATE = 0.18;
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+// ─── Placeholder venue data matching Stitch designs ───
+const VENUE_IMAGERY: Record<string, { tagline: string; cuisine: string; hours: string; icon: keyof typeof Ionicons.glyphMap }> = {
+  "The Conservatory": {
+    tagline: "Modern European, farm-to-table",
+    cuisine: "Fine Dining",
+    hours: "Dinner 18:00–22:30",
+    icon: "leaf-outline",
+  },
+  "The Terrace": {
+    tagline: "Al fresco dining with panoramic views",
+    cuisine: "Mediterranean",
+    hours: "Lunch & Cocktails until 21:00",
+    icon: "sunny-outline",
+  },
+  "Clubhouse Grill": {
+    tagline: "Artisanal burgers, premium steaks",
+    cuisine: "Casual Elite",
+    hours: "Open Now",
+    icon: "flame-outline",
+  },
+  "The Vintner's Cellar": {
+    tagline: "Exclusive tastings & private sessions",
+    cuisine: "Wine Bar",
+    hours: "Members Only",
+    icon: "wine-outline",
+  },
+  "The Blue Lounge": {
+    tagline: "Signature cocktails & live music",
+    cuisine: "Cocktail Lounge",
+    hours: "Live Jazz Tonight",
+    icon: "musical-notes-outline",
+  },
+};
+
+function getVenueInfo(name: string) {
+  return (
+    VENUE_IMAGERY[name] ?? {
+      tagline: "Fine dining experience",
+      cuisine: "Restaurant",
+      hours: "Open Today",
+      icon: "restaurant-outline" as keyof typeof Ionicons.glyphMap,
+    }
+  );
+}
 
 interface Facility {
   id: string;
@@ -89,45 +139,59 @@ export default function DiningScreen() {
   // Booking flow
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [loadingFacilities, setLoadingFacilities] = useState(true);
-  const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
+  const [selectedFacility, setSelectedFacility] = useState<Facility | null>(
+    null
+  );
   const [selectedDate, setSelectedDate] = useState("");
   const [slots, setSlots] = useState<DiningSlot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedTime, setSelectedTime] = useState<DiningSlot | null>(null);
   const [partySize, setPartySize] = useState(2);
   const [bookingInProgress, setBookingInProgress] = useState(false);
+  const [specialRequests, setSpecialRequests] = useState("");
+  const [dietaryNotes, setDietaryNotes] = useState("");
+  const [seatingPreference, setSeatingPreference] = useState<string>("any");
 
   // Menu + ordering flow
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [loadingMenu, setLoadingMenu] = useState(false);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
+    null
+  );
   const [cart, setCart] = useState<CartItem[]>([]);
   const [tableNumber, setTableNumber] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
   const [placingOrder, setPlacingOrder] = useState(false);
+  const [serviceMode, setServiceMode] = useState<"table" | "pickup">("table");
 
   // Cancel state
-  const [cancellingBooking, setCancellingBooking] = useState<string | null>(null);
+  const [cancellingBooking, setCancellingBooking] = useState<string | null>(
+    null
+  );
   const [cancellingOrder, setCancellingOrder] = useState<string | null>(null);
 
   // Flow mode: "reserve" or "order"
   const [flowMode, setFlowMode] = useState<"reserve" | "order">("reserve");
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (session?.access_token) {
-    headers["Authorization"] = `Bearer ${session.access_token}`;
-  }
+  const getHeaders = useCallback(() => {
+    const h: Record<string, string> = { "Content-Type": "application/json" };
+    if (session?.access_token) {
+      h["Authorization"] = `Bearer ${session.access_token}`;
+    }
+    return h;
+  }, [session?.access_token]);
 
   // === Data fetching ===
 
   const fetchHomeData = useCallback(async () => {
+    const headers = getHeaders();
+    console.log("[Dining] fetchHomeData called, token?", !!headers.Authorization, "API_URL:", API_URL);
     try {
       const [bookingsRes, ordersRes] = await Promise.all([
         fetch(`${API_URL}/api/bookings/my`, { headers }),
         fetch(`${API_URL}/api/dining/orders/my`, { headers }),
       ]);
+      console.log("[Dining] bookingsRes:", bookingsRes.status, "ordersRes:", ordersRes.status);
 
       if (bookingsRes.ok) {
         const data = await bookingsRes.json();
@@ -148,28 +212,35 @@ export default function DiningScreen() {
       setLoadingHome(false);
       setRefreshing(false);
     }
-  }, [session?.access_token]);
+  }, [getHeaders]);
+
+  const fetchFacilities = useCallback(async () => {
+    const headers = getHeaders();
+    console.log("[Dining] fetchFacilities called, token?", !!headers.Authorization);
+    try {
+      const res = await fetch(`${API_URL}/api/facilities?type=dining`, {
+        headers,
+      });
+      console.log("[Dining] facilities status:", res.status);
+      if (res.ok) {
+        const data = await res.json();
+        console.log("[Dining] facilities count:", data.facilities?.length);
+        setFacilities(data.facilities ?? []);
+      }
+    } catch (err) {
+      console.error("[Dining] fetchFacilities error:", err);
+    } finally {
+      setLoadingFacilities(false);
+    }
+  }, [getHeaders]);
 
   useEffect(() => {
     fetchHomeData();
     fetchFacilities();
   }, [fetchHomeData, fetchFacilities]);
 
-  const fetchFacilities = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/facilities?type=dining`, { headers });
-      if (res.ok) {
-        const data = await res.json();
-        setFacilities(data.facilities ?? []);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setLoadingFacilities(false);
-    }
-  }, [session?.access_token]);
-
   async function fetchSlots(facilityId: string, date: string) {
+    const headers = getHeaders();
     setLoadingSlots(true);
     setSelectedTime(null);
     try {
@@ -189,6 +260,7 @@ export default function DiningScreen() {
   }
 
   async function fetchMenu(facilityId: string) {
+    const headers = getHeaders();
     setLoadingMenu(true);
     try {
       const res = await fetch(
@@ -213,6 +285,7 @@ export default function DiningScreen() {
 
   async function handleBookReservation() {
     if (!selectedFacility || !selectedDate || !selectedTime) return;
+    const headers = getHeaders();
     setBookingInProgress(true);
     try {
       const res = await fetch(`${API_URL}/api/bookings`, {
@@ -245,6 +318,7 @@ export default function DiningScreen() {
 
   async function handlePlaceOrder() {
     if (!selectedFacility || cart.length === 0) return;
+    const headers = getHeaders();
     setPlacingOrder(true);
     try {
       const res = await fetch(`${API_URL}/api/dining/orders`, {
@@ -263,7 +337,10 @@ export default function DiningScreen() {
       });
 
       if (res.ok) {
-        Alert.alert("Order Placed!", "Your order has been submitted and charged to your member account.");
+        Alert.alert(
+          "Order Placed!",
+          "Your order has been submitted and charged to your member account."
+        );
         resetFlow();
         setView("home");
         fetchHomeData();
@@ -285,6 +362,7 @@ export default function DiningScreen() {
         text: "Cancel Reservation",
         style: "destructive",
         onPress: async () => {
+          const headers = getHeaders();
           setCancellingBooking(bookingId);
           try {
             const res = await fetch(
@@ -311,6 +389,7 @@ export default function DiningScreen() {
         text: "Cancel Order",
         style: "destructive",
         onPress: async () => {
+          const headers = getHeaders();
           setCancellingOrder(orderId);
           try {
             const res = await fetch(
@@ -341,6 +420,10 @@ export default function DiningScreen() {
     setCart([]);
     setTableNumber("");
     setOrderNotes("");
+    setSpecialRequests("");
+    setDietaryNotes("");
+    setSeatingPreference("any");
+    setServiceMode("table");
   }
 
   // === Cart helpers ===
@@ -350,7 +433,9 @@ export default function DiningScreen() {
       const existing = prev.find((c) => c.menu_item_id === item.id);
       if (existing) {
         return prev.map((c) =>
-          c.menu_item_id === item.id ? { ...c, quantity: c.quantity + 1 } : c
+          c.menu_item_id === item.id
+            ? { ...c, quantity: c.quantity + 1 }
+            : c
         );
       }
       return [
@@ -370,7 +455,9 @@ export default function DiningScreen() {
     setCart((prev) =>
       prev
         .map((c) =>
-          c.menu_item_id === menuItemId ? { ...c, quantity: c.quantity + delta } : c
+          c.menu_item_id === menuItemId
+            ? { ...c, quantity: c.quantity + delta }
+            : c
         )
         .filter((c) => c.quantity > 0)
     );
@@ -378,7 +465,8 @@ export default function DiningScreen() {
 
   const subtotal = cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
   const tax = Math.round(subtotal * TAX_RATE * 100) / 100;
-  const total = Math.round((subtotal + tax) * 100) / 100;
+  const serviceCharge = Math.round(subtotal * SERVICE_CHARGE_RATE * 100) / 100;
+  const total = Math.round((subtotal + tax + serviceCharge) * 100) / 100;
   const cartCount = cart.reduce((sum, c) => sum + c.quantity, 0);
 
   // === Formatters ===
@@ -391,12 +479,26 @@ export default function DiningScreen() {
     return `${display}:${m} ${ampm}`;
   }
 
+  function formatTime24(timeStr: string) {
+    return timeStr.substring(0, 5);
+  }
+
   function formatDate(dateStr: string) {
     const d = new Date(dateStr + "T12:00:00");
     return d.toLocaleDateString("en-US", {
       weekday: "short",
       month: "short",
       day: "numeric",
+    });
+  }
+
+  function formatDateLong(dateStr: string) {
+    const d = new Date(dateStr + "T12:00:00");
+    return d.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
     });
   }
 
@@ -415,9 +517,9 @@ export default function DiningScreen() {
     };
   });
 
-  function groupSlots(slots: DiningSlot[]) {
+  function groupSlots(slotsArr: DiningSlot[]) {
     const groups: Record<string, DiningSlot[]> = {};
-    for (const slot of slots) {
+    for (const slot of slotsArr) {
       const hour = parseInt(slot.start_time.split(":")[0]);
       const label = hour < 15 ? "Lunch" : "Dinner";
       if (!groups[label]) groups[label] = [];
@@ -428,128 +530,268 @@ export default function DiningScreen() {
 
   const statusColors: Record<string, { bg: string; text: string }> = {
     pending: { bg: "#fef9c3", text: "#a16207" },
-    confirmed: { bg: "#dbeafe", text: "#1d4ed8" },
-    preparing: { bg: "#fed7aa", text: "#c2410c" },
+    confirmed: { bg: Colors.light.accent, text: Colors.light.primary },
+    preparing: { bg: Colors.light.tertiaryFixed, text: Colors.light.tertiary },
     ready: { bg: "#dcfce7", text: "#15803d" },
   };
 
-  // ========= VENUE SELECTION =========
+  const seatingOptions = [
+    { key: "any", label: "No Preference" },
+    { key: "terrace", label: "Private Terrace" },
+    { key: "window", label: "Window Seat" },
+    { key: "bar", label: "Bar Seating" },
+  ];
+
+  // ═════════════════════════════════════════════════════
+  // VENUE SELECTION — Restaurant Selection (Stitch)
+  // ═════════════════════════════════════════════════════
   if (view === "venue") {
     return (
       <View style={s.container}>
-        <View style={s.header}>
+        {/* Header */}
+        <View style={s.luxHeader}>
           <TouchableOpacity
-            onPress={() => { resetFlow(); setView("home"); }}
+            onPress={() => {
+              resetFlow();
+              setView("home");
+            }}
             style={s.backBtn}
           >
-            <Ionicons name="chevron-back" size={16} color={Colors.light.primary} />
-            <Text style={s.backText}>Back</Text>
+            <Ionicons
+              name="chevron-back"
+              size={20}
+              color={Colors.light.primary}
+            />
           </TouchableOpacity>
-          <Text style={s.headerTitle}>
-            {flowMode === "reserve" ? "Select Venue" : "Select Restaurant"}
-          </Text>
+          <View style={{ flex: 1 }}>
+            <Text style={s.luxHeaderSerif}>The Lakes</Text>
+            <Text style={s.luxHeaderSub}>
+              {flowMode === "reserve"
+                ? "Select a venue to reserve"
+                : "Select a restaurant to order"}
+            </Text>
+          </View>
         </View>
+
         {loadingFacilities ? (
           <View style={s.centered}>
             <ActivityIndicator size="large" color={Colors.light.primary} />
           </View>
         ) : facilities.length === 0 ? (
           <View style={s.centered}>
-            <Text style={s.emptyText}>No dining venues available.</Text>
+            <Ionicons
+              name="restaurant-outline"
+              size={48}
+              color={Colors.light.mutedForeground}
+            />
+            <Text style={s.emptyTitle}>No dining venues available</Text>
+            <Text style={s.emptyText}>
+              Check back soon for new dining experiences.
+            </Text>
           </View>
         ) : (
-          <View style={s.courseGrid}>
-            {facilities.map((f) => (
-              <TouchableOpacity
-                key={f.id}
-                style={s.courseCard}
-                onPress={() => {
-                  setSelectedFacility(f);
-                  if (flowMode === "reserve") {
-                    setView("date");
-                  } else {
-                    fetchMenu(f.id);
-                    setView("menu");
-                  }
-                }}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="restaurant-outline" size={32} color={Colors.light.primary} />
-                <Text style={s.courseName}>{f.name}</Text>
-                <Text style={s.courseDesc}>{f.description}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <ScrollView
+            contentContainerStyle={s.venueList}
+            showsVerticalScrollIndicator={false}
+          >
+            {facilities.map((f) => {
+              const info = getVenueInfo(f.name);
+              return (
+                <TouchableOpacity
+                  key={f.id}
+                  style={s.venueCard}
+                  onPress={() => {
+                    setSelectedFacility(f);
+                    if (flowMode === "reserve") {
+                      setView("date");
+                    } else {
+                      fetchMenu(f.id);
+                      setView("menu");
+                    }
+                  }}
+                  activeOpacity={0.85}
+                >
+                  {/* Venue image placeholder with gradient */}
+                  <View style={s.venueImageWrap}>
+                    <LinearGradient
+                      colors={["#1b4332", "#012d1d"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={s.venueImagePlaceholder}
+                    >
+                      <Ionicons
+                        name={info.icon}
+                        size={40}
+                        color="rgba(255,255,255,0.3)"
+                      />
+                    </LinearGradient>
+                    {/* Cuisine badge */}
+                    <View style={s.cuisineBadge}>
+                      <Text style={s.cuisineBadgeText}>{info.cuisine}</Text>
+                    </View>
+                  </View>
+
+                  <View style={s.venueCardBody}>
+                    <Text style={s.venueCardName}>{f.name}</Text>
+                    <Text style={s.venueCardTagline}>
+                      {f.description || info.tagline}
+                    </Text>
+
+                    <View style={s.venueMetaRow}>
+                      <View style={s.venueMetaItem}>
+                        <Ionicons
+                          name="time-outline"
+                          size={13}
+                          color={Colors.light.onSurfaceVariant}
+                        />
+                        <Text style={s.venueMetaText}>{info.hours}</Text>
+                      </View>
+                    </View>
+
+                    <View style={s.venueActions}>
+                      {flowMode === "reserve" ? (
+                        <View style={s.venueCtaBtn}>
+                          <Ionicons
+                            name="calendar-outline"
+                            size={14}
+                            color={Colors.light.primaryForeground}
+                          />
+                          <Text style={s.venueCtaText}>Reserve a Table</Text>
+                        </View>
+                      ) : (
+                        <View style={s.venueCtaBtn}>
+                          <Ionicons
+                            name="restaurant-outline"
+                            size={14}
+                            color={Colors.light.primaryForeground}
+                          />
+                          <Text style={s.venueCtaText}>View Menu</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         )}
       </View>
     );
   }
 
-  // ========= DATE SELECTION =========
+  // ═════════════════════════════════════════════════════
+  // DATE SELECTION — Part of Reserve a Table (Stitch)
+  // ═════════════════════════════════════════════════════
   if (view === "date") {
     return (
       <View style={s.container}>
-        <View style={s.header}>
+        <View style={s.luxHeader}>
           <TouchableOpacity onPress={() => setView("venue")} style={s.backBtn}>
-            <Ionicons name="chevron-back" size={16} color={Colors.light.primary} />
-            <Text style={s.backText}>Back</Text>
+            <Ionicons
+              name="chevron-back"
+              size={20}
+              color={Colors.light.primary}
+            />
           </TouchableOpacity>
-          <Text style={s.headerTitle}>{selectedFacility?.name}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={s.luxHeaderSerif}>{selectedFacility?.name}</Text>
+            <Text style={s.luxHeaderSub}>Select your preferred date</Text>
+          </View>
         </View>
-        <Text style={s.sectionLabel}>Select a Date</Text>
+
         <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.dateStrip}
+          contentContainerStyle={{ paddingBottom: 32 }}
+          showsVerticalScrollIndicator={false}
         >
-          {dates.map((d) => {
-            const isSelected = d.value === selectedDate;
-            return (
-              <TouchableOpacity
-                key={d.value}
-                style={[s.dateCard, isSelected && s.dateCardSelected]}
-                onPress={() => {
-                  setSelectedDate(d.value);
-                  if (selectedFacility) {
-                    fetchSlots(selectedFacility.id, d.value);
-                  }
-                  setView("time");
-                }}
-                activeOpacity={0.7}
-              >
-                <Text style={[s.dateDayName, isSelected && s.dateTextSelected]}>
-                  {d.dayName}
-                </Text>
-                <Text style={[s.dateDayNum, isSelected && s.dateTextSelected]}>
-                  {d.dayNum}
-                </Text>
-                <Text style={[s.dateMonth, isSelected && s.dateTextSelected]}>
-                  {d.month}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+          <View style={s.sectionBlock}>
+            <View style={s.sectionLabelRow}>
+              <Ionicons
+                name="calendar-outline"
+                size={16}
+                color={Colors.light.onSurfaceVariant}
+              />
+              <Text style={s.sectionLabel}>Date</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.dateStrip}
+            >
+              {dates.map((d) => {
+                const isSelected = d.value === selectedDate;
+                return (
+                  <TouchableOpacity
+                    key={d.value}
+                    style={[s.dateCard, isSelected && s.dateCardSelected]}
+                    onPress={() => {
+                      setSelectedDate(d.value);
+                      if (selectedFacility) {
+                        fetchSlots(selectedFacility.id, d.value);
+                      }
+                      setView("time");
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        s.dateDayName,
+                        isSelected && s.dateTextSelected,
+                      ]}
+                    >
+                      {d.dayName}
+                    </Text>
+                    <Text
+                      style={[
+                        s.dateDayNum,
+                        isSelected && s.dateTextSelected,
+                      ]}
+                    >
+                      {d.dayNum}
+                    </Text>
+                    <Text
+                      style={[
+                        s.dateMonth,
+                        isSelected && s.dateTextSelected,
+                      ]}
+                    >
+                      {d.month}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
         </ScrollView>
       </View>
     );
   }
 
-  // ========= TIME SELECTION + BOOK =========
+  // ═════════════════════════════════════════════════════
+  // TIME + PARTY SIZE + CONFIRM — Reserve a Table (Stitch)
+  // ═════════════════════════════════════════════════════
   if (view === "time") {
     const grouped = groupSlots(slots);
     return (
       <View style={s.container}>
-        <View style={s.header}>
+        <View style={s.luxHeader}>
           <TouchableOpacity
-            onPress={() => { setView("date"); setSelectedTime(null); setSlots([]); }}
+            onPress={() => {
+              setView("date");
+              setSelectedTime(null);
+              setSlots([]);
+            }}
             style={s.backBtn}
           >
-            <Ionicons name="chevron-back" size={16} color={Colors.light.primary} />
-            <Text style={s.backText}>Back</Text>
+            <Ionicons
+              name="chevron-back"
+              size={20}
+              color={Colors.light.primary}
+            />
           </TouchableOpacity>
-          <Text style={s.headerTitle}>
-            {selectedFacility?.name} — {formatDate(selectedDate)}
-          </Text>
+          <View style={{ flex: 1 }}>
+            <Text style={s.luxHeaderSerif}>{selectedFacility?.name}</Text>
+            <Text style={s.luxHeaderSub}>{formatDateLong(selectedDate)}</Text>
+          </View>
         </View>
 
         {loadingSlots ? (
@@ -557,13 +799,58 @@ export default function DiningScreen() {
             <ActivityIndicator size="large" color={Colors.light.primary} />
           </View>
         ) : (
-          <ScrollView contentContainerStyle={s.timeContent}>
+          <ScrollView
+            contentContainerStyle={{ paddingBottom: 140 }}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Party Size */}
+            <View style={s.sectionBlock}>
+              <View style={s.sectionLabelRow}>
+                <Ionicons
+                  name="people-outline"
+                  size={16}
+                  color={Colors.light.onSurfaceVariant}
+                />
+                <Text style={s.sectionLabel}>Number of Guests</Text>
+              </View>
+              <View style={s.partySizeRow}>
+                {[1, 2, 3, 4, 5, 6].map((n) => (
+                  <TouchableOpacity
+                    key={n}
+                    onPress={() => setPartySize(n)}
+                    style={[
+                      s.partySizeBtn,
+                      partySize === n && s.partySizeBtnSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        s.partySizeText,
+                        partySize === n && s.partySizeTextSelected,
+                      ]}
+                    >
+                      {n === 6 ? "6+" : n}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Time slots */}
             {Object.entries(grouped).map(([period, periodSlots]) => (
-              <View key={period}>
-                <Text style={s.sectionLabel}>{period}</Text>
+              <View key={period} style={s.sectionBlock}>
+                <View style={s.sectionLabelRow}>
+                  <Ionicons
+                    name="time-outline"
+                    size={16}
+                    color={Colors.light.onSurfaceVariant}
+                  />
+                  <Text style={s.sectionLabel}>{period} Service</Text>
+                </View>
                 <View style={s.timeGrid}>
                   {periodSlots.map((slot) => {
-                    const isSelected = selectedTime?.start_time === slot.start_time;
+                    const isSelected =
+                      selectedTime?.start_time === slot.start_time;
                     return (
                       <TouchableOpacity
                         key={slot.start_time}
@@ -583,7 +870,7 @@ export default function DiningScreen() {
                             !slot.is_available && s.timeChipTextDisabled,
                           ]}
                         >
-                          {formatTime(slot.start_time)}
+                          {formatTime24(slot.start_time)}
                         </Text>
                         {slot.is_available && (
                           <Text
@@ -602,74 +889,184 @@ export default function DiningScreen() {
               </View>
             ))}
 
-            {selectedTime && (
-              <View style={s.confirmSection}>
-                <Text style={s.sectionLabel}>Party Size</Text>
-                <View style={s.partySizeRow}>
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                    <TouchableOpacity
-                      key={n}
-                      onPress={() => setPartySize(n)}
+            {/* Seating Preference */}
+            <View style={s.sectionBlock}>
+              <View style={s.sectionLabelRow}>
+                <Ionicons
+                  name="location-outline"
+                  size={16}
+                  color={Colors.light.onSurfaceVariant}
+                />
+                <Text style={s.sectionLabel}>Seating Preference</Text>
+              </View>
+              <View style={s.seatingRow}>
+                {seatingOptions.map((opt) => (
+                  <TouchableOpacity
+                    key={opt.key}
+                    onPress={() => setSeatingPreference(opt.key)}
+                    style={[
+                      s.seatingChip,
+                      seatingPreference === opt.key && s.seatingChipSelected,
+                    ]}
+                  >
+                    <Text
                       style={[
-                        s.partySizeBtn,
-                        partySize === n && s.partySizeBtnSelected,
+                        s.seatingChipText,
+                        seatingPreference === opt.key &&
+                          s.seatingChipTextSelected,
                       ]}
                     >
-                      <Text
-                        style={[
-                          s.partySizeText,
-                          partySize === n && s.partySizeTextSelected,
-                        ]}
-                      >
-                        {n}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <TouchableOpacity
-                  style={[s.confirmBtn, bookingInProgress && { opacity: 0.5 }]}
-                  onPress={handleBookReservation}
-                  disabled={bookingInProgress}
-                  activeOpacity={0.8}
-                >
-                  <Text style={s.confirmBtnText}>
-                    {bookingInProgress
-                      ? "Reserving..."
-                      : `Confirm — ${formatTime(selectedTime.start_time)} · ${partySize} ${partySize === 1 ? "guest" : "guests"}`}
-                  </Text>
-                </TouchableOpacity>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-            )}
+            </View>
+
+            {/* Special Requests */}
+            <View style={s.sectionBlock}>
+              <View style={s.sectionLabelRow}>
+                <Ionicons
+                  name="chatbubble-outline"
+                  size={16}
+                  color={Colors.light.onSurfaceVariant}
+                />
+                <Text style={s.sectionLabel}>Special Requests</Text>
+              </View>
+              <TextInput
+                style={s.luxInput}
+                value={specialRequests}
+                onChangeText={setSpecialRequests}
+                placeholder="Window seat, Anniversary, Birthday..."
+                placeholderTextColor={Colors.light.mutedForeground}
+                multiline
+              />
+              <TextInput
+                style={[s.luxInput, { marginTop: 10 }]}
+                value={dietaryNotes}
+                onChangeText={setDietaryNotes}
+                placeholder="Dietary Requirements & Allergy Info"
+                placeholderTextColor={Colors.light.mutedForeground}
+                multiline
+              />
+            </View>
           </ScrollView>
+        )}
+
+        {/* Sticky confirm footer */}
+        {selectedTime && (
+          <View style={s.stickyFooter}>
+            <TouchableOpacity
+              style={[s.primaryBtn, bookingInProgress && { opacity: 0.5 }]}
+              onPress={handleBookReservation}
+              disabled={bookingInProgress}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={[Colors.light.primary, Colors.light.primaryContainer]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={s.primaryBtnGradient}
+              >
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={18}
+                  color={Colors.light.primaryForeground}
+                />
+                <Text style={s.primaryBtnText}>
+                  {bookingInProgress
+                    ? "Reserving..."
+                    : "Confirm Reservation"}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <Text style={s.policyNote}>
+              By confirming, you agree to our 24-hour cancellation policy
+            </Text>
+          </View>
         )}
       </View>
     );
   }
 
-  // ========= MENU BROWSING =========
+  // ═════════════════════════════════════════════════════
+  // MENU BROWSING — Menu & Ordering (Stitch)
+  // ═════════════════════════════════════════════════════
   if (view === "menu") {
     const activeCategory = categories.find((c) => c.id === selectedCategoryId);
     return (
       <View style={s.container}>
-        <View style={s.header}>
+        {/* Header with venue name */}
+        <View style={s.luxHeader}>
           <TouchableOpacity
-            onPress={() => { setView("venue"); setCategories([]); setCart([]); }}
+            onPress={() => {
+              setView("venue");
+              setCategories([]);
+              setCart([]);
+            }}
             style={s.backBtn}
           >
-            <Ionicons name="chevron-back" size={16} color={Colors.light.primary} />
-            <Text style={s.backText}>Back</Text>
+            <Ionicons
+              name="chevron-back"
+              size={20}
+              color={Colors.light.primary}
+            />
           </TouchableOpacity>
-          <Text style={[s.headerTitle, { flex: 1 }]}>{selectedFacility?.name}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={s.luxHeaderSerif}>{selectedFacility?.name}</Text>
+            <Text style={s.luxHeaderSub}>
+              {getVenueInfo(selectedFacility?.name ?? "").tagline}
+            </Text>
+          </View>
           {cartCount > 0 && (
             <TouchableOpacity
               onPress={() => setView("cart")}
               style={s.cartBadge}
             >
-              <Ionicons name="cart-outline" size={16} color={Colors.light.primaryForeground} />
+              <Ionicons
+                name="basket-outline"
+                size={16}
+                color={Colors.light.primaryForeground}
+              />
               <Text style={s.cartBadgeText}>{cartCount}</Text>
             </TouchableOpacity>
           )}
+        </View>
+
+        {/* Service mode toggle */}
+        <View style={s.serviceToggleWrap}>
+          <TouchableOpacity
+            style={[
+              s.serviceToggleBtn,
+              serviceMode === "table" && s.serviceToggleBtnActive,
+            ]}
+            onPress={() => setServiceMode("table")}
+          >
+            <Text
+              style={[
+                s.serviceToggleText,
+                serviceMode === "table" && s.serviceToggleTextActive,
+              ]}
+            >
+              Table Service
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              s.serviceToggleBtn,
+              serviceMode === "pickup" && s.serviceToggleBtnActive,
+            ]}
+            onPress={() => setServiceMode("pickup")}
+          >
+            <Text
+              style={[
+                s.serviceToggleText,
+                serviceMode === "pickup" && s.serviceToggleTextActive,
+              ]}
+            >
+              Pickup
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {loadingMenu ? (
@@ -678,15 +1075,22 @@ export default function DiningScreen() {
           </View>
         ) : categories.length === 0 ? (
           <View style={s.centered}>
-            <Text style={s.emptyText}>No menu items available.</Text>
+            <Ionicons
+              name="book-outline"
+              size={48}
+              color={Colors.light.mutedForeground}
+            />
+            <Text style={s.emptyTitle}>No menu items available</Text>
           </View>
         ) : (
           <>
-            {/* Category tabs */}
+            {/* Menu heading above category pills */}
+            <Text style={s.menuHeading}>Browse the Menu</Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={s.categoryStrip}
+              style={{ flexShrink: 0, flexGrow: 0 }}
             >
               {categories.map((cat) => (
                 <TouchableOpacity
@@ -700,7 +1104,8 @@ export default function DiningScreen() {
                   <Text
                     style={[
                       s.categoryChipText,
-                      selectedCategoryId === cat.id && s.categoryChipTextSelected,
+                      selectedCategoryId === cat.id &&
+                        s.categoryChipTextSelected,
                     ]}
                   >
                     {cat.name}
@@ -709,45 +1114,83 @@ export default function DiningScreen() {
               ))}
             </ScrollView>
 
-            {/* Items */}
-            <ScrollView contentContainerStyle={{ paddingBottom: cartCount > 0 ? 80 : 16 }}>
+            {/* Menu items */}
+            <ScrollView
+              contentContainerStyle={{
+                paddingBottom: cartCount > 0 ? 100 : 16,
+              }}
+              showsVerticalScrollIndicator={false}
+            >
               {activeCategory?.items.map((item) => {
                 const inCart = cart.find((c) => c.menu_item_id === item.id);
                 return (
-                  <View key={item.id} style={s.menuItem}>
-                    <View style={{ flex: 1, marginRight: 12 }}>
-                      <Text style={s.menuItemName}>{item.name}</Text>
+                  <View key={item.id} style={s.menuCard}>
+                    {/* Food image placeholder */}
+                    <View style={s.menuCardImageWrap}>
+                      <LinearGradient
+                        colors={["#2e3131", "#191c1c"]}
+                        style={s.menuCardImage}
+                      >
+                        <Ionicons
+                          name="restaurant-outline"
+                          size={20}
+                          color="rgba(255,255,255,0.2)"
+                        />
+                      </LinearGradient>
+                    </View>
+
+                    <View style={s.menuCardBody}>
+                      <View style={s.menuCardHeader}>
+                        <Text style={s.menuCardName}>{item.name}</Text>
+                        <Text style={s.menuCardPrice}>
+                          {formatPrice(item.price)}
+                        </Text>
+                      </View>
                       {item.description && (
-                        <Text style={s.menuItemDesc} numberOfLines={2}>
+                        <Text style={s.menuCardDesc} numberOfLines={2}>
                           {item.description}
                         </Text>
                       )}
-                      <Text style={s.menuItemPrice}>{formatPrice(item.price)}</Text>
-                    </View>
-                    {inCart ? (
-                      <View style={s.qtyRow}>
-                        <TouchableOpacity
-                          onPress={() => updateQuantity(item.id, -1)}
-                          style={s.qtyBtn}
-                        >
-                          <Text style={s.qtyBtnText}>-</Text>
-                        </TouchableOpacity>
-                        <Text style={s.qtyText}>{inCart.quantity}</Text>
-                        <TouchableOpacity
-                          onPress={() => updateQuantity(item.id, 1)}
-                          style={s.qtyBtn}
-                        >
-                          <Text style={s.qtyBtnText}>+</Text>
-                        </TouchableOpacity>
+
+                      <View style={s.menuCardFooter}>
+                        {inCart ? (
+                          <View style={s.qtyRow}>
+                            <TouchableOpacity
+                              onPress={() => updateQuantity(item.id, -1)}
+                              style={s.qtyBtn}
+                            >
+                              <Ionicons
+                                name="remove"
+                                size={14}
+                                color={Colors.light.primary}
+                              />
+                            </TouchableOpacity>
+                            <Text style={s.qtyText}>{inCart.quantity}</Text>
+                            <TouchableOpacity
+                              onPress={() => updateQuantity(item.id, 1)}
+                              style={s.qtyBtn}
+                            >
+                              <Ionicons
+                                name="add"
+                                size={14}
+                                color={Colors.light.primary}
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
+                          <TouchableOpacity
+                            onPress={() => addToCart(item)}
+                            style={s.addBtn}
+                          >
+                            <Ionicons
+                              name="add"
+                              size={16}
+                              color={Colors.light.primaryForeground}
+                            />
+                          </TouchableOpacity>
+                        )}
                       </View>
-                    ) : (
-                      <TouchableOpacity
-                        onPress={() => addToCart(item)}
-                        style={s.addBtn}
-                      >
-                        <Text style={s.addBtnText}>Add</Text>
-                      </TouchableOpacity>
-                    )}
+                    </View>
                   </View>
                 );
               })}
@@ -756,13 +1199,31 @@ export default function DiningScreen() {
             {/* Floating cart bar */}
             {cartCount > 0 && (
               <TouchableOpacity
-                style={s.fab}
+                style={s.floatingCartBar}
                 onPress={() => setView("cart")}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
               >
-                <Text style={s.fabText}>
-                  View Cart ({cartCount}) — {formatPrice(subtotal)}
-                </Text>
+                <LinearGradient
+                  colors={[Colors.light.primary, Colors.light.primaryContainer]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={s.floatingCartBarInner}
+                >
+                  <View style={s.floatingCartLeft}>
+                    <Ionicons
+                      name="basket"
+                      size={18}
+                      color={Colors.light.primaryForeground}
+                    />
+                    <Text style={s.floatingCartCount}>
+                      {cartCount} {cartCount === 1 ? "Item" : "Items"}
+                    </Text>
+                  </View>
+                  <Text style={s.floatingCartPrice}>
+                    {formatPrice(subtotal)}
+                  </Text>
+                  <Text style={s.floatingCartCta}>View Order</Text>
+                </LinearGradient>
               </TouchableOpacity>
             )}
           </>
@@ -771,66 +1232,102 @@ export default function DiningScreen() {
     );
   }
 
-  // ========= CART / CHECKOUT =========
+  // ═════════════════════════════════════════════════════
+  // CART / CHECKOUT — Dining Checkout (Stitch)
+  // ═════════════════════════════════════════════════════
   if (view === "cart") {
     return (
       <View style={s.container}>
-        <View style={s.header}>
+        <View style={s.luxHeader}>
           <TouchableOpacity onPress={() => setView("menu")} style={s.backBtn}>
-            <Ionicons name="chevron-back" size={16} color={Colors.light.primary} />
-            <Text style={s.backText}>Back to menu</Text>
+            <Ionicons
+              name="chevron-back"
+              size={20}
+              color={Colors.light.primary}
+            />
           </TouchableOpacity>
-          <Text style={s.headerTitle}>Your Order</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={s.luxHeaderSerif}>Your Order</Text>
+            <Text style={s.luxHeaderSub}>{selectedFacility?.name}</Text>
+          </View>
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
+        <ScrollView
+          contentContainerStyle={{ padding: 20, paddingBottom: 180 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Order items */}
           {cart.map((item) => (
-            <View key={item.menu_item_id} style={s.cartItem}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.cartItemName}>{item.name}</Text>
-                <Text style={s.cartItemPrice}>
-                  {formatPrice(item.price)} each
+            <View key={item.menu_item_id} style={s.checkoutItem}>
+              <View style={s.checkoutItemLeft}>
+                <View style={s.checkoutItemIcon}>
+                  <Ionicons
+                    name="restaurant-outline"
+                    size={14}
+                    color={Colors.light.primary}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.checkoutItemName}>{item.name}</Text>
+                  <Text style={s.checkoutItemMeta}>
+                    {formatPrice(item.price)} each
+                  </Text>
+                </View>
+              </View>
+              <View style={s.checkoutItemRight}>
+                <View style={s.qtyRow}>
+                  <TouchableOpacity
+                    onPress={() => updateQuantity(item.menu_item_id, -1)}
+                    style={s.qtyBtnSmall}
+                  >
+                    <Ionicons
+                      name="remove"
+                      size={12}
+                      color={Colors.light.primary}
+                    />
+                  </TouchableOpacity>
+                  <Text style={s.qtyText}>{item.quantity}</Text>
+                  <TouchableOpacity
+                    onPress={() => updateQuantity(item.menu_item_id, 1)}
+                    style={s.qtyBtnSmall}
+                  >
+                    <Ionicons
+                      name="add"
+                      size={12}
+                      color={Colors.light.primary}
+                    />
+                  </TouchableOpacity>
+                </View>
+                <Text style={s.checkoutItemTotal}>
+                  {formatPrice(item.price * item.quantity)}
                 </Text>
               </View>
-              <View style={s.qtyRow}>
-                <TouchableOpacity
-                  onPress={() => updateQuantity(item.menu_item_id, -1)}
-                  style={s.qtyBtn}
-                >
-                  <Text style={s.qtyBtnText}>-</Text>
-                </TouchableOpacity>
-                <Text style={s.qtyText}>{item.quantity}</Text>
-                <TouchableOpacity
-                  onPress={() => updateQuantity(item.menu_item_id, 1)}
-                  style={s.qtyBtn}
-                >
-                  <Text style={s.qtyBtnText}>+</Text>
-                </TouchableOpacity>
-              </View>
-              <Text style={s.cartItemTotal}>
-                {formatPrice(item.price * item.quantity)}
-              </Text>
             </View>
           ))}
 
-          <View style={s.cartInputs}>
+          {/* Notes fields */}
+          <View style={s.checkoutInputs}>
+            {serviceMode === "table" && (
+              <TextInput
+                style={s.luxInput}
+                value={tableNumber}
+                onChangeText={setTableNumber}
+                placeholder="Table number (optional)"
+                placeholderTextColor={Colors.light.mutedForeground}
+              />
+            )}
             <TextInput
-              style={s.input}
-              value={tableNumber}
-              onChangeText={setTableNumber}
-              placeholder="Table number (optional)"
-              placeholderTextColor={Colors.light.mutedForeground}
-            />
-            <TextInput
-              style={s.input}
+              style={s.luxInput}
               value={orderNotes}
               onChangeText={setOrderNotes}
-              placeholder="Notes (optional)"
+              placeholder="Dietary notes or special requests"
               placeholderTextColor={Colors.light.mutedForeground}
+              multiline
             />
           </View>
 
-          <View style={s.totals}>
+          {/* Totals */}
+          <View style={s.totalsSurface}>
             <View style={s.totalRow}>
               <Text style={s.totalLabel}>Subtotal</Text>
               <Text style={s.totalValue}>{formatPrice(subtotal)}</Text>
@@ -839,42 +1336,69 @@ export default function DiningScreen() {
               <Text style={s.totalLabel}>Tax (8%)</Text>
               <Text style={s.totalValue}>{formatPrice(tax)}</Text>
             </View>
-            <View style={[s.totalRow, s.totalRowFinal]}>
+            <View style={s.totalRow}>
+              <Text style={s.totalLabel}>Service Charge (18%)</Text>
+              <Text style={s.totalValue}>{formatPrice(serviceCharge)}</Text>
+            </View>
+            <View style={s.totalDivider} />
+            <View style={s.totalRow}>
               <Text style={s.totalFinalLabel}>Total</Text>
               <Text style={s.totalFinalValue}>{formatPrice(total)}</Text>
             </View>
           </View>
         </ScrollView>
 
-        <View style={s.cartFooter}>
+        {/* Sticky checkout footer */}
+        <View style={s.stickyFooter}>
           <TouchableOpacity
-            style={[s.confirmBtn, placingOrder && { opacity: 0.5 }]}
+            style={[s.primaryBtn, placingOrder && { opacity: 0.5 }]}
             onPress={handlePlaceOrder}
             disabled={placingOrder || cart.length === 0}
             activeOpacity={0.8}
           >
-            <Text style={s.confirmBtnText}>
-              {placingOrder ? "Placing Order..." : `Place Order — ${formatPrice(total)}`}
-            </Text>
+            <LinearGradient
+              colors={[Colors.light.primary, Colors.light.primaryContainer]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={s.primaryBtnGradient}
+            >
+              <Ionicons
+                name="restaurant-outline"
+                size={18}
+                color={Colors.light.primaryForeground}
+              />
+              <Text style={s.primaryBtnText}>
+                {placingOrder ? "Placing Order..." : "Place Order"}
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
-          <Text style={s.chargeNote}>Charged to your member account</Text>
+          <Text style={s.policyNote}>
+            By placing this order, you authorize the charge to your Member
+            Account
+          </Text>
         </View>
       </View>
     );
   }
 
-  // ========= HOME VIEW =========
+  // ═════════════════════════════════════════════════════
+  // HOME VIEW — Dining hub with luxury aesthetics
+  // ═════════════════════════════════════════════════════
   return (
     <View style={s.container}>
       <ScrollView
-        contentContainerStyle={s.listContent}
+        contentContainerStyle={s.homeContent}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => { setRefreshing(true); fetchHomeData(); }}
+            onRefresh={() => {
+              setRefreshing(true);
+              fetchHomeData();
+            }}
             tintColor={Colors.light.primary}
           />
         }
+        showsVerticalScrollIndicator={false}
       >
         {loadingHome ? (
           <View style={s.centered}>
@@ -882,43 +1406,88 @@ export default function DiningScreen() {
           </View>
         ) : (
           <>
-            {/* Action buttons */}
-            <View style={s.actionRow}>
+            {/* Hero header */}
+            <View style={s.homeHero}>
+              <Text style={s.homeHeroSerif}>The Lakes</Text>
+              <Text style={s.homeHeroSub}>
+                Curated dining experiences at the club
+              </Text>
+            </View>
+
+            {/* Action cards */}
+            <View style={s.homeActionRow}>
               <TouchableOpacity
-                style={s.actionCard}
-                onPress={() => { setFlowMode("reserve"); setView("venue"); }}
-                activeOpacity={0.7}
+                style={s.homeActionCard}
+                onPress={() => {
+                  setFlowMode("reserve");
+                  setView("venue");
+                }}
+                activeOpacity={0.85}
               >
-                <Ionicons name="calendar-outline" size={28} color={Colors.light.primary} />
-                <Text style={s.actionTitle}>Reserve a Table</Text>
-                <Text style={s.actionDesc}>Book a dining reservation</Text>
+                <LinearGradient
+                  colors={[Colors.light.primary, Colors.light.primaryContainer]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={s.homeActionGradient}
+                >
+                  <Ionicons
+                    name="calendar-outline"
+                    size={28}
+                    color="rgba(255,255,255,0.9)"
+                  />
+                  <Text style={s.homeActionTitle}>Reserve{"\n"}a Table</Text>
+                  <Text style={s.homeActionDesc}>
+                    Book dining reservations
+                  </Text>
+                </LinearGradient>
               </TouchableOpacity>
+
               <TouchableOpacity
-                style={s.actionCard}
-                onPress={() => { setFlowMode("order"); setView("venue"); }}
-                activeOpacity={0.7}
+                style={s.homeActionCard}
+                onPress={() => {
+                  setFlowMode("order");
+                  setView("venue");
+                }}
+                activeOpacity={0.85}
               >
-                <Ionicons name="fast-food-outline" size={28} color={Colors.light.primary} />
-                <Text style={s.actionTitle}>Order Food</Text>
-                <Text style={s.actionDesc}>Browse menu & order</Text>
+                <View style={s.homeActionSurface}>
+                  <Ionicons
+                    name="restaurant-outline"
+                    size={28}
+                    color={Colors.light.primary}
+                  />
+                  <Text style={s.homeActionTitleDark}>
+                    Order{"\n"}Food
+                  </Text>
+                  <Text style={s.homeActionDescDark}>
+                    Browse menu & order
+                  </Text>
+                </View>
               </TouchableOpacity>
             </View>
 
-            {/* Reservations */}
+            {/* Upcoming Reservations */}
             {bookings.length > 0 && (
-              <View style={s.section}>
-                <Text style={s.sectionTitle}>Upcoming Reservations</Text>
+              <View style={s.homeSection}>
+                <Text style={s.homeSectionTitle}>Upcoming Reservations</Text>
                 {bookings.map((b) => (
-                  <View key={b.id} style={s.bookingCard}>
-                    <View style={s.bookingCardLeft}>
-                      <View style={s.diningIcon}>
-                        <Ionicons name="restaurant-outline" size={16} color="#ea580c" />
+                  <View key={b.id} style={s.reservationCard}>
+                    <View style={s.reservationLeft}>
+                      <View style={s.reservationIcon}>
+                        <Ionicons
+                          name="calendar"
+                          size={16}
+                          color={Colors.light.primary}
+                        />
                       </View>
-                      <View>
-                        <Text style={s.bookingFacility}>{b.facility_name}</Text>
-                        <Text style={s.bookingMeta}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.reservationVenue}>
+                          {b.facility_name}
+                        </Text>
+                        <Text style={s.reservationMeta}>
                           {formatDate(b.date)} · {formatTime(b.start_time)} ·{" "}
-                          {b.party_size} {b.party_size === 1 ? "guest" : "guests"}
+                          {b.party_size}{" "}
+                          {b.party_size === 1 ? "guest" : "guests"}
                         </Text>
                       </View>
                     </View>
@@ -936,25 +1505,38 @@ export default function DiningScreen() {
               </View>
             )}
 
-            {/* Active orders */}
+            {/* Active Orders */}
             {orders.length > 0 && (
-              <View style={s.section}>
-                <Text style={s.sectionTitle}>Active Orders</Text>
+              <View style={s.homeSection}>
+                <Text style={s.homeSectionTitle}>Active Orders</Text>
                 {orders.map((order) => {
-                  const color = statusColors[order.status] ?? { bg: "#f3f4f6", text: "#6b7280" };
+                  const color = statusColors[order.status] ?? {
+                    bg: "#f3f4f6",
+                    text: "#6b7280",
+                  };
                   return (
                     <View key={order.id} style={s.orderCard}>
-                      <View style={s.orderHeader}>
-                        <View>
-                          <Text style={s.bookingFacility}>{order.facility_name}</Text>
-                          <Text style={s.bookingMeta}>
-                            {order.items.length} item{order.items.length !== 1 ? "s" : ""} ·{" "}
+                      <View style={s.orderCardTop}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.reservationVenue}>
+                            {order.facility_name}
+                          </Text>
+                          <Text style={s.reservationMeta}>
+                            {order.items.length}{" "}
+                            {order.items.length !== 1 ? "items" : "item"} ·{" "}
                             {formatPrice(order.total)}
                           </Text>
                         </View>
-                        <View style={s.orderActions}>
-                          <View style={[s.statusBadge, { backgroundColor: color.bg }]}>
-                            <Text style={[s.statusText, { color: color.text }]}>
+                        <View style={s.orderCardActions}>
+                          <View
+                            style={[
+                              s.statusBadge,
+                              { backgroundColor: color.bg },
+                            ]}
+                          >
+                            <Text
+                              style={[s.statusText, { color: color.text }]}
+                            >
                               {order.status}
                             </Text>
                           </View>
@@ -965,14 +1547,18 @@ export default function DiningScreen() {
                               disabled={cancellingOrder === order.id}
                             >
                               <Text style={s.cancelBtnText}>
-                                {cancellingOrder === order.id ? "..." : "Cancel"}
+                                {cancellingOrder === order.id
+                                  ? "..."
+                                  : "Cancel"}
                               </Text>
                             </TouchableOpacity>
                           )}
                         </View>
                       </View>
-                      <Text style={s.orderItems}>
-                        {order.items.map((i) => `${i.quantity}x ${i.name}`).join("  ")}
+                      <Text style={s.orderItemsList}>
+                        {order.items
+                          .map((i) => `${i.quantity}x ${i.name}`)
+                          .join("  ·  ")}
                       </Text>
                     </View>
                   );
@@ -983,7 +1569,13 @@ export default function DiningScreen() {
             {/* Empty state */}
             {bookings.length === 0 && orders.length === 0 && (
               <View style={s.emptyState}>
-                <Ionicons name="restaurant-outline" size={48} color={Colors.light.mutedForeground} />
+                <View style={s.emptyIconCircle}>
+                  <Ionicons
+                    name="restaurant-outline"
+                    size={36}
+                    color={Colors.light.onSurfaceVariant}
+                  />
+                </View>
                 <Text style={s.emptyTitle}>No dining activity</Text>
                 <Text style={s.emptyText}>
                   Reserve a table or place an order to get started.
@@ -997,288 +1589,721 @@ export default function DiningScreen() {
   );
 }
 
+// ═══════════════════════════════════════════════════════
+// STYLES — Luxury design system matching Stitch
+// ═══════════════════════════════════════════════════════
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.light.background },
-  header: {
+
+  // ── Luxury Header ──
+  luxHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 14,
+    backgroundColor: Colors.light.surfaceContainerLowest,
   },
-  backBtn: { flexDirection: "row", alignItems: "center", gap: 2 },
-  backText: { fontSize: 14, color: Colors.light.primary, fontWeight: "500" },
-  headerTitle: { fontSize: 15, fontWeight: "600", color: Colors.light.foreground },
-  sectionLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: Colors.light.mutedForeground,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: Colors.light.surfaceContainerLow,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  sectionTitle: {
-    fontSize: 16,
+  luxHeaderSerif: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: Colors.light.foreground,
+    fontFamily: "System",
+    letterSpacing: -0.3,
+  },
+  luxHeaderSub: {
+    fontSize: 12,
+    color: Colors.light.onSurfaceVariant,
+    marginTop: 1,
+  },
+
+  // ── Home ──
+  homeContent: { flexGrow: 1, paddingBottom: 32 },
+  homeHero: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 },
+  homeHeroSerif: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: Colors.light.foreground,
+    letterSpacing: -0.5,
+  },
+  homeHeroSub: {
+    fontSize: 14,
+    color: Colors.light.onSurfaceVariant,
+    marginTop: 4,
+    lineHeight: 20,
+  },
+
+  homeActionRow: {
+    flexDirection: "row",
+    gap: 12,
+    paddingHorizontal: 20,
+    marginBottom: 28,
+  },
+  homeActionCard: { flex: 1, borderRadius: 20, overflow: "hidden" },
+  homeActionGradient: {
+    padding: 20,
+    minHeight: 150,
+    justifyContent: "space-between",
+  },
+  homeActionSurface: {
+    padding: 20,
+    minHeight: 150,
+    justifyContent: "space-between",
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    borderRadius: 20,
+  },
+  homeActionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.95)",
+    letterSpacing: -0.3,
+    marginTop: 8,
+  },
+  homeActionTitleDark: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.light.foreground,
+    letterSpacing: -0.3,
+    marginTop: 8,
+  },
+  homeActionDesc: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.6)",
+    marginTop: 4,
+  },
+  homeActionDescDark: {
+    fontSize: 11,
+    color: Colors.light.onSurfaceVariant,
+    marginTop: 4,
+  },
+
+  homeSection: { paddingHorizontal: 20, marginBottom: 24 },
+  homeSectionTitle: {
+    fontSize: 17,
     fontWeight: "700",
     color: Colors.light.foreground,
     marginBottom: 12,
+    letterSpacing: -0.2,
   },
-  centered: { flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 80 },
-  listContent: { flexGrow: 1, padding: 16, paddingBottom: 32 },
 
-  // Action cards
-  actionRow: { flexDirection: "row", gap: 12, marginBottom: 24 },
-  actionCard: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
+  // ── Reservation card ──
+  reservationCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: Colors.light.surfaceContainerLowest,
     borderRadius: 16,
-    padding: 16,
+    padding: 14,
+    marginBottom: 8,
+  },
+  reservationLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  reservationIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: Colors.light.accent,
+    justifyContent: "center",
     alignItems: "center",
   },
-  actionTitle: {
+  reservationVenue: {
     fontSize: 14,
     fontWeight: "600",
     color: Colors.light.foreground,
-    marginTop: 8,
-    textAlign: "center",
   },
-  actionDesc: {
+  reservationMeta: {
     fontSize: 11,
-    color: Colors.light.mutedForeground,
+    color: Colors.light.onSurfaceVariant,
     marginTop: 2,
-    textAlign: "center",
   },
 
-  // Venue
-  courseGrid: { flexDirection: "row", gap: 12, padding: 16 },
-  courseCard: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    borderRadius: 16,
-    padding: 16,
-    alignItems: "center",
-  },
-  courseName: { fontSize: 14, fontWeight: "600", color: Colors.light.foreground, textAlign: "center" },
-  courseDesc: { fontSize: 11, color: Colors.light.mutedForeground, marginTop: 2, textAlign: "center" },
-
-  // Date strip
-  dateStrip: { paddingHorizontal: 16, gap: 8, paddingBottom: 16 },
-  dateCard: {
-    width: 60,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    alignItems: "center",
-  },
-  dateCardSelected: { backgroundColor: Colors.light.primary, borderColor: Colors.light.primary },
-  dateDayName: { fontSize: 11, fontWeight: "500", color: Colors.light.mutedForeground },
-  dateDayNum: { fontSize: 18, fontWeight: "700", color: Colors.light.foreground, marginVertical: 2 },
-  dateMonth: { fontSize: 10, color: Colors.light.mutedForeground },
-  dateTextSelected: { color: Colors.light.primaryForeground },
-
-  // Time grid
-  timeContent: { paddingBottom: 32 },
-  timeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 16 },
-  timeChip: { borderWidth: 1, borderColor: Colors.light.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, alignItems: "center" },
-  timeChipSelected: { backgroundColor: Colors.light.primary, borderColor: Colors.light.primary },
-  timeChipDisabled: { backgroundColor: Colors.light.muted, borderColor: Colors.light.border },
-  timeChipText: { fontSize: 12, fontWeight: "500", color: Colors.light.foreground },
-  timeChipTextSelected: { color: Colors.light.primaryForeground },
-  timeChipTextDisabled: { color: Colors.light.mutedForeground, textDecorationLine: "line-through" },
-  timeChipSub: { fontSize: 9, color: Colors.light.mutedForeground, marginTop: 1 },
-
-  // Confirm
-  confirmSection: { borderTopWidth: 1, borderTopColor: Colors.light.border, marginTop: 16 },
-  partySizeRow: { flexDirection: "row", gap: 8, paddingHorizontal: 16, marginBottom: 16, flexWrap: "wrap" },
-  partySizeBtn: {
-    width: 40,
-    height: 40,
+  cancelBtn: {
+    backgroundColor: "#fef2f2",
     borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  partySizeBtnSelected: { backgroundColor: Colors.light.primary, borderColor: Colors.light.primary },
-  partySizeText: { fontSize: 14, fontWeight: "600", color: Colors.light.foreground },
-  partySizeTextSelected: { color: Colors.light.primaryForeground },
-  confirmBtn: {
-    backgroundColor: Colors.light.primary,
-    borderRadius: 12,
-    paddingVertical: 14,
-    marginHorizontal: 16,
-    alignItems: "center",
-  },
-  confirmBtnText: { color: Colors.light.primaryForeground, fontSize: 14, fontWeight: "600" },
-
-  // Menu
-  categoryStrip: { paddingHorizontal: 16, gap: 8, paddingVertical: 12 },
-  categoryChip: {
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    borderRadius: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  categoryChipSelected: { backgroundColor: Colors.light.primary, borderColor: Colors.light.primary },
-  categoryChipText: { fontSize: 12, fontWeight: "500", color: Colors.light.foreground },
-  categoryChipTextSelected: { color: Colors.light.primaryForeground },
+  cancelBtnText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: Colors.light.destructive,
+  },
 
-  menuItem: {
+  // ── Order card ──
+  orderCard: {
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 8,
+  },
+  orderCardTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  orderCardActions: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    gap: 6,
   },
-  menuItemName: { fontSize: 14, fontWeight: "600", color: Colors.light.foreground },
-  menuItemDesc: { fontSize: 11, color: Colors.light.mutedForeground, marginTop: 2 },
-  menuItemPrice: { fontSize: 14, fontWeight: "700", color: Colors.light.primary, marginTop: 4 },
+  statusBadge: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
+  statusText: { fontSize: 11, fontWeight: "600", textTransform: "capitalize" },
+  orderItemsList: {
+    fontSize: 11,
+    color: Colors.light.onSurfaceVariant,
+    marginTop: 8,
+    lineHeight: 16,
+  },
 
-  qtyRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  qtyBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
+  // ── Empty state ──
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: 80,
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingTop: 40,
+    paddingHorizontal: 40,
+  },
+  emptyIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    backgroundColor: Colors.light.surfaceContainerHigh,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: Colors.light.foreground,
+    marginBottom: 4,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: Colors.light.onSurfaceVariant,
+    textAlign: "center",
+    lineHeight: 18,
+  },
+
+  // ── Venue Selection ──
+  venueList: { paddingHorizontal: 20, paddingBottom: 32, gap: 16 },
+  venueCard: {
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    borderRadius: 20,
+    overflow: "hidden",
+  },
+  venueImageWrap: { height: 140, position: "relative" },
+  venueImagePlaceholder: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  qtyBtnText: { fontSize: 14, fontWeight: "600", color: Colors.light.foreground },
-  qtyText: { fontSize: 14, fontWeight: "600", color: Colors.light.foreground, minWidth: 20, textAlign: "center" },
-
-  addBtn: {
-    borderWidth: 1,
-    borderColor: Colors.light.primary,
+  cuisineBadge: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    backgroundColor: "rgba(0,0,0,0.5)",
     borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  addBtnText: { fontSize: 12, fontWeight: "600", color: Colors.light.primary },
-
-  cartBadge: {
-    backgroundColor: Colors.light.primary,
-    borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 4,
+  },
+  cuisineBadgeText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#fff",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  venueCardBody: { padding: 16 },
+  venueCardName: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.light.foreground,
+    letterSpacing: -0.3,
+  },
+  venueCardTagline: {
+    fontSize: 13,
+    color: Colors.light.onSurfaceVariant,
+    marginTop: 3,
+    lineHeight: 18,
+  },
+  venueMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 10,
+  },
+  venueMetaItem: { flexDirection: "row", alignItems: "center", gap: 4 },
+  venueMetaText: { fontSize: 12, color: Colors.light.onSurfaceVariant },
+  venueActions: { marginTop: 14 },
+  venueCtaBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: Colors.light.primary,
+    borderRadius: 12,
+    paddingVertical: 11,
+  },
+  venueCtaText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: Colors.light.primaryForeground,
+  },
+
+  // ── Date Selection ──
+  sectionBlock: { paddingTop: 20 },
+  sectionLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: Colors.light.onSurfaceVariant,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  dateStrip: { paddingHorizontal: 20, gap: 8, paddingBottom: 8 },
+  dateCard: {
+    width: 64,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    alignItems: "center",
+  },
+  dateCardSelected: {
+    backgroundColor: Colors.light.primary,
+  },
+  dateDayName: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: Colors.light.onSurfaceVariant,
+  },
+  dateDayNum: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: Colors.light.foreground,
+    marginVertical: 2,
+  },
+  dateMonth: { fontSize: 10, color: Colors.light.onSurfaceVariant },
+  dateTextSelected: { color: Colors.light.primaryForeground },
+
+  // ── Time Grid ──
+  timeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    paddingHorizontal: 20,
+  },
+  timeChip: {
+    minWidth: 72,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignItems: "center",
+    backgroundColor: Colors.light.surfaceContainerLowest,
+  },
+  timeChipSelected: {
+    backgroundColor: Colors.light.primary,
+  },
+  timeChipDisabled: {
+    backgroundColor: Colors.light.surfaceContainerHigh,
+    opacity: 0.5,
+  },
+  timeChipText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.light.foreground,
+  },
+  timeChipTextSelected: { color: Colors.light.primaryForeground },
+  timeChipTextDisabled: {
+    color: Colors.light.mutedForeground,
+    textDecorationLine: "line-through",
+  },
+  timeChipSub: {
+    fontSize: 9,
+    color: Colors.light.onSurfaceVariant,
+    marginTop: 2,
+  },
+
+  // ── Party Size ──
+  partySizeRow: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 20,
+  },
+  partySizeBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  partySizeBtnSelected: {
+    backgroundColor: Colors.light.primary,
+  },
+  partySizeText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: Colors.light.foreground,
+  },
+  partySizeTextSelected: { color: Colors.light.primaryForeground },
+
+  // ── Seating Preference ──
+  seatingRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    paddingHorizontal: 20,
+  },
+  seatingChip: {
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: Colors.light.surfaceContainerLowest,
+  },
+  seatingChipSelected: {
+    backgroundColor: Colors.light.primary,
+  },
+  seatingChipText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: Colors.light.foreground,
+  },
+  seatingChipTextSelected: { color: Colors.light.primaryForeground },
+
+  // ── Inputs ──
+  luxInput: {
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 14,
+    color: Colors.light.foreground,
+    marginHorizontal: 20,
+  },
+
+  // ── Sticky Footer ──
+  stickyFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 32,
+    backgroundColor: Colors.light.background,
+  },
+  primaryBtn: { borderRadius: 16, overflow: "hidden" },
+  primaryBtnGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 16,
+  },
+  primaryBtnText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: Colors.light.primaryForeground,
+  },
+  policyNote: {
+    fontSize: 11,
+    color: Colors.light.onSurfaceVariant,
+    textAlign: "center",
+    marginTop: 10,
+    lineHeight: 15,
+  },
+
+  // ── Service Toggle ──
+  serviceToggleWrap: {
+    flexDirection: "row",
+    marginHorizontal: 20,
+    marginVertical: 8,
+    backgroundColor: Colors.light.surfaceContainer,
+    borderRadius: 12,
+    padding: 3,
+  },
+  serviceToggleBtn: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  serviceToggleBtnActive: {
+    backgroundColor: Colors.light.surfaceContainerLowest,
+  },
+  serviceToggleText: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: Colors.light.onSurfaceVariant,
+  },
+  serviceToggleTextActive: {
+    color: Colors.light.foreground,
+    fontWeight: "600",
+  },
+
+  // ── Menu Heading ──
+  menuHeading: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: Colors.light.foreground,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 4,
+    letterSpacing: -0.3,
+  },
+
+  // ── Category Chips ──
+  categoryStrip: {
+    paddingHorizontal: 20,
+    gap: 8,
+    paddingTop: 10,
+    paddingBottom: 14,
+    alignItems: "center" as const,
+  },
+  categoryChip: {
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    minHeight: 48,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  categoryChipSelected: {
+    backgroundColor: Colors.light.primary,
+  },
+  categoryChipText: {
+    fontSize: 16,
+    fontWeight: "700" as const,
+    color: Colors.light.foreground,
+    lineHeight: 20,
+  },
+  categoryChipTextSelected: { color: Colors.light.primaryForeground },
+
+  // ── Menu Card ──
+  menuCard: {
+    flexDirection: "row",
+    marginHorizontal: 20,
+    marginBottom: 12,
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  menuCardImageWrap: { width: 90 },
+  menuCardImage: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    minHeight: 90,
+  },
+  menuCardBody: { flex: 1, padding: 12 },
+  menuCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  menuCardName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.light.foreground,
+    flex: 1,
+    marginRight: 8,
+  },
+  menuCardPrice: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: Colors.light.primary,
+  },
+  menuCardDesc: {
+    fontSize: 11,
+    color: Colors.light.onSurfaceVariant,
+    marginTop: 4,
+    lineHeight: 15,
+  },
+  menuCardFooter: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 8,
+  },
+
+  // ── Quantity Controls ──
+  qtyRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  qtyBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: Colors.light.surfaceContainerLow,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  qtyBtnSmall: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: Colors.light.surfaceContainerLow,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  qtyText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.light.foreground,
+    minWidth: 20,
+    textAlign: "center",
+  },
+
+  addBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: Colors.light.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  // ── Cart Badge ──
+  cartBadge: {
+    backgroundColor: Colors.light.primary,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
   },
-  cartBadgeText: { fontSize: 12, fontWeight: "700", color: Colors.light.primaryForeground },
+  cartBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: Colors.light.primaryForeground,
+  },
 
-  // Cart
-  cartItem: {
+  // ── Floating Cart Bar ──
+  floatingCartBar: {
+    position: "absolute",
+    bottom: 16,
+    left: 20,
+    right: 20,
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 6,
+  },
+  floatingCartBarInner: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
   },
-  cartItemName: { fontSize: 14, fontWeight: "600", color: Colors.light.foreground },
-  cartItemPrice: { fontSize: 11, color: Colors.light.mutedForeground, marginTop: 2 },
-  cartItemTotal: { fontSize: 14, fontWeight: "700", color: Colors.light.foreground, marginLeft: 12, minWidth: 60, textAlign: "right" },
-
-  cartInputs: { gap: 10, marginTop: 16 },
-  input: {
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+  floatingCartLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flex: 1,
+  },
+  floatingCartCount: {
     fontSize: 14,
-    color: Colors.light.foreground,
+    fontWeight: "600",
+    color: Colors.light.primaryForeground,
+  },
+  floatingCartPrice: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: Colors.light.primaryForeground,
+    marginRight: 12,
+  },
+  floatingCartCta: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.7)",
   },
 
-  totals: { marginTop: 16 },
-  totalRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 },
-  totalLabel: { fontSize: 13, color: Colors.light.mutedForeground },
-  totalValue: { fontSize: 13, color: Colors.light.mutedForeground },
-  totalRowFinal: { borderTopWidth: 1, borderTopColor: Colors.light.border, paddingTop: 8, marginTop: 4 },
-  totalFinalLabel: { fontSize: 15, fontWeight: "700", color: Colors.light.foreground },
-  totalFinalValue: { fontSize: 15, fontWeight: "700", color: Colors.light.foreground },
-
-  cartFooter: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
-    padding: 16,
-    backgroundColor: Colors.light.background,
-  },
-  chargeNote: { fontSize: 11, color: Colors.light.mutedForeground, textAlign: "center", marginTop: 8 },
-
-  // Bookings / Orders cards
-  section: { marginBottom: 24 },
-  bookingCard: {
+  // ── Checkout ──
+  checkoutItem: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 8,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.light.outlineVariant,
   },
-  bookingCardLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
-  diningIcon: {
+  checkoutItemLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  checkoutItemIcon: {
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: "#fed7aa",
+    backgroundColor: Colors.light.accent,
     justifyContent: "center",
     alignItems: "center",
   },
-  bookingFacility: { fontSize: 14, fontWeight: "600", color: Colors.light.foreground },
-  bookingMeta: { fontSize: 11, color: Colors.light.mutedForeground, marginTop: 1 },
-  cancelBtn: {
-    borderWidth: 1,
-    borderColor: "#fecaca",
-    backgroundColor: "#fef2f2",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+  checkoutItemName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.light.foreground,
   },
-  cancelBtnText: { fontSize: 11, fontWeight: "600", color: "#b91c1c" },
-
-  orderCard: {
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 8,
+  checkoutItemMeta: {
+    fontSize: 11,
+    color: Colors.light.onSurfaceVariant,
+    marginTop: 1,
   },
-  orderHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  orderActions: { flexDirection: "row", alignItems: "center", gap: 6 },
-  statusBadge: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
-  statusText: { fontSize: 11, fontWeight: "600" },
-  orderItems: { fontSize: 11, color: Colors.light.mutedForeground, marginTop: 6 },
-
-  // Empty
-  emptyState: { flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 60 },
-  emptyTitle: { fontSize: 18, fontWeight: "600", color: Colors.light.foreground, marginTop: 12, marginBottom: 4 },
-  emptyText: { fontSize: 14, color: Colors.light.mutedForeground, textAlign: "center" },
-
-  // FAB
-  fab: {
-    position: "absolute",
-    bottom: 16,
-    left: 16,
-    right: 16,
-    backgroundColor: Colors.light.primary,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+  checkoutItemRight: { alignItems: "flex-end", gap: 6 },
+  checkoutItemTotal: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: Colors.light.foreground,
   },
-  fabText: { color: Colors.light.primaryForeground, fontSize: 15, fontWeight: "600" },
+
+  checkoutInputs: { gap: 10, marginTop: 20 },
+
+  // ── Totals Surface ──
+  totalsSurface: {
+    marginTop: 24,
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    borderRadius: 16,
+    padding: 16,
+  },
+  totalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 6,
+  },
+  totalLabel: { fontSize: 13, color: Colors.light.onSurfaceVariant },
+  totalValue: { fontSize: 13, color: Colors.light.onSurfaceVariant },
+  totalDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.light.outlineVariant,
+    marginVertical: 8,
+  },
+  totalFinalLabel: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: Colors.light.foreground,
+  },
+  totalFinalValue: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: Colors.light.foreground,
+  },
 });

@@ -7,6 +7,7 @@ import type {
   MembershipTierLevel,
 } from "@club/shared";
 import { MemberDirectory } from "./member-directory";
+import { AddMemberModal } from "./add-member-modal";
 
 export default function MembersPage() {
   const [members, setMembers] = useState<DirectoryMember[]>([]);
@@ -17,6 +18,7 @@ export default function MembersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [tierFilter, setTierFilter] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const fetchMembers = useCallback(async () => {
     try {
@@ -79,7 +81,10 @@ export default function MembersPage() {
           </p>
         </div>
         {role === "admin" && (
-          <button className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-foreground)] hover:opacity-90 transition-opacity">
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-foreground)] hover:opacity-90 transition-opacity"
+          >
             Add Member
           </button>
         )}
@@ -93,6 +98,14 @@ export default function MembersPage() {
         tierFilter={tierFilter}
         onTierFilterChange={setTierFilter}
       />
+
+      {showAddModal && (
+        <AddMemberModal
+          tiers={tiers}
+          onClose={() => setShowAddModal(false)}
+          onSuccess={() => fetchMembers()}
+        />
+      )}
     </div>
   );
 }

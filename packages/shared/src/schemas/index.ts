@@ -18,6 +18,24 @@ export const createMemberSchema = z.object({
 
 export const updateMemberSchema = createMemberSchema.partial();
 
+// Invite: admin creates a member and sends invite
+export const inviteMemberSchema = z.object({
+  first_name: z.string().min(1, "First name is required").max(100),
+  last_name: z.string().min(1, "Last name is required").max(100),
+  email: z.string().email("Invalid email address"),
+  phone: z.string().optional(),
+  role: z.enum(["admin", "staff", "member"]).default("member"),
+  membership_tier_id: z.string().uuid().optional().nullable(),
+  member_number: z.string().optional(),
+  notes: z.string().optional(),
+  send_invite: z.boolean().default(true),
+});
+
+// Invite claim: member sets password to activate account
+export const claimInviteSchema = z.object({
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
 // Membership tier schemas
 export const createTierSchema = z.object({
   name: z.string().min(1, "Tier name is required").max(100),
@@ -83,6 +101,23 @@ export const createAnnouncementSchema = z.object({
   content: z.string().min(1, "Content is required"),
   priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"),
   target_tier_ids: z.array(z.string().uuid()).optional(),
+});
+
+// Golf rate schemas
+export const createGolfRateSchema = z.object({
+  facility_id: z.string().uuid("Invalid facility"),
+  name: z.string().min(1, "Rate name is required").max(100),
+  holes: z.enum(["9", "18"]).default("18"),
+  day_type: z.enum(["weekday", "weekend"]).default("weekday"),
+  time_type: z.enum(["prime", "afternoon", "twilight"]).default("prime"),
+  member_price: z.number().min(0, "Price cannot be negative"),
+  guest_price: z.number().min(0, "Price cannot be negative"),
+  cart_fee: z.number().min(0, "Fee cannot be negative").default(0),
+  is_active: z.boolean().default(true),
+});
+
+export const updateGolfRateSchema = createGolfRateSchema.partial().extend({
+  id: z.string().uuid(),
 });
 
 // Chat schemas
@@ -196,3 +231,7 @@ export type UpdateDiningOrderStatusInput = z.infer<
   typeof updateDiningOrderStatusSchema
 >;
 export type ScheduleConfigInput = z.infer<typeof scheduleConfigSchema>;
+export type CreateGolfRateInput = z.infer<typeof createGolfRateSchema>;
+export type UpdateGolfRateInput = z.infer<typeof updateGolfRateSchema>;
+export type InviteMemberInput = z.infer<typeof inviteMemberSchema>;
+export type ClaimInviteInput = z.infer<typeof claimInviteSchema>;

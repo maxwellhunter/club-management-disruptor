@@ -7,8 +7,12 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
+  Image,
+  TextInput,
 } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/lib/auth-context";
@@ -18,6 +22,24 @@ import type { RsvpStatus } from "@club/shared";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
+
+const EVENT_IMAGES: Record<string, string> = {
+  social:
+    "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&q=80",
+  sporting:
+    "https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=800&q=80",
+  dining:
+    "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&q=80",
+  default:
+    "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&q=80",
+};
+
+// Stitch RSVP form: dietary options as card-style rows
+const DIETARY_OPTIONS = [
+  "No Preferences",
+  "Vegetarian / Vegan",
+  "Gluten Free",
+];
 
 interface EventWithRsvp {
   id: string;
@@ -31,14 +53,21 @@ interface EventWithRsvp {
   status: string;
   rsvp_count: number;
   user_rsvp_status: RsvpStatus | null;
+  category?: string;
 }
 
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-US", {
+const serifFont = Platform.select({
+  ios: "Georgia",
+  android: "serif",
+  default: "serif",
+});
+
+function formatFullDate(dateStr: string) {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("en-US", {
     weekday: "long",
-    month: "long",
+    month: "short",
     day: "numeric",
-    year: "numeric",
   });
 }
 
@@ -50,15 +79,10 @@ function formatTime(dateStr: string) {
   });
 }
 
-function formatTimeRange(start: string, end: string | null) {
-  const startTime = formatTime(start);
-  if (!end) return startTime;
-  return `${startTime} – ${formatTime(end)}`;
-}
-
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
+  const router = useRouter();
 
   const [event, setEvent] = useState<EventWithRsvp | null>(null);
   const [role, setRole] = useState<string>("member");
@@ -66,18 +90,25 @@ export default function EventDetailScreen() {
   const [error, setError] = useState("");
   const [rsvpLoading, setRsvpLoading] = useState(false);
 
+  // RSVP form state (matches Stitch: guest count 1-4, dietary, notes)
+  const [guestCount, setGuestCount] = useState(2);
+  const [dietaryPreference, setDietaryPreference] = useState("No Preferences");
+  const [additionalNotes, setAdditionalNotes] = useState("");
+
   // Admin modals
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAttendeesModal, setShowAttendeesModal] = useState(false);
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (session?.access_token) {
-    headers["Authorization"] = `Bearer ${session.access_token}`;
-  }
+  const getHeaders = useCallback(() => {
+    const h: Record<string, string> = { "Content-Type": "application/json" };
+    if (session?.access_token) {
+      h["Authorization"] = `Bearer ${session.access_token}`;
+    }
+    return h;
+  }, [session?.access_token]);
 
   const fetchEvent = useCallback(async () => {
+    const headers = getHeaders();
     try {
       const res = await fetch(`${API_URL}/api/events/${id}`, { headers });
       if (res.ok) {
@@ -93,13 +124,13 @@ export default function EventDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id, session?.access_token]);
+  }, [id, getHeaders]);
 
   useEffect(() => {
     fetchEvent();
   }, [fetchEvent]);
 
-  function handleRsvp() {
+  async function handleRsvp() {
     if (!event) return;
     if (event.user_rsvp_status === "attending") {
       Alert.alert(
@@ -110,28 +141,27 @@ export default function EventDetailScreen() {
           {
             text: "Cancel RSVP",
             style: "destructive",
-            onPress: () => executeRsvp(),
+            onPress: () => executeRsvp("declined"),
           },
         ]
       );
     } else {
-      executeRsvp();
+      executeRsvp("attending");
     }
   }
 
-  async function executeRsvp() {
+  async function executeRsvp(newStatus: RsvpStatus) {
     if (!event) return;
+    const headers = getHeaders();
     setRsvpLoading(true);
     try {
-      const newStatus: RsvpStatus =
-        event.user_rsvp_status === "attending" ? "declined" : "attending";
       const res = await fetch(`${API_URL}/api/events/rsvp`, {
         method: "POST",
         headers,
         body: JSON.stringify({
           event_id: event.id,
           status: newStatus,
-          guest_count: 0,
+          guest_count: newStatus === "attending" ? guestCount - 1 : 0,
         }),
       });
       if (res.ok) {
@@ -149,7 +179,11 @@ export default function EventDetailScreen() {
 
   const isAdmin = role === "admin";
   const isAttending = event?.user_rsvp_status === "attending";
-  const isFree = !event?.price || event.price === 0;
+
+  function getEventImage() {
+    const cat = (event?.category || "default").toLowerCase();
+    return EVENT_IMAGES[cat] || EVENT_IMAGES.default;
+  }
 
   if (loading) {
     return (
@@ -162,7 +196,11 @@ export default function EventDetailScreen() {
   if (error || !event) {
     return (
       <View style={styles.centered}>
-        <Ionicons name="alert-circle-outline" size={48} color={Colors.light.mutedForeground} />
+        <Ionicons
+          name="alert-circle-outline"
+          size={48}
+          color={Colors.light.outlineVariant}
+        />
         <Text style={styles.errorTitle}>{error || "Event not found"}</Text>
         <Text style={styles.errorText}>
           This event may have been removed or you don&apos;t have access.
@@ -171,131 +209,278 @@ export default function EventDetailScreen() {
     );
   }
 
-  const capacityPercent =
-    event.capacity && event.capacity > 0
-      ? Math.min((event.rsvp_count / event.capacity) * 100, 100)
-      : null;
+  const categoryLabel =
+    (event.category || "Social").charAt(0).toUpperCase() +
+    (event.category || "social").slice(1);
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Title + badges */}
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>{event.title}</Text>
-          <View style={styles.badgeRow}>
-            {isAdmin && event.status !== "published" && (
-              <View style={styles.statusBadge}>
-                <Text style={styles.statusBadgeText}>{event.status}</Text>
-              </View>
-            )}
-            <View
-              style={[
-                styles.priceBadge,
-                isFree ? styles.priceFree : styles.pricePaid,
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Hero image (Stitch: h-[530px] rounded-3xl with gradient overlay) ── */}
+        <View style={styles.heroWrap}>
+          <View style={styles.heroInner}>
+            <Image
+              source={{ uri: getEventImage() }}
+              style={styles.heroImage}
+              resizeMode="cover"
+            />
+            <LinearGradient
+              colors={[
+                "transparent",
+                "rgba(1, 45, 29, 0.2)",
+                "rgba(1, 45, 29, 0.8)",
               ]}
+              style={styles.heroGradient}
+            />
+            {/* Back button */}
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => router.back()}
+              activeOpacity={0.7}
             >
-              <Text
-                style={[
-                  styles.priceText,
-                  isFree ? styles.priceTextFree : styles.priceTextPaid,
-                ]}
-              >
-                {isFree ? "Free" : `$${event.price}`}
+              <Ionicons name="chevron-back" size={22} color="#ffffff" />
+            </TouchableOpacity>
+            {/* Signature Event badge (Stitch: tertiary-fixed bg) */}
+            <View style={styles.heroCategoryBadge}>
+              <Text style={styles.heroCategoryText}>
+                {categoryLabel.toUpperCase()} EVENT
               </Text>
             </View>
-          </View>
-        </View>
-
-        {/* Event info */}
-        <View style={styles.infoSection}>
-          <View style={styles.infoRow}>
-            <Ionicons name="calendar-outline" size={18} color={Colors.light.mutedForeground} style={{ marginTop: 1 }} />
-            <View>
-              <Text style={styles.infoLabel}>
-                {formatDate(event.start_date)}
-              </Text>
-              <Text style={styles.infoDetail}>
-                {formatTimeRange(event.start_date, event.end_date)}
-              </Text>
-            </View>
-          </View>
-
-          {event.location && (
-            <View style={styles.infoRow}>
-              <Ionicons name="location-outline" size={18} color={Colors.light.mutedForeground} style={{ marginTop: 1 }} />
-              <Text style={styles.infoDetail}>{event.location}</Text>
-            </View>
-          )}
-
-          <View style={styles.infoRow}>
-            <Ionicons name="people-outline" size={18} color={Colors.light.mutedForeground} style={{ marginTop: 1 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.infoDetail}>
-                {event.rsvp_count} attending
-                {event.capacity ? ` of ${event.capacity} spots` : ""}
-              </Text>
-              {capacityPercent !== null && (
-                <View style={styles.capacityBarBg}>
-                  <View
-                    style={[
-                      styles.capacityBarFill,
-                      {
-                        width: `${capacityPercent}%`,
-                        backgroundColor:
-                          capacityPercent >= 90
-                            ? "#ef4444"
-                            : capacityPercent >= 70
-                              ? "#eab308"
-                              : Colors.light.primary,
-                      },
-                    ]}
-                  />
-                </View>
+            {/* Title + subtitle on image */}
+            <View style={styles.heroTextArea}>
+              <Text style={styles.heroTitle}>{event.title}</Text>
+              {event.location && (
+                <Text style={styles.heroSubtitle}>at {event.location}</Text>
               )}
             </View>
           </View>
         </View>
 
-        {/* Description */}
+        {/* ── Details section (Stitch: flex-wrap gap-12 with label + icon rows) ── */}
+        <View style={styles.detailsRow}>
+          {/* Date & Time */}
+          <View style={styles.detailBlock}>
+            <Text style={styles.detailLabel}>DATE & TIME</Text>
+            <View style={styles.detailIconRow}>
+              <Ionicons
+                name="calendar-outline"
+                size={20}
+                color={Colors.light.primary}
+              />
+              <Text style={styles.detailValue}>
+                {formatFullDate(event.start_date)}
+              </Text>
+            </View>
+            <Text style={styles.detailSub}>
+              Reception at {formatTime(event.start_date)}
+            </Text>
+          </View>
+          {/* Location */}
+          {event.location && (
+            <View style={styles.detailBlock}>
+              <Text style={styles.detailLabel}>LOCATION</Text>
+              <View style={styles.detailIconRow}>
+                <Ionicons
+                  name="location-outline"
+                  size={20}
+                  color={Colors.light.primary}
+                />
+                <Text style={styles.detailValue}>{event.location}</Text>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* ── Description (Stitch: headline text-3xl + body paragraphs) ── */}
         {event.description && (
           <View style={styles.descriptionSection}>
-            <Text style={styles.description}>{event.description}</Text>
+            <Text style={styles.sectionHeadline}>About This Event</Text>
+            <Text style={styles.descriptionBody}>{event.description}</Text>
           </View>
         )}
 
-        {/* RSVP button */}
-        {event.status === "published" && (
-          <TouchableOpacity
-            style={[
-              styles.rsvpBtn,
-              isAttending ? styles.rsvpBtnAttending : styles.rsvpBtnDefault,
-              rsvpLoading && { opacity: 0.5 },
-            ]}
-            onPress={handleRsvp}
-            disabled={rsvpLoading}
-            activeOpacity={0.7}
-          >
-            {rsvpLoading ? (
-              <ActivityIndicator
-                size="small"
-                color={
-                  isAttending
-                    ? "#166534"
-                    : Colors.light.primaryForeground
-                }
+        {/* ── Capacity / attendees info ── */}
+        {(event.capacity || event.rsvp_count > 0) && (
+          <View style={styles.capacityCard}>
+            <View style={styles.capacityIconRow}>
+              <Ionicons
+                name="people-outline"
+                size={18}
+                color={Colors.light.primary}
               />
-            ) : isAttending ? (
-              <View style={styles.rsvpBtnRow}>
-                <Ionicons name="checkmark" size={18} color="#166534" />
-                <Text style={[styles.rsvpBtnText, styles.rsvpBtnTextAttending]}>Attending</Text>
+              <Text style={styles.capacityText}>
+                {event.rsvp_count} attending
+                {event.capacity ? ` of ${event.capacity} spots` : ""}
+              </Text>
+            </View>
+            {event.capacity && event.capacity > 0 && (
+              <View style={styles.capacityBarBg}>
+                <View
+                  style={[
+                    styles.capacityBarFill,
+                    {
+                      width: `${Math.min(
+                        (event.rsvp_count / event.capacity) * 100,
+                        100
+                      )}%`,
+                    },
+                  ]}
+                />
               </View>
-            ) : (
-              <Text style={[styles.rsvpBtnText, styles.rsvpBtnTextDefault]}>RSVP</Text>
             )}
-          </TouchableOpacity>
+          </View>
         )}
 
-        {/* Admin actions */}
+        {/* ── RSVP form (Stitch: sticky card with editorial-shadow rounded-3xl) ── */}
+        {event.status === "published" && (
+          <View style={styles.rsvpCard}>
+            <Text style={styles.rsvpHeadline}>
+              {isAttending
+                ? "Your Reservation"
+                : "Confirm Your Attendance"}
+            </Text>
+
+            {!isAttending && (
+              <>
+                {/* Guest count (Stitch: grid-cols-4 with border buttons, active = bg-primary) */}
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>NUMBER OF GUESTS</Text>
+                  <View style={styles.guestGrid}>
+                    {[1, 2, 3, 4].map((n) => {
+                      const isSelected = guestCount === n;
+                      return (
+                        <TouchableOpacity
+                          key={n}
+                          style={[
+                            styles.guestBtn,
+                            isSelected
+                              ? styles.guestBtnActive
+                              : styles.guestBtnInactive,
+                          ]}
+                          onPress={() => setGuestCount(n)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.guestBtnText,
+                              isSelected && styles.guestBtnTextActive,
+                            ]}
+                          >
+                            {n}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Dietary preferences (Stitch: card-style rows with check_circle) */}
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>DIETARY PREFERENCES</Text>
+                  <View style={styles.dietaryList}>
+                    {DIETARY_OPTIONS.map((option) => {
+                      const isSelected = dietaryPreference === option;
+                      return (
+                        <TouchableOpacity
+                          key={option}
+                          style={[
+                            styles.dietaryRow,
+                            isSelected
+                              ? styles.dietaryRowSelected
+                              : styles.dietaryRowDefault,
+                          ]}
+                          onPress={() => setDietaryPreference(option)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.dietaryText}>{option}</Text>
+                          <Ionicons
+                            name={
+                              isSelected
+                                ? "checkmark-circle"
+                                : "ellipse-outline"
+                            }
+                            size={22}
+                            color={
+                              isSelected
+                                ? Colors.light.primary
+                                : Colors.light.outline
+                            }
+                          />
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Additional notes (Stitch: textarea bg-surface-container rounded-2xl) */}
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>ADDITIONAL NOTES</Text>
+                  <TextInput
+                    style={styles.notesInput}
+                    multiline
+                    numberOfLines={3}
+                    placeholder="Special seating requests or allergies..."
+                    placeholderTextColor={`${Colors.light.onSurfaceVariant}80`}
+                    value={additionalNotes}
+                    onChangeText={setAdditionalNotes}
+                    textAlignVertical="top"
+                  />
+                </View>
+              </>
+            )}
+
+            {/* Confirm RSVP button (Stitch: bg-gradient from-primary to-primary-container) */}
+            <TouchableOpacity
+              style={[
+                styles.rsvpBtn,
+                isAttending && styles.rsvpBtnAttending,
+                rsvpLoading && { opacity: 0.5 },
+              ]}
+              onPress={handleRsvp}
+              disabled={rsvpLoading}
+              activeOpacity={0.8}
+            >
+              {rsvpLoading ? (
+                <ActivityIndicator
+                  size="small"
+                  color={
+                    isAttending ? Colors.light.primary : "#ffffff"
+                  }
+                />
+              ) : isAttending ? (
+                <View style={styles.rsvpBtnRow}>
+                  <Ionicons name="checkmark-circle" size={20} color={Colors.light.primary} />
+                  <Text style={styles.rsvpBtnTextAttending}>
+                    You're Attending
+                  </Text>
+                  <Text style={styles.rsvpCancelHint}>Tap to cancel</Text>
+                </View>
+              ) : (
+                <LinearGradient
+                  colors={[Colors.light.primary, Colors.light.primaryContainer]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.rsvpBtnGradient}
+                >
+                  <Text style={styles.rsvpBtnText}>CONFIRM RSVP</Text>
+                </LinearGradient>
+              )}
+            </TouchableOpacity>
+
+            {/* Policy text (Stitch: text-center text-xs) */}
+            {!isAttending && (
+              <Text style={styles.policyText}>
+                By confirming, you agree to our guest policies. Cancellation is
+                required 48 hours prior to the event.
+              </Text>
+            )}
+          </View>
+        )}
+
+        {/* ── Admin actions ── */}
         {isAdmin && (
           <View style={styles.adminSection}>
             <TouchableOpacity
@@ -303,6 +488,11 @@ export default function EventDetailScreen() {
               onPress={() => setShowEditModal(true)}
               activeOpacity={0.7}
             >
+              <Ionicons
+                name="create-outline"
+                size={18}
+                color={Colors.light.foreground}
+              />
               <Text style={styles.adminBtnText}>Edit Event</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -310,7 +500,12 @@ export default function EventDetailScreen() {
               onPress={() => setShowAttendeesModal(true)}
               activeOpacity={0.7}
             >
-              <Text style={styles.adminBtnText}>View Attendees</Text>
+              <Ionicons
+                name="list-outline"
+                size={18}
+                color={Colors.light.foreground}
+              />
+              <Text style={styles.adminBtnText}>Attendees</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -321,7 +516,7 @@ export default function EventDetailScreen() {
         visible={showEditModal}
         event={event as EventWithRsvp}
         apiUrl={API_URL}
-        headers={headers}
+        headers={getHeaders()}
         onClose={() => setShowEditModal(false)}
         onSaved={() => {
           setShowEditModal(false);
@@ -335,7 +530,7 @@ export default function EventDetailScreen() {
         eventId={event.id}
         eventTitle={event.title}
         apiUrl={API_URL}
-        headers={headers}
+        headers={getHeaders()}
         onClose={() => setShowAttendeesModal(false)}
       />
     </View>
@@ -347,8 +542,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.light.background,
   },
-  content: {
-    padding: 20,
+  scrollContent: {
     paddingBottom: 40,
   },
   centered: {
@@ -358,167 +552,338 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.background,
     padding: 24,
   },
-  // Error
-  errorIcon: {
-    fontSize: 48,
-    marginBottom: 12,
-    color: Colors.light.mutedForeground,
-  },
   errorTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontFamily: serifFont,
+    fontSize: 20,
     color: Colors.light.foreground,
-    marginBottom: 4,
+    marginTop: 12,
+    marginBottom: 6,
   },
   errorText: {
     fontSize: 14,
-    color: Colors.light.mutedForeground,
+    color: Colors.light.onSurfaceVariant,
     textAlign: "center",
   },
-  // Title
-  titleRow: {
-    gap: 12,
-    marginBottom: 20,
+
+  // ── Hero (Stitch: relative h-[530px] rounded-3xl overflow-hidden) ──
+  heroWrap: {
+    paddingHorizontal: 12,
+    paddingTop: 4,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: Colors.light.foreground,
+  heroInner: {
+    height: 360,
+    borderRadius: 24,
+    overflow: "hidden",
+    position: "relative",
   },
-  badgeRow: {
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "center",
+  heroImage: {
+    width: "100%",
+    height: "100%",
   },
-  statusBadge: {
-    borderRadius: 12,
-    backgroundColor: "#f3f4f6",
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+  heroGradient: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
-  statusBadgeText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#374151",
-    textTransform: "capitalize",
-  },
-  priceBadge: {
+  backBtn: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 52 : 12,
+    left: 12,
+    width: 40,
+    height: 40,
     borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroCategoryBadge: {
+    position: "absolute",
+    bottom: 84,
+    left: 24,
+    backgroundColor: Colors.light.tertiaryFixed,
     paddingHorizontal: 10,
     paddingVertical: 4,
+    borderRadius: 9999,
   },
-  priceFree: {
-    backgroundColor: "#dcfce7",
+  heroCategoryText: {
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 3,
+    color: Colors.light.tertiary,
   },
-  pricePaid: {
-    backgroundColor: "#dbeafe",
+  heroTextArea: {
+    position: "absolute",
+    bottom: 24,
+    left: 24,
+    right: 24,
   },
-  priceText: {
-    fontSize: 12,
+  heroTitle: {
+    fontFamily: serifFont,
+    fontSize: 34,
+    fontWeight: "700",
+    color: "#ffffff",
+    lineHeight: 40,
+    letterSpacing: -0.5,
+  },
+  heroSubtitle: {
+    fontFamily: serifFont,
+    fontSize: 20,
+    fontStyle: "italic",
+    color: "rgba(255,255,255,0.9)",
+    marginTop: 2,
+  },
+
+  // ── Details (Stitch: flex-wrap gap-12 with uppercase labels) ──
+  detailsRow: {
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 24,
+    gap: 24,
+  },
+  detailBlock: {
+    gap: 6,
+  },
+  detailLabel: {
+    fontSize: 10,
     fontWeight: "600",
+    letterSpacing: 3,
+    color: Colors.light.onSurfaceVariant,
+    marginBottom: 4,
   },
-  priceTextFree: {
-    color: "#166534",
-  },
-  priceTextPaid: {
-    color: "#1e40af",
-  },
-  // Info
-  infoSection: {
-    gap: 14,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  infoRow: {
+  detailIconRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
+    alignItems: "center",
+    gap: 10,
   },
-  infoIcon: {
+  detailValue: {
     fontSize: 18,
-    marginTop: 1,
-  },
-  infoLabel: {
-    fontSize: 15,
-    fontWeight: "600",
+    fontWeight: "500",
     color: Colors.light.foreground,
   },
-  infoDetail: {
+  detailSub: {
     fontSize: 14,
-    color: Colors.light.mutedForeground,
-    marginTop: 1,
+    color: Colors.light.onSurfaceVariant,
+    marginLeft: 30,
+  },
+
+  // ── Description (Stitch: headline text-3xl + body text-lg) ──
+  descriptionSection: {
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    gap: 12,
+  },
+  sectionHeadline: {
+    fontFamily: serifFont,
+    fontSize: 24,
+    fontWeight: "700",
+    color: Colors.light.primary,
+  },
+  descriptionBody: {
+    fontSize: 16,
+    color: Colors.light.onSurfaceVariant,
+    lineHeight: 26,
+  },
+
+  // ── Capacity ──
+  capacityCard: {
+    marginHorizontal: 24,
+    backgroundColor: Colors.light.surfaceContainerLow,
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 24,
+  },
+  capacityIconRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 10,
+  },
+  capacityText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: Colors.light.foreground,
   },
   capacityBarBg: {
-    marginTop: 8,
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.light.muted,
+    backgroundColor: Colors.light.surfaceContainerHigh,
     overflow: "hidden",
   },
   capacityBarFill: {
     height: "100%",
     borderRadius: 3,
-  },
-  // Description
-  descriptionSection: {
-    paddingTop: 20,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  description: {
-    fontSize: 15,
-    color: Colors.light.foreground,
-    lineHeight: 22,
-  },
-  // RSVP
-  rsvpBtn: {
-    marginTop: 20,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  rsvpBtnDefault: {
     backgroundColor: Colors.light.primary,
   },
-  rsvpBtnAttending: {
-    backgroundColor: "#dcfce7",
+
+  // ── RSVP card (Stitch: bg-surface-container-lowest editorial-shadow rounded-3xl) ──
+  rsvpCard: {
+    marginHorizontal: 24,
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    borderRadius: 24,
+    padding: 28,
+    shadowColor: "#191c1c",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 24,
+    elevation: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: `${Colors.light.outlineVariant}20`,
+  },
+  rsvpHeadline: {
+    fontFamily: serifFont,
+    fontSize: 22,
+    fontWeight: "700",
+    color: Colors.light.foreground,
+    marginBottom: 24,
+  },
+
+  // Field groups
+  fieldGroup: {
+    marginBottom: 24,
+    gap: 8,
+  },
+  fieldLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 3,
+    color: Colors.light.onSurfaceVariant,
+  },
+
+  // Guest count (Stitch: grid-cols-4 gap-3, border + bg-primary active)
+  guestGrid: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  guestBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: "center",
+  },
+  guestBtnInactive: {
     borderWidth: 1,
-    borderColor: "#86efac",
+    borderColor: Colors.light.outlineVariant,
+  },
+  guestBtnActive: {
+    backgroundColor: Colors.light.primary,
+    shadowColor: "#191c1c",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 24,
+    elevation: 4,
+  },
+  guestBtnText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: Colors.light.foreground,
+  },
+  guestBtnTextActive: {
+    color: "#ffffff",
+  },
+
+  // Dietary (Stitch: card rows with check_circle / radio_button_unchecked)
+  dietaryList: {
+    gap: 8,
+  },
+  dietaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 16,
+  },
+  dietaryRowSelected: {
+    backgroundColor: Colors.light.surfaceContainer,
+  },
+  dietaryRowDefault: {
+    borderWidth: 1,
+    borderColor: Colors.light.outlineVariant,
+  },
+  dietaryText: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: Colors.light.foreground,
+  },
+
+  // Notes (Stitch: bg-surface-container border-none rounded-2xl p-4)
+  notesInput: {
+    backgroundColor: Colors.light.surfaceContainer,
+    borderRadius: 16,
+    padding: 16,
+    fontSize: 15,
+    color: Colors.light.foreground,
+    minHeight: 80,
+    lineHeight: 22,
+  },
+
+  // RSVP button (Stitch: bg-gradient-to-br from-primary to-primary-container rounded-2xl py-5)
+  rsvpBtn: {
+    borderRadius: 16,
+    overflow: "hidden",
+    marginTop: 8,
+  },
+  rsvpBtnGradient: {
+    paddingVertical: 18,
+    alignItems: "center",
+    borderRadius: 16,
+  },
+  rsvpBtnAttending: {
+    backgroundColor: Colors.light.accent,
+    paddingVertical: 16,
+    alignItems: "center",
   },
   rsvpBtnText: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  rsvpBtnTextDefault: {
-    color: Colors.light.primaryForeground,
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 3,
+    color: "#ffffff",
   },
   rsvpBtnTextAttending: {
-    color: "#166534",
+    fontSize: 15,
+    fontWeight: "600",
+    color: Colors.light.primary,
   },
   rsvpBtnRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
+    justifyContent: "center",
   },
-  // Admin
+  rsvpCancelHint: {
+    fontSize: 12,
+    color: `${Colors.light.primary}80`,
+    marginLeft: 4,
+  },
+
+  // Policy text (Stitch: text-center text-xs text-on-surface-variant)
+  policyText: {
+    fontSize: 12,
+    color: Colors.light.onSurfaceVariant,
+    textAlign: "center",
+    marginTop: 16,
+    paddingHorizontal: 12,
+    lineHeight: 18,
+  },
+
+  // ── Admin ──
   adminSection: {
     marginTop: 24,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
+    marginHorizontal: 24,
     flexDirection: "row",
     gap: 12,
   },
   adminBtn: {
     flex: 1,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    paddingVertical: 10,
+    flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.light.muted,
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 16,
+    paddingVertical: 14,
+    backgroundColor: Colors.light.surfaceContainerLow,
   },
   adminBtnText: {
     fontSize: 14,

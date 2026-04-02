@@ -9,7 +9,9 @@ import {
   ScrollView,
   RefreshControl,
   Linking,
+  Platform,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth-context";
 import { Colors } from "@/constants/theme";
@@ -30,21 +32,61 @@ interface BillingStatus {
   } | null;
 }
 
+type Transaction = {
+  id: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  date: string;
+  amount: string;
+  type: "charge" | "payment" | "credit";
+};
+
+// Placeholder recent activity
+const MOCK_ACTIVITY: Transaction[] = [
+  {
+    id: "1",
+    icon: "restaurant-outline",
+    title: "The Conservatory Dining",
+    date: "Mar 15, 2026 • 7:30 PM",
+    amount: "-$362.50",
+    type: "charge",
+  },
+  {
+    id: "2",
+    icon: "golf-outline",
+    title: "Golf Pro Shop Purchase",
+    date: "Mar 12, 2026 • 11:15 AM",
+    amount: "-$1,280.00",
+    type: "charge",
+  },
+  {
+    id: "3",
+    icon: "card-outline",
+    title: "Annual Membership Fee",
+    date: "Mar 1, 2026",
+    amount: "-$2,500.00",
+    type: "charge",
+  },
+];
+
 export default function ProfileScreen() {
   const { user, session, signOut } = useAuth();
+  const router = useRouter();
   const [billing, setBilling] = useState<BillingStatus | null>(null);
   const [billingLoading, setBillingLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (session?.access_token) {
-    headers["Authorization"] = `Bearer ${session.access_token}`;
-  }
+  const getHeaders = useCallback(() => {
+    const h: Record<string, string> = { "Content-Type": "application/json" };
+    if (session?.access_token) {
+      h["Authorization"] = `Bearer ${session.access_token}`;
+    }
+    return h;
+  }, [session?.access_token]);
 
   const fetchBilling = useCallback(async () => {
+    const headers = getHeaders();
     try {
       const res = await fetch(`${API_URL}/api/billing/status`, { headers });
       if (res.ok) {
@@ -57,7 +99,7 @@ export default function ProfileScreen() {
       setBillingLoading(false);
       setRefreshing(false);
     }
-  }, [session?.access_token]);
+  }, [getHeaders]);
 
   useEffect(() => {
     fetchBilling();
@@ -71,6 +113,7 @@ export default function ProfileScreen() {
   }
 
   async function handleManageBilling() {
+    const headers = getHeaders();
     setActionLoading(true);
     try {
       const res = await fetch(`${API_URL}/api/billing/portal`, {
@@ -91,6 +134,7 @@ export default function ProfileScreen() {
   }
 
   async function handleSetupBilling() {
+    const headers = getHeaders();
     setActionLoading(true);
     try {
       const res = await fetch(`${API_URL}/api/billing/setup`, {
@@ -110,21 +154,21 @@ export default function ProfileScreen() {
     }
   }
 
-  function formatDate(dateStr: string) {
-    if (!dateStr) return "—";
-    return new Date(dateStr).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  }
-
+  const fullName = user?.user_metadata?.full_name ?? "Member";
+  const initials = fullName
+    .split(" ")
+    .map((n: string) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
   const sub = billing?.subscription;
+  const tierName = billing?.tierName || sub?.tierName || "Member";
 
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -136,124 +180,217 @@ export default function ProfileScreen() {
         />
       }
     >
-      {/* Header */}
-      <View style={styles.header}>
+      {/* Profile Header */}
+      <View style={styles.profileHeader}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {(user?.user_metadata?.full_name ?? "U").charAt(0).toUpperCase()}
+          <Text style={styles.avatarText}>{initials}</Text>
+        </View>
+        <Text style={styles.profileName}>{fullName}</Text>
+        <View style={styles.tierBadge}>
+          <Text style={styles.tierBadgeText}>
+            {tierName.toUpperCase()} MEMBER
           </Text>
         </View>
-        <Text style={styles.name}>
-          {user?.user_metadata?.full_name ?? "Member"}
-        </Text>
-        <Text style={styles.email}>{user?.email}</Text>
       </View>
 
-      {/* Membership info */}
-      <View style={styles.section}>
-        <ProfileRow
-          label="Membership"
-          value={billing?.tierName || "—"}
-        />
-        <ProfileRow label="Member Since" value="—" />
-        {sub ? (
-          <ProfileRow
-            label="Subscription"
-            value={sub.status === "active" ? "Active" : sub.status.replace("_", " ")}
-            valueColor={sub.status === "active" ? "#16a34a" : "#dc2626"}
+      {/* Account Balance Card */}
+      <View style={styles.balanceCard}>
+        <Text style={styles.balanceLabel}>CURRENT STATEMENT BALANCE</Text>
+        {billingLoading ? (
+          <ActivityIndicator
+            size="small"
+            color={Colors.light.primaryForeground}
+            style={{ marginVertical: 12 }}
           />
         ) : (
-          <ProfileRow label="Subscription" value="Not set up" />
+          <Text style={styles.balanceAmount}>
+            ${sub ? sub.amount.toFixed(2) : "0.00"}
+          </Text>
         )}
+        <View style={styles.balanceActions}>
+          <TouchableOpacity
+            style={styles.payButton}
+            onPress={sub ? handleManageBilling : handleSetupBilling}
+            disabled={actionLoading}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.payButtonText}>
+              {sub ? "Pay Statement" : "Set Up Billing"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.detailsButton}
+            onPress={handleManageBilling}
+            disabled={actionLoading}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.detailsButtonText}>Details</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Billing section */}
-      <View style={styles.section}>
-        {billingLoading ? (
-          <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" color={Colors.light.primary} />
-            <Text style={styles.loadingText}>Loading billing...</Text>
+      {/* Account Details */}
+      {sub && (
+        <View style={styles.accountDetails}>
+          <View style={styles.accountDetailRow}>
+            <Text style={styles.accountDetailLabel}>UNBILLED CHARGES</Text>
+            <View style={styles.accountDetailValueRow}>
+              <Text style={styles.accountDetailValue}>
+                ${sub.amount.toFixed(2)}
+              </Text>
+              <Ionicons
+                name="information-circle-outline"
+                size={16}
+                color={Colors.light.onSurfaceVariant}
+              />
+            </View>
           </View>
-        ) : sub ? (
-          <>
-            <ProfileRow
-              label="Monthly Dues"
-              value={`$${sub.amount}/mo`}
-            />
-            <ProfileRow
-              label="Next Billing"
-              value={formatDate(sub.currentPeriodEnd)}
-            />
-            {sub.cancelAtPeriodEnd && (
-              <View style={styles.warningRow}>
-                <Text style={styles.warningText}>
+          <View style={styles.accountDetailDivider} />
+          <View style={styles.accountDetailRow}>
+            <Text style={styles.accountDetailLabel}>NEXT BILLING</Text>
+            <Text style={styles.accountDetailValue}>
+              {sub.currentPeriodEnd
+                ? new Date(sub.currentPeriodEnd).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })
+                : "—"}
+            </Text>
+          </View>
+          {sub.cancelAtPeriodEnd && (
+            <>
+              <View style={styles.accountDetailDivider} />
+              <View style={styles.cancelWarning}>
+                <Ionicons name="warning-outline" size={14} color="#92400e" />
+                <Text style={styles.cancelWarningText}>
                   Cancels at end of billing period
                 </Text>
               </View>
-            )}
-            <TouchableOpacity
-              style={[styles.actionRow, actionLoading && { opacity: 0.5 }]}
-              onPress={handleManageBilling}
-              disabled={actionLoading}
-              activeOpacity={0.6}
-            >
-              <Text style={styles.actionText}>Manage Billing</Text>
-              <Ionicons name="chevron-forward" size={16} color={Colors.light.mutedForeground} />
-            </TouchableOpacity>
-          </>
-        ) : (
-          <TouchableOpacity
-            style={[styles.setupRow, actionLoading && { opacity: 0.5 }]}
-            onPress={handleSetupBilling}
-            disabled={actionLoading}
-            activeOpacity={0.6}
-          >
-            <View>
-              <Text style={styles.setupTitle}>Set Up Billing</Text>
-              <Text style={styles.setupSubtitle}>
-                Start automatic dues payments
-              </Text>
-            </View>
-            <Text style={styles.actionArrow}>→</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+            </>
+          )}
+        </View>
+      )}
 
-      {/* Other actions */}
-      <View style={styles.section}>
-        <ProfileRow label="Notifications" showChevron />
-        <ProfileRow label="Family Members" showChevron />
-      </View>
-
-      <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-        <Text style={styles.signOutText}>Sign Out</Text>
+      {/* Membership Card Link */}
+      <TouchableOpacity
+        style={styles.membershipCardButton}
+        onPress={() => router.push("/membership-card")}
+        activeOpacity={0.7}
+      >
+        <View style={styles.membershipCardIcon}>
+          <Ionicons
+            name="diamond"
+            size={16}
+            color={Colors.light.primaryForeground}
+          />
+        </View>
+        <View style={styles.membershipCardContent}>
+          <Text style={styles.membershipCardTitle}>Membership Card</Text>
+          <Text style={styles.membershipCardSubtitle}>
+            View your digital member ID & QR code
+          </Text>
+        </View>
+        <Ionicons
+          name="chevron-forward"
+          size={16}
+          color={Colors.light.onSurfaceVariant}
+        />
       </TouchableOpacity>
+
+      {/* Recent Activity */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Recent Activity</Text>
+          <TouchableOpacity activeOpacity={0.7}>
+            <Text style={styles.viewAllText}>VIEW ALL</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.activityCard}>
+          {MOCK_ACTIVITY.map((tx, index) => (
+            <View key={tx.id}>
+              {index > 0 && <View style={styles.activityDivider} />}
+              <View style={styles.activityRow}>
+                <View style={styles.activityIconWrap}>
+                  <Ionicons
+                    name={tx.icon}
+                    size={20}
+                    color={Colors.light.primary}
+                  />
+                </View>
+                <View style={styles.activityContent}>
+                  <Text style={styles.activityTitle}>{tx.title}</Text>
+                  <Text style={styles.activityDate}>{tx.date}</Text>
+                </View>
+                <Text style={styles.activityAmount}>{tx.amount}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Account Settings */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Account Settings</Text>
+        <View style={styles.settingsCard}>
+          <SettingsRow
+            icon="person-outline"
+            title="Personal Information"
+            subtitle="Name, email, phone number"
+          />
+          <View style={styles.settingsDivider} />
+          <SettingsRow
+            icon="notifications-outline"
+            title="Notification Preferences"
+            subtitle="Push notifications, emails and alerts"
+          />
+          <View style={styles.settingsDivider} />
+          <SettingsRow
+            icon="shield-checkmark-outline"
+            title="Security & Privacy"
+            subtitle="Password, 2FA, data preferences"
+          />
+        </View>
+      </View>
+
+      {/* Sign Out */}
+      <TouchableOpacity
+        style={styles.signOutButton}
+        onPress={handleSignOut}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.signOutText}>Sign Out of ClubOS</Text>
+      </TouchableOpacity>
+
+      <View style={{ height: 32 }} />
     </ScrollView>
   );
 }
 
-function ProfileRow({
-  label,
-  value,
-  valueColor,
-  showChevron,
+function SettingsRow({
+  icon,
+  title,
+  subtitle,
 }: {
-  label: string;
-  value?: string;
-  valueColor?: string;
-  showChevron?: boolean;
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle: string;
 }) {
   return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      {showChevron ? (
-        <Ionicons name="chevron-forward" size={16} color={Colors.light.mutedForeground} />
-      ) : (
-        <Text style={[styles.rowValue, valueColor ? { color: valueColor } : undefined]}>
-          {value}
-        </Text>
-      )}
-    </View>
+    <TouchableOpacity style={styles.settingsRow} activeOpacity={0.7}>
+      <View style={styles.settingsIconWrap}>
+        <Ionicons name={icon} size={20} color={Colors.light.onSurfaceVariant} />
+      </View>
+      <View style={styles.settingsContent}>
+        <Text style={styles.settingsTitle}>{title}</Text>
+        <Text style={styles.settingsSubtitle}>{subtitle}</Text>
+      </View>
+      <Ionicons
+        name="chevron-forward"
+        size={16}
+        color={Colors.light.outlineVariant}
+      />
+    </TouchableOpacity>
   );
 }
 
@@ -263,126 +400,333 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.background,
   },
   content: {
-    padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 20,
   },
-  header: {
+
+  // Profile Header
+  profileHeader: {
     alignItems: "center",
-    marginBottom: 32,
-    marginTop: 12,
+    paddingTop: Platform.OS === "ios" ? 70 : 50,
+    paddingBottom: 24,
   },
   avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: Colors.light.primary,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.light.surfaceContainerHigh,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 14,
+    borderWidth: 3,
+    borderColor: Colors.light.outlineVariant,
   },
   avatarText: {
     fontSize: 28,
-    fontWeight: "bold",
+    fontWeight: "700",
+    color: Colors.light.onSurfaceVariant,
+  },
+  profileName: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: Colors.light.foreground,
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    marginBottom: 6,
+  },
+  tierBadge: {
+    backgroundColor: Colors.light.primaryContainer,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  tierBadgeText: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 1,
     color: Colors.light.primaryForeground,
   },
-  name: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: Colors.light.foreground,
-  },
-  email: {
-    fontSize: 14,
-    color: Colors.light.mutedForeground,
-    marginTop: 2,
-  },
-  section: {
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    borderRadius: 16,
-    marginBottom: 16,
-    overflow: "hidden",
-  },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+
+  // Balance Card
+  balanceCard: {
+    marginHorizontal: 24,
+    backgroundColor: Colors.light.primary,
+    borderRadius: 20,
+    padding: 24,
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    marginBottom: 20,
+    shadowColor: Colors.light.primary,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 6,
   },
-  rowLabel: {
-    fontSize: 14,
-    color: Colors.light.foreground,
+  balanceLabel: {
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 1.5,
+    color: Colors.light.accent,
+    marginBottom: 6,
   },
-  rowValue: {
-    fontSize: 14,
-    color: Colors.light.mutedForeground,
+  balanceAmount: {
+    fontSize: 36,
+    fontWeight: "700",
+    color: Colors.light.primaryForeground,
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    marginBottom: 20,
   },
-  loadingRow: {
+  balanceActions: {
     flexDirection: "row",
+    gap: 10,
+    width: "100%",
+  },
+  payButton: {
+    flex: 1,
+    backgroundColor: Colors.light.primaryForeground,
+    borderRadius: 12,
+    paddingVertical: 12,
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 20,
-    gap: 8,
   },
-  loadingText: {
-    fontSize: 14,
-    color: Colors.light.mutedForeground,
-  },
-  warningRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: "#fef3c7",
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  warningText: {
-    fontSize: 13,
-    color: "#92400e",
-  },
-  actionRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  actionText: {
+  payButtonText: {
     fontSize: 14,
     fontWeight: "600",
     color: Colors.light.primary,
   },
-  actionArrow: {
-    fontSize: 16,
-    color: Colors.light.mutedForeground,
-  },
-  setupRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  setupTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.light.primary,
-  },
-  setupSubtitle: {
-    fontSize: 12,
-    color: Colors.light.mutedForeground,
-    marginTop: 2,
-  },
-  signOutButton: {
-    alignItems: "center",
-    paddingVertical: 14,
+  detailsButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.light.destructive,
-    marginTop: 8,
+    borderColor: Colors.light.accent + "60",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detailsButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.light.primaryForeground,
+  },
+
+  // Account Details
+  accountDetails: {
+    marginHorizontal: 24,
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 20,
+    shadowColor: Colors.light.foreground,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 12,
+    elevation: 1,
+  },
+  accountDetailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 4,
+  },
+  accountDetailLabel: {
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 1,
+    color: Colors.light.outline,
+  },
+  accountDetailValueRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  accountDetailValue: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.light.foreground,
+  },
+  accountDetailDivider: {
+    height: 1,
+    backgroundColor: Colors.light.surfaceContainerLow,
+    marginVertical: 12,
+  },
+  cancelWarning: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#fffbeb",
+    padding: 10,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  cancelWarningText: {
+    fontSize: 12,
+    color: "#92400e",
+    fontWeight: "500",
+  },
+
+  // Membership Card Button
+  membershipCardButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    marginHorizontal: 24,
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    shadowColor: Colors.light.foreground,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  membershipCardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: Colors.light.primaryContainer,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  membershipCardContent: {
+    flex: 1,
+    gap: 2,
+  },
+  membershipCardTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: Colors.light.foreground,
+  },
+  membershipCardSubtitle: {
+    fontSize: 12,
+    color: Colors.light.onSurfaceVariant,
+  },
+
+  // Sections
+  section: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.light.foreground,
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    paddingHorizontal: 24,
+    marginBottom: 12,
+  },
+  viewAllText: {
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+    color: Colors.light.onSurfaceVariant,
+  },
+
+  // Activity
+  activityCard: {
+    marginHorizontal: 24,
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: Colors.light.foreground,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 12,
+    elevation: 1,
+  },
+  activityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 4,
+  },
+  activityIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: Colors.light.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  activityContent: {
+    flex: 1,
+    gap: 2,
+  },
+  activityTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.light.foreground,
+  },
+  activityDate: {
+    fontSize: 11,
+    color: Colors.light.onSurfaceVariant,
+  },
+  activityAmount: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.light.foreground,
+  },
+  activityDivider: {
+    height: 1,
+    backgroundColor: Colors.light.surfaceContainerLow,
+    marginVertical: 10,
+  },
+
+  // Settings
+  settingsCard: {
+    marginHorizontal: 24,
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    borderRadius: 16,
+    padding: 4,
+    shadowColor: Colors.light.foreground,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 12,
+    elevation: 1,
+  },
+  settingsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 14,
+  },
+  settingsIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: Colors.light.surfaceContainerLow,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  settingsContent: {
+    flex: 1,
+    gap: 2,
+  },
+  settingsTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.light.foreground,
+  },
+  settingsSubtitle: {
+    fontSize: 12,
+    color: Colors.light.onSurfaceVariant,
+  },
+  settingsDivider: {
+    height: 1,
+    backgroundColor: Colors.light.surfaceContainerLow,
+    marginHorizontal: 14,
+  },
+
+  // Sign Out
+  signOutButton: {
+    alignItems: "center",
+    marginHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.light.destructive + "40",
   },
   signOutText: {
     fontSize: 14,

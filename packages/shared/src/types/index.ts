@@ -3,7 +3,7 @@
 // ============================================
 
 export type MemberRole = "admin" | "staff" | "member";
-export type MemberStatus = "active" | "inactive" | "suspended" | "pending";
+export type MemberStatus = "active" | "inactive" | "suspended" | "pending" | "invited";
 export type MembershipTierLevel = "standard" | "premium" | "vip" | "honorary";
 export type SubscriptionStatus =
   | "active"
@@ -43,11 +43,27 @@ export interface Member {
   family_id: string | null;
   join_date: string;
   notes: string | null;
+  invite_token: string | null;
+  invite_expires_at: string | null;
+  invite_sent_at: string | null;
+  invite_accepted_at: string | null;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   subscription_status: SubscriptionStatus | null;
   created_at: string;
   updated_at: string;
+}
+
+// Invite claim page data (returned by GET /api/invite/[token])
+export interface InviteInfo {
+  member_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  tier_name: string | null;
+  club_name: string;
+  club_logo_url: string | null;
+  expires_at: string;
 }
 
 export interface MembershipTier {
@@ -363,6 +379,37 @@ export interface DirectoryMember {
 export interface MemberDirectoryResponse {
   members: DirectoryMember[];
   tiers: { id: string; name: string; level: MembershipTierLevel }[];
+  role: MemberRole;
+}
+
+// Golf pricing types
+export type GolfDayType = "weekday" | "weekend";
+export type GolfTimeType = "prime" | "afternoon" | "twilight";
+export type GolfHoles = "9" | "18";
+
+export interface GolfRate {
+  id: string;
+  club_id: string;
+  facility_id: string;
+  name: string;
+  holes: GolfHoles;
+  day_type: GolfDayType;
+  time_type: GolfTimeType;
+  member_price: number;
+  guest_price: number;
+  cart_fee: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GolfRateWithFacility extends GolfRate {
+  facility_name: string;
+}
+
+export interface GolfRatesResponse {
+  rates: GolfRateWithFacility[];
+  facilities: { id: string; name: string }[];
   role: MemberRole;
 }
 

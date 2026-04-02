@@ -31,7 +31,7 @@ CREATE INDEX idx_waitlist_slot_lookup
 CREATE TRIGGER set_waitlist_updated_at
   BEFORE UPDATE ON booking_waitlist
   FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+  EXECUTE FUNCTION update_updated_at();
 
 -- ============================================
 -- RLS Policies

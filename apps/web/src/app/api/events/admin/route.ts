@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createApiClient } from "@/lib/supabase/api";
 import { getMemberWithTier } from "@/lib/golf-eligibility";
 import { createEventSchema } from "@club/shared";
-
-// Service role client for admin writes (bypasses RLS)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
   try {
@@ -46,7 +40,7 @@ export async function POST(request: Request) {
     }
 
     // Use service role client for the write (bypasses RLS, safe since admin is verified above)
-    const { data: event, error } = await supabaseAdmin
+    const { data: event, error } = await getSupabaseAdmin()
       .from("events")
       .insert({
         club_id: result.member.club_id,

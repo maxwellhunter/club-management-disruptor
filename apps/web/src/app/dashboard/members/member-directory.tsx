@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { Search, Users, Mail, Phone } from "lucide-react";
 import type { DirectoryMember, MembershipTierLevel } from "@club/shared";
 
@@ -27,6 +28,8 @@ export function MemberDirectory({
   tierFilter,
   onTierFilterChange,
 }: MemberDirectoryProps) {
+  const router = useRouter();
+
   return (
     <>
       {/* Search + Filter bar */}
@@ -80,7 +83,11 @@ export function MemberDirectory({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {members.map((member) => (
-            <MemberCard key={member.id} member={member} />
+            <MemberCard
+              key={member.id}
+              member={member}
+              onClick={() => router.push(`/dashboard/members/${member.id}`)}
+            />
           ))}
         </div>
       )}
@@ -88,13 +95,18 @@ export function MemberDirectory({
   );
 }
 
-function MemberCard({ member }: { member: DirectoryMember }) {
+function MemberCard({ member, onClick }: { member: DirectoryMember; onClick: () => void }) {
   const initials =
     `${member.first_name[0]}${member.last_name[0]}`.toUpperCase();
   const badgeClass = member.tier_level ? TIER_BADGE[member.tier_level] : null;
 
   return (
-    <div className="rounded-xl border border-[var(--border)] p-4 hover:border-[var(--primary)] hover:shadow-sm transition-all">
+    <div
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter") onClick(); }}
+      className="rounded-xl border border-[var(--border)] p-4 hover:border-[var(--primary)] hover:shadow-sm transition-all cursor-pointer">
       <div className="flex items-start gap-3">
         {member.avatar_url ? (
           <img

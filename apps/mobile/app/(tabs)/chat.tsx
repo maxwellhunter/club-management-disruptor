@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   FlatList,
+  ScrollView,
   KeyboardAvoidingView,
   Platform,
   Alert,
@@ -17,6 +18,12 @@ import { useAuth } from "@/lib/auth-context";
 import { Colors } from "@/constants/theme";
 import type { RsvpStatus } from "@club/shared";
 import { ChatMarkdown } from "@/components/markdown";
+
+const SERIF_FONT = Platform.select({
+  ios: "Georgia",
+  android: "serif",
+  default: "serif",
+});
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -104,11 +111,11 @@ function formatTeeTime(time: string) {
   return `${h12}:${m} ${ampm}`;
 }
 
-const SUGGESTIONS = [
-  "Book a tee time Saturday",
-  "What events this week?",
-  "Show my balance",
-  "Newest members?",
+const QUICK_ACTIONS = [
+  { label: "Book Golf", icon: "golf-outline" as const, prompt: "Book a tee time this weekend" },
+  { label: "Dinner Reservation", icon: "restaurant-outline" as const, prompt: "Make a dinner reservation" },
+  { label: "Spa Services", icon: "leaf-outline" as const, prompt: "What spa services are available?" },
+  { label: "Club Calendar", icon: "calendar-outline" as const, prompt: "What events are coming up?" },
 ];
 
 // ─── EventCard Component ─────────────────────────────────────────────
@@ -227,107 +234,105 @@ function EventCard({
 
 const cardStyles = StyleSheet.create({
   card: {
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    borderRadius: 12,
-    padding: 14,
-    marginTop: 8,
-    backgroundColor: Colors.light.background,
+    borderRadius: 24,
+    padding: 18,
+    marginTop: 10,
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    shadowColor: Colors.light.foreground,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 24,
+    elevation: 3,
   },
   titleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    gap: 10,
+    gap: 12,
   },
   title: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "600",
+    fontFamily: SERIF_FONT,
     color: Colors.light.foreground,
     flex: 1,
   },
   badge: {
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+    borderRadius: 9999,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
   },
   freeBadge: {
-    backgroundColor: "#dcfce7",
+    backgroundColor: Colors.light.accent,
   },
   paidBadge: {
-    backgroundColor: "#dbeafe",
+    backgroundColor: Colors.light.tertiaryFixed,
   },
   badgeText: {
     fontSize: 12,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   freeBadgeText: {
-    color: "#166534",
+    color: Colors.light.primary,
   },
   paidBadgeText: {
-    color: "#1e40af",
+    color: Colors.light.tertiary,
   },
   meta: {
-    marginTop: 10,
-    gap: 3,
+    marginTop: 12,
+    gap: 4,
   },
   metaText: {
     fontSize: 13,
-    color: Colors.light.mutedForeground,
+    color: Colors.light.onSurfaceVariant,
   },
   description: {
-    marginTop: 10,
+    marginTop: 12,
     fontSize: 13,
     color: Colors.light.foreground,
-    lineHeight: 18,
+    lineHeight: 19,
   },
   rsvpButton: {
-    marginTop: 12,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 18,
+    marginTop: 14,
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     alignSelf: "flex-start",
   },
   defaultButton: {
     backgroundColor: Colors.light.primary,
   },
   attendingButton: {
-    backgroundColor: "#dcfce7",
-    borderWidth: 1,
-    borderColor: "#86efac",
+    backgroundColor: Colors.light.accent,
   },
   disabledButton: {
     opacity: 0.5,
   },
   rsvpText: {
     fontSize: 14,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   defaultText: {
     color: Colors.light.primaryForeground,
   },
   attendingText: {
-    color: "#166534",
+    color: Colors.light.primary,
   },
   cancelButton: {
     backgroundColor: "#fef2f2",
-    borderWidth: 1,
-    borderColor: "#fca5a5",
   },
   cancelText: {
     fontSize: 14,
-    fontWeight: "500",
-    color: "#b91c1c",
+    fontWeight: "600",
+    color: Colors.light.destructive,
   },
   cancelledButton: {
-    backgroundColor: "#f5f5f5",
-    borderWidth: 1,
-    borderColor: "#e5e5e5",
+    backgroundColor: Colors.light.surfaceContainerLow,
   },
   cancelledText: {
     fontSize: 14,
     fontWeight: "500",
-    color: "#a3a3a3",
+    color: Colors.light.onSurfaceVariant,
   },
 });
 
@@ -618,11 +623,40 @@ export default function ChatScreen() {
     }
   }
 
-  function renderMessage({ item }: { item: Message }) {
+  function renderMessage({ item, index }: { item: Message; index: number }) {
     const isUser = item.role === "user";
+    const msgTime = new Date(parseInt(item.id));
+    const timeLabel = !isNaN(msgTime.getTime())
+      ? msgTime.toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        })
+      : "";
 
     return (
-      <View>
+      <View style={isUser ? styles.userColumn : styles.assistantColumn}>
+        {/* Date pill for first message */}
+        {index === 0 && (
+          <View style={styles.datePillRow}>
+            <View style={styles.datePill}>
+              <Text style={styles.datePillText}>
+                Today, {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric" })}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* AI label row */}
+        {!isUser && item.content ? (
+          <View style={styles.aiLabelRow}>
+            <View style={styles.aiAvatarSmall}>
+              <Ionicons name="sparkles" size={10} color={Colors.light.primaryForeground} />
+            </View>
+            <Text style={styles.aiLabelText}>THE RESERVE AI</Text>
+          </View>
+        ) : null}
+
         {/* Text bubble */}
         {item.content ? (
           <View
@@ -639,6 +673,18 @@ export default function ChatScreen() {
               <ChatMarkdown>{item.content}</ChatMarkdown>
             )}
           </View>
+        ) : null}
+
+        {/* Timestamp */}
+        {item.content && timeLabel ? (
+          <Text
+            style={[
+              styles.timestamp,
+              isUser ? styles.timestampRight : styles.timestampLeft,
+            ]}
+          >
+            {timeLabel}
+          </Text>
         ) : null}
 
         {/* Event card attachments */}
@@ -959,6 +1005,13 @@ export default function ChatScreen() {
     );
   }
 
+  function getGreeting() {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+  }
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -967,20 +1020,19 @@ export default function ChatScreen() {
     >
       {messages.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="chatbubble-ellipses-outline" size={48} color={Colors.light.mutedForeground} />
-          <Text style={styles.emptyText}>
-            Hi! I'm your club assistant. Try asking:
-          </Text>
-          <View style={styles.suggestions}>
-            {SUGGESTIONS.map((s) => (
-              <TouchableOpacity
-                key={s}
-                style={styles.suggestion}
-                onPress={() => setInput(s)}
-              >
-                <Text style={styles.suggestionText}>{s}</Text>
-              </TouchableOpacity>
-            ))}
+          {/* Concierge greeting — Stitch style */}
+          <View style={styles.greetingContainer}>
+            <View style={styles.conciergeIcon}>
+              <Ionicons name="sparkles" size={24} color={Colors.light.primaryForeground} />
+            </View>
+            <Text style={styles.greetingTitle}>ClubOS AI</Text>
+            <View style={styles.activeRow}>
+              <View style={styles.activeDot} />
+              <Text style={styles.activeLabel}>Concierge Active</Text>
+            </View>
+            <Text style={styles.greetingText}>
+              {getGreeting()}. How can I assist{"\n"}you at the club today?
+            </Text>
           </View>
         </View>
       ) : (
@@ -996,32 +1048,82 @@ export default function ChatScreen() {
           ListFooterComponent={
             loading ? (
               <View style={styles.typingIndicator}>
-                <ActivityIndicator size="small" color={Colors.light.mutedForeground} />
+                <View style={styles.typingDots}>
+                  <View style={styles.aiAvatarSmall}>
+                    <Ionicons name="sparkles" size={10} color={Colors.light.primaryForeground} />
+                  </View>
+                  <ActivityIndicator size="small" color={Colors.light.primary} />
+                </View>
               </View>
             ) : null
           }
         />
       )}
 
-      <View style={styles.inputBar}>
-        <TextInput
-          style={styles.input}
-          placeholder="Ask anything about your club..."
-          placeholderTextColor={Colors.light.mutedForeground}
-          value={input}
-          onChangeText={setInput}
-          onSubmitEditing={handleSend}
-          returnKeyType="send"
-          multiline
-          maxLength={4000}
-        />
-        <TouchableOpacity
-          style={[styles.sendButton, (!input.trim() || loading) && styles.sendDisabled]}
-          onPress={handleSend}
-          disabled={!input.trim() || loading}
+      {/* Bottom: Quick Chips + Input */}
+      <View style={styles.inputBarContainer}>
+        {/* Quick action chips — horizontal scroll */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.quickChipsScroll}
         >
-          <Ionicons name="arrow-up" size={18} color={Colors.light.primaryForeground} />
-        </TouchableOpacity>
+          {QUICK_ACTIONS.map((action) => (
+            <TouchableOpacity
+              key={action.label}
+              style={styles.quickChip}
+              onPress={() => {
+                setInput(action.prompt);
+                setTimeout(handleSend, 100);
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={action.icon}
+                size={16}
+                color={Colors.light.primary}
+              />
+              <Text style={styles.quickChipText}>{action.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Main input bar — pill shape */}
+        <View style={styles.inputPill}>
+          <TouchableOpacity style={styles.attachBtn} activeOpacity={0.6}>
+            <Ionicons
+              name="attach"
+              size={22}
+              color={Colors.light.onSurfaceVariant}
+            />
+          </TouchableOpacity>
+          <TextInput
+            style={styles.input}
+            placeholder="Type your request here..."
+            placeholderTextColor={Colors.light.outline}
+            value={input}
+            onChangeText={setInput}
+            onSubmitEditing={handleSend}
+            returnKeyType="send"
+            multiline
+            maxLength={4000}
+          />
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              (!input.trim() || loading) && styles.sendDisabled,
+            ]}
+            onPress={handleSend}
+            disabled={!input.trim() || loading}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name="send"
+              size={16}
+              color={Colors.light.primaryForeground}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -1032,107 +1134,270 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.light.background,
   },
+
+  // ─── Empty State / Concierge Welcome ────────────────────────────
   emptyState: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 24,
+    paddingHorizontal: 32,
+    paddingBottom: 40,
   },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
+  greetingContainer: {
+    alignItems: "center",
   },
-  emptyText: {
-    fontSize: 14,
-    color: Colors.light.mutedForeground,
-    marginBottom: 16,
-  },
-  suggestions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: 8,
-  },
-  suggestion: {
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  suggestionText: {
-    fontSize: 13,
-    color: Colors.light.foreground,
-  },
-  messageList: {
-    padding: 16,
-    gap: 8,
-  },
-  messageBubble: {
-    maxWidth: "80%",
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  userBubble: {
-    alignSelf: "flex-end",
+  conciergeIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: Colors.light.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+    shadowColor: Colors.light.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 6,
   },
-  assistantBubble: {
-    alignSelf: "flex-start",
-    backgroundColor: Colors.light.muted,
+  greetingTitle: {
+    fontSize: 24,
+    fontFamily: SERIF_FONT,
+    fontStyle: "italic",
+    fontWeight: "700",
+    color: Colors.light.primary,
+    letterSpacing: -0.3,
+    marginBottom: 8,
   },
-  messageText: {
-    fontSize: 14,
-    color: Colors.light.foreground,
-    lineHeight: 20,
-  },
-  userText: {
-    color: Colors.light.primaryForeground,
-  },
-  attachmentContainer: {
-    alignSelf: "flex-start",
-    maxWidth: "90%",
-  },
-  typingIndicator: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-  },
-  inputBar: {
+  activeRow: {
     flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 24,
+  },
+  activeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#22c55e",
+  },
+  activeLabel: {
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 1.5,
+    color: Colors.light.onSurfaceVariant,
+    textTransform: "uppercase",
+  },
+  greetingText: {
+    fontSize: 18,
+    fontFamily: SERIF_FONT,
+    color: Colors.light.primary,
+    textAlign: "center",
+    lineHeight: 26,
+  },
+
+  // ─── Messages ───────────────────────────────────────────────────
+  messageList: {
+    padding: 24,
+    paddingBottom: 8,
+    gap: 28,
+  },
+  assistantColumn: {
+    alignItems: "flex-start",
+    maxWidth: "85%",
+    gap: 4,
+  },
+  userColumn: {
     alignItems: "flex-end",
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
-    gap: 8,
+    alignSelf: "flex-end",
+    maxWidth: "85%",
+    gap: 4,
   },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    borderRadius: 20,
+
+  // Date pill
+  datePillRow: {
+    width: "100%",
+    alignItems: "center",
+    marginBottom: 16,
+    alignSelf: "center",
+  },
+  datePill: {
+    backgroundColor: Colors.light.surfaceContainerLow,
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 14,
-    maxHeight: 100,
-    color: Colors.light.foreground,
+    paddingVertical: 5,
+    borderRadius: 20,
   },
-  sendButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  datePillText: {
+    fontSize: 9,
+    fontWeight: "600",
+    letterSpacing: 2,
+    color: Colors.light.onSurfaceVariant,
+    textTransform: "uppercase",
+  },
+
+  // AI label row
+  aiLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
+  },
+  aiAvatarSmall: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: Colors.light.primary,
     justifyContent: "center",
     alignItems: "center",
   },
-  sendDisabled: {
-    opacity: 0.4,
+  aiLabelText: {
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 1.5,
+    color: Colors.light.primary,
   },
-  sendText: {
-    color: Colors.light.primaryForeground,
-    fontSize: 18,
-    fontWeight: "bold",
+
+  // Bubbles
+  messageBubble: {
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  userBubble: {
+    backgroundColor: Colors.light.surfaceContainerHigh + "99",
+    borderTopRightRadius: 4,
+    borderWidth: 1,
+    borderColor: Colors.light.outlineVariant + "26",
+  },
+  assistantBubble: {
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    borderTopLeftRadius: 4,
+    shadowColor: Colors.light.foreground,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 20,
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: Colors.light.outlineVariant + "18",
+  },
+  messageText: {
+    fontSize: 15,
+    color: Colors.light.foreground,
+    lineHeight: 22,
+  },
+  userText: {
+    color: Colors.light.foreground,
+  },
+
+  // Timestamps
+  timestamp: {
+    fontSize: 10,
+    color: Colors.light.onSurfaceVariant + "66",
+    marginTop: 2,
+  },
+  timestampLeft: {
+    marginLeft: 4,
+  },
+  timestampRight: {
+    marginRight: 4,
+  },
+
+  attachmentContainer: {
+    alignSelf: "flex-start",
+    maxWidth: "92%",
+    marginLeft: 0,
+  },
+
+  // ─── Typing Indicator ──────────────────────────────────────────
+  typingIndicator: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+  },
+  typingDots: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  typingAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  // ─── Bottom Input Area ─────────────────────────────────────────
+  inputBarContainer: {
+    paddingBottom: Platform.OS === "ios" ? 4 : 8,
+    paddingTop: 4,
+  },
+  quickChipsScroll: {
+    paddingHorizontal: 16,
+    gap: 8,
+    paddingBottom: 12,
+  },
+  quickChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: Colors.light.outlineVariant + "33",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 24,
+  },
+  quickChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: Colors.light.primary,
+    letterSpacing: -0.2,
+  },
+  inputPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 16,
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    borderRadius: 28,
+    paddingLeft: 4,
+    paddingRight: 6,
+    paddingVertical: 6,
+    shadowColor: Colors.light.foreground,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 32,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: Colors.light.outlineVariant + "18",
+  },
+  attachBtn: {
+    padding: 10,
+  },
+  input: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.light.foreground,
+    paddingVertical: 8,
+    maxHeight: 100,
+  },
+  sendButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.light.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: Colors.light.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  sendDisabled: {
+    backgroundColor: Colors.light.surfaceContainerHigh,
+    shadowOpacity: 0,
+    elevation: 0,
   },
 });
 
@@ -1140,35 +1405,33 @@ const teeStyles = StyleSheet.create({
   partySizeRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginTop: 8,
-    marginBottom: 4,
+    gap: 8,
+    marginTop: 10,
+    marginBottom: 6,
   },
   partySizeLabel: {
-    fontSize: 12,
-    color: Colors.light.mutedForeground,
+    fontSize: 13,
+    color: Colors.light.onSurfaceVariant,
   },
   partySizePills: {
     flexDirection: "row",
-    gap: 4,
+    gap: 6,
   },
   partySizePill: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.light.surfaceContainerLow,
     justifyContent: "center",
     alignItems: "center",
   },
   partySizePillActive: {
     backgroundColor: Colors.light.primary,
-    borderColor: Colors.light.primary,
   },
   partySizePillText: {
-    fontSize: 12,
-    fontWeight: "500",
-    color: Colors.light.mutedForeground,
+    fontSize: 13,
+    fontWeight: "600",
+    color: Colors.light.onSurfaceVariant,
   },
   partySizePillTextActive: {
     color: Colors.light.primaryForeground,
@@ -1176,155 +1439,162 @@ const teeStyles = StyleSheet.create({
   courseSelectorRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginBottom: 4,
+    gap: 8,
+    marginBottom: 6,
   },
   coursePills: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 4,
+    gap: 6,
   },
   coursePill: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    borderRadius: 9999,
+    backgroundColor: Colors.light.surfaceContainerLow,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
   },
   coursePillActive: {
     backgroundColor: Colors.light.primary,
-    borderColor: Colors.light.primary,
   },
   coursePillText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "500",
-    color: Colors.light.mutedForeground,
+    color: Colors.light.onSurfaceVariant,
   },
   coursePillTextActive: {
     color: Colors.light.primaryForeground,
   },
   facilitySubLabel: {
-    fontSize: 11,
-    color: Colors.light.mutedForeground,
-    marginBottom: 4,
+    fontSize: 12,
+    fontFamily: SERIF_FONT,
+    color: Colors.light.onSurfaceVariant,
+    marginBottom: 6,
     marginLeft: 2,
   },
   dateGroup: {
-    marginTop: 8,
+    marginTop: 10,
   },
   dateHeader: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "600",
-    color: Colors.light.mutedForeground,
-    marginBottom: 6,
+    fontFamily: SERIF_FONT,
+    color: Colors.light.foreground,
+    marginBottom: 8,
   },
   slotsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 6,
+    gap: 8,
   },
   slotChip: {
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.light.tertiaryFixed,
+    shadowColor: Colors.light.foreground,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
   },
   slotChipBooked: {
-    borderColor: "#86efac",
-    backgroundColor: "#dcfce7",
+    backgroundColor: Colors.light.accent,
+    borderLeftColor: Colors.light.primary,
   },
   slotChipContent: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: 6,
   },
   slotTime: {
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: "500",
     color: Colors.light.foreground,
   },
   slotTimeBooked: {
-    fontSize: 13,
-    color: "#166534",
+    fontSize: 14,
+    fontWeight: "500",
+    color: Colors.light.primary,
   },
   confirmCard: {
-    borderWidth: 1,
-    borderColor: "#86efac",
-    backgroundColor: "#f0fdf4",
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: Colors.light.accent,
+    borderRadius: 24,
+    padding: 16,
   },
   confirmHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginBottom: 8,
+    gap: 8,
+    marginBottom: 10,
   },
   confirmTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "600",
-    color: "#166534",
+    fontFamily: SERIF_FONT,
+    color: Colors.light.primary,
   },
   confirmDetails: {
-    gap: 4,
+    gap: 6,
   },
   confirmRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
   },
   confirmText: {
-    fontSize: 13,
-    color: "#166534",
+    fontSize: 14,
+    color: Colors.light.primary,
   },
   bookingCard: {
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 8,
-    backgroundColor: Colors.light.background,
+    borderRadius: 24,
+    padding: 16,
+    marginTop: 10,
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    shadowColor: Colors.light.foreground,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 2,
   },
   bookingCardCancelled: {
-    borderColor: "#e5e5e5",
-    backgroundColor: "#f5f5f5",
+    backgroundColor: Colors.light.surfaceContainerLow,
+    opacity: 0.7,
   },
   bookingFacility: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "600",
+    fontFamily: SERIF_FONT,
     color: Colors.light.foreground,
   },
   bookingMeta: {
-    marginTop: 6,
-    gap: 3,
+    marginTop: 8,
+    gap: 4,
   },
   bookingMetaText: {
-    fontSize: 12,
-    color: Colors.light.mutedForeground,
+    fontSize: 13,
+    color: Colors.light.onSurfaceVariant,
   },
   cancelButton: {
-    marginTop: 8,
+    marginTop: 10,
     backgroundColor: "#fef2f2",
-    borderWidth: 1,
-    borderColor: "#fca5a5",
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     alignSelf: "flex-start",
   },
   cancelButtonText: {
     fontSize: 13,
-    fontWeight: "500",
-    color: "#b91c1c",
+    fontWeight: "600",
+    color: Colors.light.destructive,
   },
   cancelledBadge: {
-    marginTop: 8,
-    backgroundColor: "#f5f5f5",
-    borderWidth: 1,
-    borderColor: "#e5e5e5",
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
+    marginTop: 10,
+    backgroundColor: Colors.light.surfaceContainerLow,
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
@@ -1333,6 +1603,6 @@ const teeStyles = StyleSheet.create({
   cancelledText: {
     fontSize: 13,
     fontWeight: "500",
-    color: "#a3a3a3",
+    color: Colors.light.onSurfaceVariant,
   },
 });

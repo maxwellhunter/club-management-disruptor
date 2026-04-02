@@ -8,8 +8,12 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  Platform,
+  Image,
+  Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/lib/auth-context";
@@ -18,6 +22,23 @@ import { AttendeesModal } from "@/components/attendees-modal";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+// Stitch design image placeholders per category
+const EVENT_IMAGES: Record<string, string> = {
+  social:
+    "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&q=80",
+  sporting:
+    "https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=800&q=80",
+  dining:
+    "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&q=80",
+  default:
+    "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&q=80",
+};
+
+const CATEGORIES = ["All Events", "Social", "Sporting", "Dining"] as const;
+type Category = (typeof CATEGORIES)[number];
 
 interface EventWithRsvp {
   id: string;
@@ -31,14 +52,14 @@ interface EventWithRsvp {
   status: string;
   rsvp_count: number;
   user_rsvp_status: string | null;
+  category?: string;
 }
 
-const STATUS_BADGE: Record<string, { label: string; bg: string; text: string }> = {
-  draft: { label: "Draft", bg: "#f3f4f6", text: "#374151" },
-  published: { label: "Published", bg: "#dcfce7", text: "#166534" },
-  cancelled: { label: "Cancelled", bg: "#fee2e2", text: "#991b1b" },
-  completed: { label: "Completed", bg: "#dbeafe", text: "#1e40af" },
-};
+const serifFont = Platform.select({
+  ios: "Georgia",
+  android: "serif",
+  default: "serif",
+});
 
 export default function EventsScreen() {
   const { session } = useAuth();
@@ -49,6 +70,7 @@ export default function EventsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [rsvpLoading, setRsvpLoading] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<Category>("All Events");
 
   // Admin form state
   const [showForm, setShowForm] = useState(false);
@@ -58,14 +80,16 @@ export default function EventsScreen() {
     title: string;
   } | null>(null);
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (session?.access_token) {
-    headers["Authorization"] = `Bearer ${session.access_token}`;
-  }
+  const getHeaders = useCallback(() => {
+    const h: Record<string, string> = { "Content-Type": "application/json" };
+    if (session?.access_token) {
+      h["Authorization"] = `Bearer ${session.access_token}`;
+    }
+    return h;
+  }, [session?.access_token]);
 
   const fetchEvents = useCallback(async () => {
+    const headers = getHeaders();
     try {
       const res = await fetch(`${API_URL}/api/events`, { headers });
       if (res.ok) {
@@ -79,13 +103,22 @@ export default function EventsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [session?.access_token]);
+  }, [getHeaders]);
 
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
 
   const isAdmin = role === "admin";
+
+  const filteredEvents =
+    activeCategory === "All Events"
+      ? events
+      : events.filter(
+          (e) =>
+            (e.category || "social").toLowerCase() ===
+            activeCategory.toLowerCase()
+        );
 
   function handleRsvp(eventId: string, currentStatus: string | null) {
     if (currentStatus === "attending") {
@@ -107,6 +140,7 @@ export default function EventsScreen() {
   }
 
   async function executeRsvp(eventId: string, newStatus: string) {
+    const headers = getHeaders();
     setRsvpLoading(eventId);
     try {
       const res = await fetch(`${API_URL}/api/events/rsvp`, {
@@ -133,6 +167,7 @@ export default function EventsScreen() {
   }
 
   async function handlePublish(eventId: string) {
+    const headers = getHeaders();
     setActionLoading(eventId);
     try {
       const res = await fetch(`${API_URL}/api/events/admin/${eventId}`, {
@@ -163,6 +198,7 @@ export default function EventsScreen() {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
+            const headers = getHeaders();
             setActionLoading(eventId);
             try {
               const res = await fetch(
@@ -187,7 +223,11 @@ export default function EventsScreen() {
   }
 
   function showAdminMenu(event: EventWithRsvp) {
-    const actions: { text: string; onPress: () => void; style?: "destructive" | "cancel" }[] = [];
+    const actions: {
+      text: string;
+      onPress: () => void;
+      style?: "destructive" | "cancel";
+    }[] = [];
 
     if (event.status === "draft") {
       actions.push({
@@ -224,7 +264,6 @@ export default function EventsScreen() {
   function formatDate(dateStr: string) {
     const d = new Date(dateStr);
     return d.toLocaleDateString("en-US", {
-      weekday: "short",
       month: "short",
       day: "numeric",
     });
@@ -239,6 +278,29 @@ export default function EventsScreen() {
     });
   }
 
+  function getEventImage(event: EventWithRsvp) {
+    const cat = (event.category || "default").toLowerCase();
+    return EVENT_IMAGES[cat] || EVENT_IMAGES.default;
+  }
+
+  function getCategoryLabel(event: EventWithRsvp) {
+    const cat = (event.category || "social").toLowerCase();
+    const label = cat.charAt(0).toUpperCase() + cat.slice(1);
+    if (event.location) return `${label} · ${event.location}`;
+    return label;
+  }
+
+  function getActionLabel(event: EventWithRsvp) {
+    const cat = (event.category || "social").toLowerCase();
+    if (cat === "dining") return "Book Experience";
+    if (cat === "sporting") return "Tournament Details";
+    return "Reserve Seat";
+  }
+
+  function isPastEvent(event: EventWithRsvp) {
+    return new Date(event.start_date) < new Date();
+  }
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -247,22 +309,15 @@ export default function EventsScreen() {
     );
   }
 
-  if (events.length === 0 && !isAdmin) {
-    return (
-      <View style={styles.centered}>
-        <Ionicons name="sparkles-outline" size={48} color={Colors.light.mutedForeground} />
-        <Text style={styles.emptyTitle}>No upcoming events</Text>
-        <Text style={styles.emptyText}>
-          Check back soon for club events and social gatherings.
-        </Text>
-      </View>
-    );
-  }
+  // Determine featured event (first event) and remaining
+  const featuredEvent = filteredEvents.length > 0 ? filteredEvents[0] : null;
+  const remainingEvents = filteredEvents.slice(1);
 
   return (
     <View style={styles.container}>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -274,158 +329,363 @@ export default function EventsScreen() {
           />
         }
       >
-        {events.length === 0 && isAdmin ? (
-          <View style={styles.emptyAdmin}>
-            <Ionicons name="calendar-outline" size={48} color={Colors.light.mutedForeground} />
-            <Text style={styles.emptyTitle}>No events yet</Text>
+        {/* Hero header — matches Stitch "Seasonal Highlights" section */}
+        <View style={styles.heroSection}>
+          <Text style={styles.heroLabel}>SEASONAL HIGHLIGHTS</Text>
+          <Text style={styles.heroTitle}>
+            Club{"\n"}Gatherings &{"\n"}Curated Socials
+          </Text>
+          <Text style={styles.heroSubtitle}>
+            Experience the pinnacle of club life through our exclusive
+            member-only events.
+          </Text>
+        </View>
+
+        {/* Category filter pills — matches Stitch filter row */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+        >
+          {CATEGORIES.map((cat) => {
+            const isActive = activeCategory === cat;
+            return (
+              <TouchableOpacity
+                key={cat}
+                style={[
+                  styles.filterPill,
+                  isActive && styles.filterPillActive,
+                ]}
+                onPress={() => setActiveCategory(cat)}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.filterPillText,
+                    isActive && styles.filterPillTextActive,
+                  ]}
+                >
+                  {cat}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {/* Events list */}
+        {filteredEvents.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons
+              name="calendar-outline"
+              size={48}
+              color={Colors.light.outlineVariant}
+            />
+            <Text style={styles.emptyTitle}>
+              {isAdmin ? "No events yet" : "No upcoming events"}
+            </Text>
             <Text style={styles.emptyText}>
-              Tap the + button to create your first event.
+              {isAdmin
+                ? "Tap the + button to create your first event."
+                : "Check back soon for club events and social gatherings."}
             </Text>
           </View>
         ) : (
-          events.map((event) => {
-            const isAttending = event.user_rsvp_status === "attending";
-            const isLoadingThis = rsvpLoading === event.id;
-            const isFree = !event.price || event.price === 0;
-            const badge = STATUS_BADGE[event.status];
-            const isActionLoading = actionLoading === event.id;
-
-            return (
+          <View style={styles.eventsList}>
+            {/* Featured event card — Stitch: large overlay card with content on image */}
+            {featuredEvent && (
               <TouchableOpacity
-                key={event.id}
-                style={styles.card}
-                activeOpacity={0.7}
-                onPress={() => router.push(`/event/${event.id}`)}
+                style={styles.featuredCard}
+                activeOpacity={0.85}
+                onPress={() => router.push(`/event/${featuredEvent.id}`)}
               >
-                {/* Title + badges */}
-                <View style={styles.titleRow}>
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <View style={styles.badgeRow}>
-                      <Text style={styles.title} numberOfLines={2}>
-                        {event.title}
-                      </Text>
-                      {isAdmin && badge && (
-                        <View
-                          style={[
-                            styles.statusBadge,
-                            { backgroundColor: badge.bg },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.statusBadgeText,
-                              { color: badge.text },
-                            ]}
-                          >
-                            {badge.label}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
+                <Image
+                  source={{ uri: getEventImage(featuredEvent) }}
+                  style={styles.featuredImage}
+                  resizeMode="cover"
+                />
+                <LinearGradient
+                  colors={[
+                    "transparent",
+                    "rgba(1, 45, 29, 0.2)",
+                    Colors.light.primary,
+                  ]}
+                  style={styles.featuredGradient}
+                />
+                {/* Signature Event badge — top left */}
+                <View style={styles.signatureBadge}>
+                  <Text style={styles.signatureBadgeText}>
+                    {(featuredEvent.category || "Social").toUpperCase()}
+                  </Text>
+                </View>
+                {/* Admin menu */}
+                {isAdmin && (
+                  <TouchableOpacity
+                    onPress={() => showAdminMenu(featuredEvent)}
+                    disabled={actionLoading === featuredEvent.id}
+                    style={styles.featuredAdminBtn}
+                    activeOpacity={0.6}
+                  >
+                    {actionLoading === featuredEvent.id ? (
+                      <ActivityIndicator size="small" color="#ffffff" />
+                    ) : (
+                      <Ionicons
+                        name="ellipsis-horizontal"
+                        size={18}
+                        color="#ffffff"
+                      />
+                    )}
+                  </TouchableOpacity>
+                )}
+                {/* Content overlay — bottom */}
+                <View style={styles.featuredContent}>
+                  <View style={styles.featuredDateRow}>
+                    <Ionicons
+                      name="calendar-outline"
+                      size={14}
+                      color={Colors.light.tertiaryFixed}
+                    />
+                    <Text style={styles.featuredDateText}>
+                      {formatDate(featuredEvent.start_date).toUpperCase()} ·{" "}
+                      {formatTime(featuredEvent.start_date)}
+                    </Text>
                   </View>
-                  <View style={styles.rightBadges}>
-                    <View
+                  <Text style={styles.featuredTitle}>
+                    {featuredEvent.title}
+                  </Text>
+                  {featuredEvent.description && (
+                    <Text style={styles.featuredDescription} numberOfLines={2}>
+                      {featuredEvent.description}
+                    </Text>
+                  )}
+                  {/* Reserve Seat button — hide for past events */}
+                  {featuredEvent.status === "published" && !isPastEvent(featuredEvent) && (
+                    <TouchableOpacity
                       style={[
-                        styles.priceBadge,
-                        isFree ? styles.priceFree : styles.pricePaid,
+                        styles.featuredBtn,
+                        featuredEvent.user_rsvp_status === "attending" &&
+                          styles.featuredBtnAttending,
+                        rsvpLoading === featuredEvent.id && { opacity: 0.5 },
                       ]}
+                      onPress={() =>
+                        handleRsvp(
+                          featuredEvent.id,
+                          featuredEvent.user_rsvp_status
+                        )
+                      }
+                      disabled={rsvpLoading === featuredEvent.id}
+                      activeOpacity={0.7}
                     >
-                      <Text
-                        style={[
-                          styles.priceText,
-                          isFree ? styles.priceTextFree : styles.priceTextPaid,
-                        ]}
-                      >
-                        {isFree ? "Free" : `$${event.price}`}
-                      </Text>
-                    </View>
+                      {rsvpLoading === featuredEvent.id ? (
+                        <ActivityIndicator size="small" color={Colors.light.primary} />
+                      ) : featuredEvent.user_rsvp_status === "attending" ? (
+                        <View style={styles.featuredBtnRow}>
+                          <Ionicons name="checkmark-circle" size={16} color="#1b4332" />
+                          <Text style={styles.featuredBtnTextAttending}>Attending</Text>
+                        </View>
+                      ) : (
+                        <Text style={styles.featuredBtnText}>
+                          {getActionLabel(featuredEvent)}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </TouchableOpacity>
+            )}
+
+            {/* Remaining event cards — Stitch: white card with image header + body */}
+            {remainingEvents.map((event) => {
+              const isAttending = event.user_rsvp_status === "attending";
+              const isLoadingThis = rsvpLoading === event.id;
+              const isActionLoading = actionLoading === event.id;
+              const hasCapacity = event.capacity && event.capacity > 0;
+              const spotsLeft = hasCapacity
+                ? event.capacity! - event.rsvp_count
+                : null;
+
+              return (
+                <TouchableOpacity
+                  key={event.id}
+                  style={styles.eventCard}
+                  activeOpacity={0.85}
+                  onPress={() => router.push(`/event/${event.id}`)}
+                >
+                  {/* Card image */}
+                  <View style={styles.cardImageWrap}>
+                    <Image
+                      source={{ uri: getEventImage(event) }}
+                      style={styles.cardImage}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.cardImageTint} />
+                    {/* Admin menu on image */}
                     {isAdmin && (
                       <TouchableOpacity
                         onPress={() => showAdminMenu(event)}
                         disabled={isActionLoading}
-                        style={styles.menuBtn}
+                        style={styles.cardAdminBtn}
                         activeOpacity={0.6}
                       >
                         {isActionLoading ? (
-                          <ActivityIndicator
-                            size="small"
-                            color={Colors.light.mutedForeground}
-                          />
+                          <ActivityIndicator size="small" color="#fff" />
                         ) : (
-                          <Ionicons name="ellipsis-horizontal" size={18} color={Colors.light.mutedForeground} />
+                          <Ionicons
+                            name="ellipsis-horizontal"
+                            size={16}
+                            color="#fff"
+                          />
                         )}
                       </TouchableOpacity>
                     )}
-                  </View>
-                </View>
-
-                {/* Meta */}
-                <View style={styles.meta}>
-                  <View style={styles.metaRow}>
-                    <Ionicons name="calendar-outline" size={14} color={Colors.light.mutedForeground} />
-                    <Text style={styles.metaText}>
-                      {formatDate(event.start_date)} ·{" "}
-                      {formatTime(event.start_date)}
-                    </Text>
-                  </View>
-                  {event.location && (
-                    <View style={styles.metaRow}>
-                      <Ionicons name="location-outline" size={14} color={Colors.light.mutedForeground} />
-                      <Text style={styles.metaText}>
-                        {event.location}
-                      </Text>
-                    </View>
-                  )}
-                  <View style={styles.metaRow}>
-                    <Ionicons name="people-outline" size={14} color={Colors.light.mutedForeground} />
-                    <Text style={styles.metaText}>
-                      {event.rsvp_count} attending
-                      {event.capacity
-                        ? ` · ${event.capacity - event.rsvp_count} spots left`
-                        : ""}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Description */}
-                {event.description && (
-                  <Text style={styles.description} numberOfLines={3}>
-                    {event.description}
-                  </Text>
-                )}
-
-                {/* RSVP button (shown for published events) */}
-                {event.status === "published" && (
-                  <TouchableOpacity
-                    style={[
-                      styles.rsvpBtn,
-                      isAttending
-                        ? styles.rsvpBtnAttending
-                        : styles.rsvpBtnDefault,
-                      isLoadingThis && { opacity: 0.5 },
-                    ]}
-                    onPress={() =>
-                      handleRsvp(event.id, event.user_rsvp_status)
-                    }
-                    disabled={isLoadingThis}
-                    activeOpacity={0.7}
-                  >
-                    {isLoadingThis ? (
-                      <Text style={[styles.rsvpBtnText, isAttending ? styles.rsvpBtnTextAttending : styles.rsvpBtnTextDefault]}>...</Text>
-                    ) : isAttending ? (
-                      <View style={styles.rsvpBtnRow}>
-                        <Ionicons name="checkmark" size={16} color="#166534" />
-                        <Text style={[styles.rsvpBtnText, styles.rsvpBtnTextAttending]}>Attending</Text>
+                    {/* Limited badge */}
+                    {spotsLeft !== null && spotsLeft <= 15 && (
+                      <View style={styles.limitedBadge}>
+                        <Text style={styles.limitedBadgeText}>LIMITED</Text>
                       </View>
-                    ) : (
-                      <Text style={[styles.rsvpBtnText, styles.rsvpBtnTextDefault]}>RSVP</Text>
                     )}
-                  </TouchableOpacity>
-                )}
-              </TouchableOpacity>
-            );
-          })
+                  </View>
+
+                  {/* Card body — matches Stitch p-8 section */}
+                  <View style={styles.cardBody}>
+                    {/* Category + location label */}
+                    <View style={styles.cardCategoryRow}>
+                      <Text style={styles.cardCategoryText}>
+                        {getCategoryLabel(event).toUpperCase()}
+                      </Text>
+                      <View style={styles.cardDot} />
+                    </View>
+
+                    {/* Title */}
+                    <Text style={styles.cardTitle} numberOfLines={2}>
+                      {event.title}
+                    </Text>
+
+                    {/* Meta rows — matches Stitch schedule/location/group icons */}
+                    <View style={styles.cardMeta}>
+                      <View style={styles.metaRow}>
+                        <Ionicons
+                          name="time-outline"
+                          size={16}
+                          color={Colors.light.onSurfaceVariant}
+                        />
+                        <Text style={styles.metaText}>
+                          {formatDate(event.start_date)} ·{" "}
+                          {formatTime(event.start_date)}
+                        </Text>
+                      </View>
+                      {event.location && (
+                        <View style={styles.metaRow}>
+                          <Ionicons
+                            name="location-outline"
+                            size={16}
+                            color={Colors.light.onSurfaceVariant}
+                          />
+                          <Text style={styles.metaText}>{event.location}</Text>
+                        </View>
+                      )}
+                      <View style={styles.metaRow}>
+                        <Ionicons
+                          name="people-outline"
+                          size={16}
+                          color={Colors.light.onSurfaceVariant}
+                        />
+                        <Text style={styles.metaText}>
+                          {spotsLeft !== null
+                            ? `${spotsLeft} Seats Remaining`
+                            : `${event.rsvp_count} attending`}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Action button — hide for past events */}
+                    {event.status === "published" && !isPastEvent(event) && (
+                      <TouchableOpacity
+                        style={[
+                          styles.cardBtn,
+                          isAttending && styles.cardBtnAttending,
+                          isLoadingThis && { opacity: 0.5 },
+                        ]}
+                        onPress={() =>
+                          handleRsvp(event.id, event.user_rsvp_status)
+                        }
+                        disabled={isLoadingThis}
+                        activeOpacity={0.7}
+                      >
+                        {isLoadingThis ? (
+                          <ActivityIndicator
+                            size="small"
+                            color={
+                              isAttending
+                                ? Colors.light.primary
+                                : Colors.light.primary
+                            }
+                          />
+                        ) : isAttending ? (
+                          <View style={styles.cardBtnRow}>
+                            <Ionicons
+                              name="checkmark-circle"
+                              size={16}
+                              color={Colors.light.primary}
+                            />
+                            <Text style={styles.cardBtnTextActive}>
+                              Attending
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text style={styles.cardBtnText}>
+                            {getActionLabel(event)}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Draft indicator for admin */}
+                    {isAdmin && event.status === "draft" && (
+                      <View style={styles.draftRow}>
+                        <Ionicons
+                          name="document-outline"
+                          size={13}
+                          color={Colors.light.onSurfaceVariant}
+                        />
+                        <Text style={styles.draftText}>Draft</Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         )}
+
+        {/* "Host Your Own Occasion" CTA — matches Stitch dark primary card */}
+        <View style={styles.ctaCard}>
+          <LinearGradient
+            colors={[Colors.light.primary, Colors.light.primaryContainer]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.ctaGradient}
+          >
+            <Ionicons
+              name="sparkles"
+              size={32}
+              color={Colors.light.tertiaryFixed}
+              style={styles.ctaIcon}
+            />
+            <Text style={styles.ctaTitle}>Host Your Own Occasion</Text>
+            <Text style={styles.ctaDescription}>
+              The club offers bespoke event planning services for private
+              member celebrations.
+            </Text>
+            <TouchableOpacity style={styles.ctaLink} activeOpacity={0.7}>
+              <Text style={styles.ctaLinkText}>INQUIRE TODAY</Text>
+              <Ionicons
+                name="arrow-forward"
+                size={14}
+                color={Colors.light.tertiaryFixed}
+              />
+            </TouchableOpacity>
+          </LinearGradient>
+        </View>
       </ScrollView>
 
       {/* Admin FAB */}
@@ -438,7 +698,11 @@ export default function EventsScreen() {
           }}
           activeOpacity={0.8}
         >
-          <Text style={styles.fabText}>+</Text>
+          <Ionicons
+            name="add"
+            size={28}
+            color={Colors.light.primaryForeground}
+          />
         </TouchableOpacity>
       )}
 
@@ -447,7 +711,7 @@ export default function EventsScreen() {
         visible={showForm}
         event={editingEvent}
         apiUrl={API_URL}
-        headers={headers}
+        headers={getHeaders()}
         onClose={() => {
           setShowForm(false);
           setEditingEvent(null);
@@ -465,7 +729,7 @@ export default function EventsScreen() {
         eventId={viewingAttendees?.id ?? ""}
         eventTitle={viewingAttendees?.title ?? ""}
         apiUrl={API_URL}
-        headers={headers}
+        headers={getHeaders()}
         onClose={() => setViewingAttendees(null)}
       />
     </View>
@@ -477,10 +741,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.light.background,
   },
-  content: {
-    padding: 16,
-    gap: 12,
-    paddingBottom: 100,
+  scrollContent: {
+    paddingBottom: 120,
   },
   centered: {
     flex: 1,
@@ -489,153 +751,382 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.background,
     padding: 24,
   },
-  // Empty state
-  emptyIcon: {
-    fontSize: 48,
+
+  // ── Hero section (Stitch: "Seasonal Highlights" + headline) ──
+  heroSection: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 28,
+  },
+  heroLabel: {
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 3,
+    color: Colors.light.tertiary,
     marginBottom: 12,
   },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+  heroTitle: {
+    fontFamily: serifFont,
+    fontSize: 38,
+    fontWeight: "700",
+    color: Colors.light.primary,
+    lineHeight: 44,
+    letterSpacing: -0.5,
+    marginBottom: 12,
+  },
+  heroSubtitle: {
+    fontSize: 16,
+    fontStyle: "italic",
+    color: Colors.light.onSurfaceVariant,
+    lineHeight: 24,
+  },
+
+  // ── Filter pills (Stitch: px-8 py-3 rounded-full) ──
+  filterRow: {
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    gap: 10,
+    flexDirection: "row",
+  },
+  filterPill: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 9999,
+    backgroundColor: Colors.light.surfaceContainerLow,
+  },
+  filterPillActive: {
+    backgroundColor: Colors.light.primary,
+    shadowColor: "#191c1c",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 24,
+    elevation: 4,
+  },
+  filterPillText: {
+    fontSize: 13,
+    fontWeight: "500",
     color: Colors.light.foreground,
-    marginBottom: 4,
+  },
+  filterPillTextActive: {
+    color: "#ffffff",
+  },
+
+  // ── Empty state ──
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: 60,
+    paddingHorizontal: 24,
+  },
+  emptyTitle: {
+    fontFamily: serifFont,
+    fontSize: 20,
+    color: Colors.light.foreground,
+    marginTop: 12,
+    marginBottom: 6,
   },
   emptyText: {
     fontSize: 14,
-    color: Colors.light.mutedForeground,
+    color: Colors.light.onSurfaceVariant,
     textAlign: "center",
+    lineHeight: 20,
   },
-  emptyAdmin: {
-    alignItems: "center",
-    paddingVertical: 60,
+
+  // ── Events list ──
+  eventsList: {
+    paddingHorizontal: 24,
+    gap: 24,
   },
-  // Card
-  card: {
-    borderWidth: 1,
-    borderColor: Colors.light.border,
+
+  // ── Featured card (Stitch: large overlay card, aspect-[16/9]) ──
+  featuredCard: {
     borderRadius: 16,
-    padding: 16,
-    backgroundColor: Colors.light.background,
+    overflow: "hidden",
+    height: 280,
+    position: "relative",
+    backgroundColor: Colors.light.primaryContainer,
   },
-  titleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 8,
+  featuredImage: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: "100%",
+    height: "100%",
+    opacity: 0.8,
   },
-  badgeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 6,
+  featuredGradient: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
-  rightBadges: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+  signatureBadge: {
+    position: "absolute",
+    top: 16,
+    left: 16,
+    backgroundColor: "rgba(52, 35, 0, 0.9)",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 9999,
   },
-  title: {
-    fontSize: 16,
+  signatureBadgeText: {
+    fontSize: 9,
     fontWeight: "700",
-    color: Colors.light.foreground,
-    flexShrink: 1,
+    letterSpacing: 3,
+    color: Colors.light.tertiaryFixed,
   },
-  statusBadge: {
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  priceBadge: {
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  priceFree: {
-    backgroundColor: "#dcfce7",
-  },
-  pricePaid: {
-    backgroundColor: "#dbeafe",
-  },
-  priceText: {
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  priceTextFree: {
-    color: "#166534",
-  },
-  priceTextPaid: {
-    color: "#1e40af",
-  },
-  menuBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
+  featuredAdminBtn: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(0,0,0,0.3)",
     alignItems: "center",
     justifyContent: "center",
   },
-  menuBtnText: {
-    fontSize: 18,
-    color: Colors.light.mutedForeground,
-    fontWeight: "700",
+  featuredContent: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
   },
-  // Meta
-  meta: {
-    marginTop: 10,
-    gap: 4,
+  featuredDateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
+  },
+  featuredDateText: {
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 2,
+    color: Colors.light.tertiaryFixed,
+  },
+  featuredTitle: {
+    fontFamily: serifFont,
+    fontSize: 28,
+    color: "#ffffff",
+    marginBottom: 4,
+  },
+  featuredDescription: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.8)",
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  featuredBtn: {
+    alignSelf: "flex-start",
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 16,
+  },
+  featuredBtnAttending: {
+    backgroundColor: Colors.light.accent,
+  },
+  featuredBtnRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  featuredBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 1,
+    color: Colors.light.primary,
+    textTransform: "uppercase",
+  },
+  featuredBtnTextAttending: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 1,
+    color: "#1b4332",
+    textTransform: "uppercase",
+  },
+
+  // ── Regular event card (Stitch: bg-surface-container-lowest rounded-xl editorial-shadow) ──
+  eventCard: {
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#191c1c",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 24,
+    elevation: 4,
+  },
+  cardImageWrap: {
+    height: 200,
+    position: "relative",
+    overflow: "hidden",
+  },
+  cardImage: {
+    width: "100%",
+    height: "100%",
+  },
+  cardImageTint: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(1, 45, 29, 0.1)",
+  },
+  cardAdminBtn: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  limitedBadge: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    backgroundColor: Colors.light.tertiaryFixed,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  limitedBadgeText: {
+    fontSize: 8,
+    fontWeight: "700",
+    letterSpacing: 1,
+    color: Colors.light.tertiary,
+  },
+
+  // Card body (Stitch: p-8)
+  cardBody: {
+    padding: 24,
+  },
+  cardCategoryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  cardCategoryText: {
+    fontSize: 9,
+    fontWeight: "600",
+    letterSpacing: 2.5,
+    color: Colors.light.onSurfaceVariant,
+  },
+  cardDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.light.primary,
+  },
+  cardTitle: {
+    fontFamily: serifFont,
+    fontSize: 22,
+    color: Colors.light.primary,
+    marginBottom: 12,
+  },
+  cardMeta: {
+    gap: 8,
+    marginBottom: 20,
   },
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 10,
   },
   metaText: {
     fontSize: 13,
-    color: Colors.light.mutedForeground,
+    color: Colors.light.onSurfaceVariant,
   },
-  // Description
-  description: {
-    fontSize: 13,
-    color: Colors.light.foreground,
-    lineHeight: 19,
-    marginTop: 10,
-  },
-  // RSVP button
-  rsvpBtn: {
-    marginTop: 14,
-    borderRadius: 10,
-    paddingVertical: 10,
+
+  // Card button (Stitch: w-full py-4 rounded-xl bg-surface-container-highest)
+  cardBtn: {
+    backgroundColor: Colors.light.surfaceContainerHighest,
+    borderRadius: 16,
+    paddingVertical: 14,
     alignItems: "center",
   },
-  rsvpBtnDefault: {
-    backgroundColor: Colors.light.primary,
+  cardBtnAttending: {
+    backgroundColor: Colors.light.accent,
   },
-  rsvpBtnAttending: {
-    backgroundColor: "#dcfce7",
-    borderWidth: 1,
-    borderColor: "#86efac",
-  },
-  rsvpBtnText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  rsvpBtnTextDefault: {
-    color: Colors.light.primaryForeground,
-  },
-  rsvpBtnTextAttending: {
-    color: "#166534",
-  },
-  rsvpBtnRow: {
+  cardBtnRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 6,
   },
-  // FAB
+  cardBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 1,
+    color: Colors.light.primary,
+    textTransform: "uppercase",
+  },
+  cardBtnTextActive: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 1,
+    color: Colors.light.primary,
+    textTransform: "uppercase",
+  },
+
+  // Draft indicator
+  draftRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingTop: 10,
+  },
+  draftText: {
+    fontSize: 11,
+    color: Colors.light.onSurfaceVariant,
+    fontWeight: "500",
+  },
+
+  // ── CTA card (Stitch: bg-primary p-8 rounded-xl) ──
+  ctaCard: {
+    marginHorizontal: 24,
+    marginTop: 32,
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  ctaGradient: {
+    padding: 28,
+  },
+  ctaIcon: {
+    marginBottom: 20,
+  },
+  ctaTitle: {
+    fontFamily: serifFont,
+    fontSize: 26,
+    color: "#ffffff",
+    marginBottom: 10,
+  },
+  ctaDescription: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.7)",
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  ctaLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  ctaLinkText: {
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 3,
+    color: Colors.light.tertiaryFixed,
+  },
+
+  // ── FAB ──
   fab: {
     position: "absolute",
     bottom: 24,
@@ -646,16 +1137,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.primary,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    shadowColor: "#191c1c",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
     elevation: 8,
   },
-  fabText: {
-    fontSize: 28,
-    fontWeight: "400",
-    color: Colors.light.primaryForeground,
-    lineHeight: 30,
-  },
+
 });

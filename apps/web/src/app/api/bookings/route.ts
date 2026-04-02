@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createApiClient } from "@/lib/supabase/api";
 import { getMemberWithTier } from "@/lib/golf-eligibility";
 import { createBookingSchema } from "@club/shared";
+import { sendBookingConfirmationEmail } from "@/lib/email";
 
 export async function POST(request: Request) {
   try {
@@ -146,6 +147,32 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
+
+    // Send confirmation email (fire-and-forget)
+    const { data: facilityDetails } = await supabase
+      .from("facilities")
+      .select("name")
+      .eq("id", facility_id)
+      .single();
+
+    const { data: club } = await supabase
+      .from("clubs")
+      .select("name")
+      .eq("id", result.member.club_id)
+      .single();
+
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+    sendBookingConfirmationEmail({
+      to: result.member.email,
+      memberName: result.member.first_name,
+      clubName: club?.name ?? "Your Club",
+      facilityName: facilityDetails?.name ?? "Facility",
+      date,
+      startTime: start_time,
+      partySize: party_size,
+      dashboardUrl: baseUrl,
+    }).catch((err) => console.error("[email] Booking confirmation failed:", err));
 
     return NextResponse.json({ booking }, { status: 201 });
   } catch (error) {

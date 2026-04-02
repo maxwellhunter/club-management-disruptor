@@ -55,12 +55,13 @@ export default function MembersScreen() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [tierFilter, setTierFilter] = useState<string | null>(null);
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (session?.access_token) {
-    headers["Authorization"] = `Bearer ${session.access_token}`;
-  }
+  const getHeaders = useCallback(() => {
+    const h: Record<string, string> = { "Content-Type": "application/json" };
+    if (session?.access_token) {
+      h["Authorization"] = `Bearer ${session.access_token}`;
+    }
+    return h;
+  }, [session?.access_token]);
 
   // Debounce search
   useEffect(() => {
@@ -69,6 +70,7 @@ export default function MembersScreen() {
   }, [search]);
 
   const fetchMembers = useCallback(async () => {
+    const headers = getHeaders();
     try {
       const params = new URLSearchParams();
       if (debouncedSearch) params.set("search", debouncedSearch);

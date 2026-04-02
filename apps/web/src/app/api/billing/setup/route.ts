@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server";
 import { createApiClient } from "@/lib/supabase/api";
-import { createClient } from "@supabase/supabase-js";
 import { getMemberWithTier } from "@/lib/golf-eligibility";
 import { createStripeCustomer, createSubscriptionCheckout } from "@/lib/stripe";
-
-// Service role client for writing stripe_customer_id (bypasses RLS)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
   try {
@@ -54,7 +48,7 @@ export async function POST(request: Request) {
     let stripeCustomerId: string;
 
     // Check if member already has a stripe_customer_id
-    const { data: memberData } = await supabaseAdmin
+    const { data: memberData } = await getSupabaseAdmin()
       .from("members")
       .select("stripe_customer_id")
       .eq("id", result.member.id)
@@ -73,7 +67,7 @@ export async function POST(request: Request) {
       stripeCustomerId = customer.id;
 
       // Save to DB
-      await supabaseAdmin
+      await getSupabaseAdmin()
         .from("members")
         .update({ stripe_customer_id: stripeCustomerId })
         .eq("id", result.member.id);
