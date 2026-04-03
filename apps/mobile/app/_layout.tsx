@@ -45,6 +45,30 @@ function RootLayoutNav() {
             headerTintColor: Colors.light.primary,
           }}
         />
+        <Stack.Screen
+          name="reports"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="settings/personal-info"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="settings/notifications"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="settings/security"
+          options={{
+            headerShown: false,
+          }}
+        />
       </Stack>
     </>
   );

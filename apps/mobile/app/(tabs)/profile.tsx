@@ -448,18 +448,21 @@ export default function ProfileScreen() {
             icon="person-outline"
             title="Personal Information"
             subtitle="Name, email, phone number"
+            onPress={() => router.push("/settings/personal-info" as never)}
           />
           <View style={styles.settingsDivider} />
           <SettingsRow
             icon="notifications-outline"
             title="Notification Preferences"
             subtitle="Push notifications, emails and alerts"
+            onPress={() => router.push("/settings/notifications" as never)}
           />
           <View style={styles.settingsDivider} />
           <SettingsRow
             icon="shield-checkmark-outline"
             title="Security & Privacy"
             subtitle="Password, 2FA, data preferences"
+            onPress={() => router.push("/settings/security" as never)}
           />
         </View>
       </View>
@@ -482,13 +485,15 @@ function SettingsRow({
   icon,
   title,
   subtitle,
+  onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   subtitle: string;
+  onPress?: () => void;
 }) {
   return (
-    <TouchableOpacity style={styles.settingsRow} activeOpacity={0.7}>
+    <TouchableOpacity style={styles.settingsRow} activeOpacity={0.7} onPress={onPress}>
       <View style={styles.settingsIconWrap}>
         <Ionicons name={icon} size={20} color={Colors.light.onSurfaceVariant} />
       </View>
