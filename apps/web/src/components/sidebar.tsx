@@ -16,6 +16,7 @@ import {
   Bot,
   BarChart3,
   ShoppingCart,
+  BookOpen,
   Settings,
   Flag,
   Heart,
@@ -34,6 +35,7 @@ const navigation = [
   { name: "Messages", href: "/dashboard/messages", icon: Mail },
   { name: "AI Chat", href: "/dashboard/chat", icon: Bot },
   { name: "POS", href: "/dashboard/pos", icon: ShoppingCart },
+  { name: "Accounting", href: "/dashboard/accounting", icon: BookOpen },
   { name: "Reports", href: "/dashboard/reports", icon: BarChart3 },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ] satisfies { name: string; href: string; icon: LucideIcon }[];

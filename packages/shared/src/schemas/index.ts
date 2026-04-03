@@ -293,6 +293,40 @@ export const createPOSTransactionSchema = z.object({
   metadata: z.record(z.unknown()).optional().nullable(),
 });
 
+// Accounting / GL Export schemas
+export const glAccountTypes = ["revenue", "expense", "asset", "liability", "equity"] as const;
+export const exportFormats = ["iif", "qbo", "csv"] as const;
+export const accountingProviders = ["quickbooks", "sage", "xero", "csv"] as const;
+
+export const createGLAccountSchema = z.object({
+  account_number: z.string().min(1, "Account number is required").max(20),
+  name: z.string().min(1, "Name is required").max(100),
+  type: z.enum(glAccountTypes),
+  description: z.string().optional().nullable(),
+});
+
+export const createGLMappingSchema = z.object({
+  source_category: z.string().min(1),
+  gl_account_id: z.string().uuid(),
+  description: z.string().optional().nullable(),
+});
+
+export const createExportSchema = z.object({
+  format: z.enum(exportFormats),
+  provider: z.enum(accountingProviders),
+  date_from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date (YYYY-MM-DD)"),
+  date_to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date (YYYY-MM-DD)"),
+});
+
+// Schedule configuration schema (admin — generate booking slots)
+export const scheduleConfigSchema = z.object({
+  facility_id: z.string().uuid(),
+  days_of_week: z.array(z.number().int().min(0).max(6)).min(1, "Select at least one day"),
+  start_time: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time format (HH:MM)"),
+  end_time: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time format (HH:MM)"),
+  interval_minutes: z.number().int().min(5).max(120).default(10),
+  max_bookings: z.number().int().min(1).max(100).default(1),
+});
 // Export inferred types from schemas
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
@@ -331,3 +365,6 @@ export type CreateCourseHoleInput = z.infer<typeof createCourseHoleSchema>;
 export type CreatePOSConfigInput = z.infer<typeof createPOSConfigSchema>;
 export type UpdatePOSConfigInput = z.infer<typeof updatePOSConfigSchema>;
 export type CreatePOSTransactionInput = z.infer<typeof createPOSTransactionSchema>;
+export type CreateGLAccountInput = z.infer<typeof createGLAccountSchema>;
+export type CreateGLMappingInput = z.infer<typeof createGLMappingSchema>;
+export type CreateExportInput = z.infer<typeof createExportSchema>;

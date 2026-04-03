@@ -564,6 +564,79 @@ export interface POSTerminalSummary {
   recentTransactions: POSTransaction[];
 }
 
+// Accounting / GL Export types
+export type AccountingProvider = "quickbooks" | "sage" | "xero" | "csv";
+export type GLAccountType = "revenue" | "expense" | "asset" | "liability" | "equity";
+export type ExportStatus = "pending" | "completed" | "failed";
+export type ExportFormat = "iif" | "qbo" | "csv";
+export type JournalEntrySource = "invoice" | "payment" | "pos_transaction" | "refund";
+
+export interface GLAccount {
+  id: string;
+  club_id: string;
+  account_number: string;
+  name: string;
+  type: GLAccountType;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface GLMapping {
+  id: string;
+  club_id: string;
+  source_category: string; // e.g., "membership_dues", "dining_revenue", "pro_shop_revenue"
+  gl_account_id: string;
+  description: string | null;
+  created_at: string;
+}
+
+export interface JournalEntry {
+  id: string;
+  club_id: string;
+  export_batch_id: string | null;
+  source: JournalEntrySource;
+  source_id: string; // invoice_id, payment_id, or pos_transaction_id
+  date: string;
+  description: string;
+  debit_account_id: string;
+  credit_account_id: string;
+  amount: number;
+  member_id: string | null;
+  reference: string | null;
+  created_at: string;
+}
+
+export interface ExportBatch {
+  id: string;
+  club_id: string;
+  format: ExportFormat;
+  provider: AccountingProvider;
+  status: ExportStatus;
+  date_from: string;
+  date_to: string;
+  entry_count: number;
+  total_debits: number;
+  total_credits: number;
+  file_url: string | null;
+  error_message: string | null;
+  exported_by: string;
+  created_at: string;
+}
+
+export interface AccountingSummary {
+  glAccounts: GLAccount[];
+  mappings: (GLMapping & { account_name: string; account_number: string })[];
+  recentExports: ExportBatch[];
+  unmappedCategories: string[];
+  periodSummary: {
+    revenue: number;
+    payments: number;
+    posSales: number;
+    outstanding: number;
+  };
+}
+
 // Chat types
 export interface ChatConversation {
   id: string;
