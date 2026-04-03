@@ -15,6 +15,9 @@ import { useAuth } from "@/lib/auth-context";
 import { Colors } from "@/constants/theme";
 import { supabase } from "@/lib/supabase";
 
+const API_URL =
+  process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
+
 function getGreeting(): string {
   const hour = new Date().getHours();
   if (hour < 12) return "Good morning";
@@ -32,6 +35,15 @@ type ItineraryItem = {
   icon: keyof typeof Ionicons.glyphMap;
 };
 
+type Announcement = {
+  id: string;
+  title: string;
+  content: string;
+  priority: "normal" | "important" | "urgent";
+  published_at: string | null;
+  created_at: string;
+};
+
 type ClubEvent = {
   id: string;
   title: string;
@@ -40,12 +52,30 @@ type ClubEvent = {
   image_url?: string;
 };
 
+function formatAnnouncementTime(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays}d ago`;
+
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 export default function HomeScreen() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [itinerary, setItinerary] = useState<ItineraryItem[]>([]);
   const [events, setEvents] = useState<ClubEvent[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
 
   const firstName =
     user?.user_metadata?.full_name?.split(" ")[0] ||
@@ -99,10 +129,31 @@ export default function HomeScreen() {
           image_url: e.image_url,
         }))
       );
+
+      // Fetch announcements from web API (tier filtering happens server-side)
+      try {
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (session?.access_token) {
+          headers["Authorization"] = `Bearer ${session.access_token}`;
+        }
+        const announcementsRes = await fetch(`${API_URL}/api/announcements`, {
+          headers,
+        });
+        if (announcementsRes.ok) {
+          const announcementsData = await announcementsRes.json();
+          setAnnouncements(
+            (announcementsData.announcements ?? []).slice(0, 3)
+          );
+        }
+      } catch {
+        // Announcements fetch failed — non-critical
+      }
     } catch {
       // Silently fail — show empty states
     }
-  }, [user?.id]);
+  }, [user?.id, session?.access_token]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -206,6 +257,70 @@ export default function HomeScreen() {
           </View>
         )}
       </View>
+
+      {/* Club Announcements */}
+      {announcements.length > 0 && (
+        <View style={styles.section}>
+          {/* Urgent/Important banner */}
+          {announcements.some((a) => a.priority === "urgent" || a.priority === "important") && (
+            <View style={styles.urgentBanner}>
+              <Ionicons
+                name="alert-circle"
+                size={16}
+                color="#d97706"
+              />
+              <Text style={styles.urgentBannerText}>
+                {announcements.filter((a) => a.priority === "urgent").length > 0
+                  ? "Urgent announcement from your club"
+                  : "Important announcement from your club"}
+              </Text>
+            </View>
+          )}
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { paddingHorizontal: 0, marginBottom: 0 }]}>Announcements</Text>
+            <TouchableOpacity
+              onPress={() => router.push("/announcements")}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.viewAllText}>View All</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.announcementsCard}>
+            {announcements.map((item, index) => (
+              <View key={item.id}>
+                {index > 0 && <View style={styles.announcementDivider} />}
+                <TouchableOpacity
+                  style={styles.announcementRow}
+                  onPress={() => router.push("/announcements")}
+                  activeOpacity={0.7}
+                >
+                  <View
+                    style={[
+                      styles.priorityDot,
+                      item.priority === "urgent" && { backgroundColor: "#dc2626" },
+                      item.priority === "important" && { backgroundColor: "#d97706" },
+                      item.priority === "normal" && { backgroundColor: Colors.light.primary },
+                    ]}
+                  />
+                  <View style={styles.announcementContent}>
+                    <Text style={styles.announcementTitle} numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                    <Text style={styles.announcementTime}>
+                      {formatAnnouncementTime(item.published_at || item.created_at)}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={Colors.light.outlineVariant}
+                  />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
 
       {/* Concierge Services */}
       <View style={styles.section}>
@@ -490,6 +605,77 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     color: Colors.light.primaryForeground,
+  },
+
+  // Announcements
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    marginBottom: 12,
+  },
+  viewAllText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: Colors.light.primary,
+  },
+  urgentBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 24,
+    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "#fffbeb",
+  },
+  urgentBannerText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#92400e",
+    flex: 1,
+  },
+  announcementsCard: {
+    marginHorizontal: 24,
+    backgroundColor: Colors.light.surfaceContainerLowest,
+    borderRadius: 20,
+    padding: 16,
+    shadowColor: Colors.light.foreground,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 24,
+    elevation: 2,
+  },
+  announcementRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 4,
+  },
+  priorityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  announcementContent: {
+    flex: 1,
+    gap: 2,
+  },
+  announcementTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.light.foreground,
+  },
+  announcementTime: {
+    fontSize: 12,
+    color: Colors.light.onSurfaceVariant,
+  },
+  announcementDivider: {
+    height: 1,
+    backgroundColor: Colors.light.surfaceContainerLow,
+    marginVertical: 10,
   },
 
   // Concierge Services

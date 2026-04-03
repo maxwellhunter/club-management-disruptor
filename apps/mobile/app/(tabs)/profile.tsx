@@ -32,6 +32,15 @@ interface BillingStatus {
   } | null;
 }
 
+interface Invoice {
+  id: string;
+  amount: number;
+  status: "draft" | "sent" | "paid" | "overdue" | "void";
+  description: string;
+  due_date: string;
+  created_at: string;
+}
+
 type Transaction = {
   id: string;
   icon: keyof typeof Ionicons.glyphMap;
@@ -39,9 +48,10 @@ type Transaction = {
   date: string;
   amount: string;
   type: "charge" | "payment" | "credit";
+  status?: "paid" | "sent" | "overdue" | "void" | "draft";
 };
 
-// Placeholder recent activity
+// Fallback activity for demo mode or when API is unavailable
 const MOCK_ACTIVITY: Transaction[] = [
   {
     id: "1",
@@ -69,6 +79,56 @@ const MOCK_ACTIVITY: Transaction[] = [
   },
 ];
 
+function getInvoiceIcon(description: string): keyof typeof Ionicons.glyphMap {
+  const lower = description.toLowerCase();
+  if (lower.includes("dining") || lower.includes("restaurant") || lower.includes("food") || lower.includes("f&b")) {
+    return "restaurant-outline";
+  }
+  if (lower.includes("golf") || lower.includes("pro shop") || lower.includes("green fee")) {
+    return "golf-outline";
+  }
+  if (lower.includes("membership") || lower.includes("dues") || lower.includes("fee")) {
+    return "card-outline";
+  }
+  return "receipt-outline";
+}
+
+function formatInvoiceDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function mapInvoiceType(status: Invoice["status"]): Transaction["type"] {
+  if (status === "paid") return "payment";
+  if (status === "void") return "credit";
+  return "charge";
+}
+
+function mapInvoiceToTransaction(invoice: Invoice): Transaction {
+  const formattedAmount = `-$${invoice.amount.toFixed(2)}`;
+  return {
+    id: invoice.id,
+    icon: getInvoiceIcon(invoice.description),
+    title: invoice.description,
+    date: formatInvoiceDate(invoice.due_date || invoice.created_at),
+    amount: formattedAmount,
+    type: mapInvoiceType(invoice.status),
+    status: invoice.status,
+  };
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  paid: "#16a34a",
+  overdue: "#dc2626",
+  sent: "#d97706",
+  draft: "#6b7280",
+  void: "#9ca3af",
+};
+
 export default function ProfileScreen() {
   const { user, session, signOut } = useAuth();
   const router = useRouter();
@@ -76,6 +136,7 @@ export default function ProfileScreen() {
   const [billingLoading, setBillingLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [transactions, setTransactions] = useState<Transaction[]>(MOCK_ACTIVITY);
 
   const getHeaders = useCallback(() => {
     const h: Record<string, string> = { "Content-Type": "application/json" };
@@ -84,6 +145,26 @@ export default function ProfileScreen() {
     }
     return h;
   }, [session?.access_token]);
+
+  const fetchInvoices = useCallback(async () => {
+    const headers = getHeaders();
+    try {
+      const res = await fetch(`${API_URL}/api/billing/invoices`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.invoices && data.invoices.length > 0) {
+          const mapped = data.invoices
+            .slice(0, 10)
+            .map((inv: Invoice) => mapInvoiceToTransaction(inv));
+          setTransactions(mapped);
+        }
+        // If invoices array is empty, keep MOCK_ACTIVITY as fallback
+      }
+    } catch (err) {
+      console.error("Failed to fetch invoices:", err);
+      // Keep MOCK_ACTIVITY as fallback on error
+    }
+  }, [getHeaders]);
 
   const fetchBilling = useCallback(async () => {
     const headers = getHeaders();
@@ -103,7 +184,8 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     fetchBilling();
-  }, [fetchBilling]);
+    fetchInvoices();
+  }, [fetchBilling, fetchInvoices]);
 
   function handleSignOut() {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
@@ -175,6 +257,7 @@ export default function ProfileScreen() {
           onRefresh={() => {
             setRefreshing(true);
             fetchBilling();
+            fetchInvoices();
           }}
           tintColor={Colors.light.primary}
         />
@@ -307,7 +390,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
         <View style={styles.activityCard}>
-          {MOCK_ACTIVITY.map((tx, index) => (
+          {transactions.map((tx, index) => (
             <View key={tx.id}>
               {index > 0 && <View style={styles.activityDivider} />}
               <View style={styles.activityRow}>
@@ -320,9 +403,37 @@ export default function ProfileScreen() {
                 </View>
                 <View style={styles.activityContent}>
                   <Text style={styles.activityTitle}>{tx.title}</Text>
-                  <Text style={styles.activityDate}>{tx.date}</Text>
+                  <View style={styles.activityDateRow}>
+                    <Text style={styles.activityDate}>{tx.date}</Text>
+                    {tx.status && (
+                      <View style={styles.statusBadge}>
+                        <View
+                          style={[
+                            styles.statusDot,
+                            { backgroundColor: STATUS_COLORS[tx.status] || "#6b7280" },
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            styles.statusText,
+                            { color: STATUS_COLORS[tx.status] || "#6b7280" },
+                          ]}
+                        >
+                          {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
-                <Text style={styles.activityAmount}>{tx.amount}</Text>
+                <Text
+                  style={[
+                    styles.activityAmount,
+                    tx.type === "payment" && styles.activityAmountPaid,
+                    tx.type === "credit" && styles.activityAmountCredit,
+                  ]}
+                >
+                  {tx.amount}
+                </Text>
               </View>
             </View>
           ))}
@@ -663,10 +774,35 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.light.onSurfaceVariant,
   },
+  activityDateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: "600",
+  },
   activityAmount: {
     fontSize: 14,
     fontWeight: "600",
     color: Colors.light.foreground,
+  },
+  activityAmountPaid: {
+    color: "#16a34a",
+  },
+  activityAmountCredit: {
+    color: "#6b7280",
   },
   activityDivider: {
     height: 1,

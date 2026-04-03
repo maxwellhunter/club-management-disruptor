@@ -37,6 +37,14 @@ function RootLayoutNav() {
             headerTintColor: Colors.light.primary,
           }}
         />
+        <Stack.Screen
+          name="announcements"
+          options={{
+            headerTitle: "Announcements",
+            headerBackTitle: "Back",
+            headerTintColor: Colors.light.primary,
+          }}
+        />
       </Stack>
     </>
   );
