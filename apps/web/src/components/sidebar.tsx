@@ -15,6 +15,7 @@ import {
   Mail,
   Bot,
   BarChart3,
+  ShoppingCart,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -28,6 +29,7 @@ const navigation = [
   { name: "Events", href: "/dashboard/events", icon: PartyPopper },
   { name: "Messages", href: "/dashboard/messages", icon: Mail },
   { name: "AI Chat", href: "/dashboard/chat", icon: Bot },
+  { name: "POS", href: "/dashboard/pos", icon: ShoppingCart },
   { name: "Reports", href: "/dashboard/reports", icon: BarChart3 },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ] satisfies { name: string; href: string; icon: LucideIcon }[];

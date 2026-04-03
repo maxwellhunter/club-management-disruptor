@@ -197,6 +197,43 @@ export const updateDiningOrderStatusSchema = z.object({
   ]),
 });
 
+// POS schemas
+export const posProviders = ["stripe_terminal", "square", "toast", "lightspeed", "manual"] as const;
+export const posLocations = ["dining", "pro_shop", "bar", "snack_bar", "other"] as const;
+
+export const createPOSConfigSchema = z.object({
+  provider: z.enum(posProviders),
+  location: z.enum(posLocations),
+  name: z.string().min(1, "Name is required").max(100),
+  config: z.record(z.unknown()).default({}),
+});
+
+export const updatePOSConfigSchema = createPOSConfigSchema.partial().extend({
+  is_active: z.boolean().optional(),
+});
+
+export const createPOSTransactionSchema = z.object({
+  pos_config_id: z.string().uuid(),
+  member_id: z.string().uuid().optional().nullable(),
+  type: z.enum(["sale", "refund", "void"]).default("sale"),
+  subtotal: z.number().min(0),
+  tax: z.number().min(0).default(0),
+  tip: z.number().min(0).default(0),
+  payment_method: z.string().optional().nullable(),
+  location: z.enum(posLocations),
+  description: z.string().optional().nullable(),
+  items: z.array(
+    z.object({
+      name: z.string().min(1),
+      sku: z.string().optional().nullable(),
+      quantity: z.number().int().min(1),
+      unit_price: z.number().min(0),
+      category: z.string().optional().nullable(),
+    })
+  ).min(1, "At least one item is required"),
+  metadata: z.record(z.unknown()).optional().nullable(),
+});
+
 // Schedule configuration schema (admin — generate booking slots)
 export const scheduleConfigSchema = z.object({
   facility_id: z.string().uuid(),
@@ -235,3 +272,6 @@ export type CreateGolfRateInput = z.infer<typeof createGolfRateSchema>;
 export type UpdateGolfRateInput = z.infer<typeof updateGolfRateSchema>;
 export type InviteMemberInput = z.infer<typeof inviteMemberSchema>;
 export type ClaimInviteInput = z.infer<typeof claimInviteSchema>;
+export type CreatePOSConfigInput = z.infer<typeof createPOSConfigSchema>;
+export type UpdatePOSConfigInput = z.infer<typeof updatePOSConfigSchema>;
+export type CreatePOSTransactionInput = z.infer<typeof createPOSTransactionSchema>;

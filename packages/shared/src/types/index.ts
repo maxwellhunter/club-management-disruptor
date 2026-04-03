@@ -413,6 +413,68 @@ export interface GolfRatesResponse {
   role: MemberRole;
 }
 
+// POS types
+export type POSProvider = "stripe_terminal" | "square" | "toast" | "lightspeed" | "manual";
+export type POSTransactionStatus = "pending" | "completed" | "refunded" | "voided" | "failed";
+export type POSTransactionType = "sale" | "refund" | "void";
+export type POSLocation = "dining" | "pro_shop" | "bar" | "snack_bar" | "other";
+
+export interface POSConfig {
+  id: string;
+  club_id: string;
+  provider: POSProvider;
+  location: POSLocation;
+  name: string;
+  is_active: boolean;
+  config: Record<string, unknown>; // provider-specific config (encrypted at rest)
+  created_at: string;
+  updated_at: string;
+}
+
+export interface POSTransaction {
+  id: string;
+  club_id: string;
+  pos_config_id: string;
+  member_id: string | null; // null for guest/walk-up sales
+  invoice_id: string | null;
+  external_id: string | null; // ID from the POS provider
+  type: POSTransactionType;
+  status: POSTransactionStatus;
+  subtotal: number;
+  tax: number;
+  tip: number;
+  total: number;
+  payment_method: string | null; // card, cash, member_charge, etc.
+  location: POSLocation;
+  description: string | null;
+  items: POSTransactionItem[];
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface POSTransactionItem {
+  id: string;
+  transaction_id: string;
+  name: string;
+  sku: string | null;
+  quantity: number;
+  unit_price: number;
+  total: number;
+  category: string | null;
+}
+
+export interface POSTerminalSummary {
+  totalSales: number;
+  transactionCount: number;
+  averageTicket: number;
+  tipTotal: number;
+  salesByLocation: { location: POSLocation; total: number; count: number }[];
+  salesByHour: { hour: number; total: number; count: number }[];
+  topItems: { name: string; quantity: number; revenue: number }[];
+  recentTransactions: POSTransaction[];
+}
+
 // Chat types
 export interface ChatConversation {
   id: string;
