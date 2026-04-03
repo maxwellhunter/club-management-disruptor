@@ -20,8 +20,8 @@ jest.mock("@/lib/supabase/api", () => ({
   }),
 }));
 
-jest.mock("@supabase/supabase-js", () => ({
-  createClient: jest.fn(() => ({
+jest.mock("@/lib/supabase/admin", () => ({
+  getSupabaseAdmin: jest.fn(() => ({
     from: (...args: unknown[]) => mockAdminFrom(...args),
   })),
 }));

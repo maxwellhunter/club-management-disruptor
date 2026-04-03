@@ -25,10 +25,10 @@ jest.mock("@/lib/golf-eligibility", () => ({
 }));
 
 const mockAdminFrom = jest.fn();
-jest.mock("@supabase/supabase-js", () => ({
-  createClient: jest.fn().mockReturnValue({
+jest.mock("@/lib/supabase/admin", () => ({
+  getSupabaseAdmin: jest.fn(() => ({
     from: (...args: unknown[]) => mockAdminFrom(...args),
-  }),
+  })),
 }));
 
 import { GET, PATCH } from "../route";
