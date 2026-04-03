@@ -637,6 +637,64 @@ export interface AccountingSummary {
   };
 }
 
+// Data Migration types
+export type ImportSourceSystem = "jonas" | "northstar" | "clubessential" | "generic_csv";
+export type ImportEntityType = "members" | "invoices" | "payments" | "bookings" | "events";
+export type ImportStatus = "pending" | "validating" | "preview" | "importing" | "completed" | "failed" | "cancelled";
+
+export interface ImportBatch {
+  id: string;
+  club_id: string;
+  source_system: ImportSourceSystem;
+  entity_type: ImportEntityType;
+  status: ImportStatus;
+  file_name: string;
+  total_rows: number;
+  valid_rows: number;
+  error_rows: number;
+  imported_rows: number;
+  skipped_rows: number;
+  field_mapping: Record<string, string>; // source_column -> target_field
+  errors: ImportError[];
+  imported_by: string;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface ImportError {
+  row: number;
+  field: string;
+  value: string;
+  message: string;
+}
+
+export interface ImportPreview {
+  batch_id: string;
+  total_rows: number;
+  valid_rows: number;
+  error_rows: number;
+  errors: ImportError[];
+  sample_rows: Record<string, unknown>[];
+  detected_columns: string[];
+  suggested_mapping: Record<string, string>;
+}
+
+export interface ImportFieldMapping {
+  source_column: string;
+  target_field: string;
+  transform?: string; // e.g., "date:MM/DD/YYYY", "phone:strip", "currency:cents"
+}
+
+export interface ImportHistorySummary {
+  recentImports: ImportBatch[];
+  stats: {
+    totalImports: number;
+    totalMembersImported: number;
+    totalInvoicesImported: number;
+    lastImportDate: string | null;
+  };
+}
+
 // Chat types
 export interface ChatConversation {
   id: string;

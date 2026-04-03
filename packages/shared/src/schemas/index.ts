@@ -327,6 +327,21 @@ export const scheduleConfigSchema = z.object({
   interval_minutes: z.number().int().min(5).max(120).default(10),
   max_bookings: z.number().int().min(1).max(100).default(1),
 });
+
+// Data Migration schemas
+export const importSourceSystems = ["jonas", "northstar", "clubessential", "generic_csv"] as const;
+export const importEntityTypes = ["members", "invoices", "payments", "bookings", "events"] as const;
+
+export const createImportSchema = z.object({
+  source_system: z.enum(importSourceSystems),
+  entity_type: z.enum(importEntityTypes),
+});
+
+export const importFieldMappingSchema = z.object({
+  batch_id: z.string().uuid(),
+  mapping: z.record(z.string()), // source_column -> target_field
+});
+
 // Export inferred types from schemas
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
@@ -368,3 +383,5 @@ export type CreatePOSTransactionInput = z.infer<typeof createPOSTransactionSchem
 export type CreateGLAccountInput = z.infer<typeof createGLAccountSchema>;
 export type CreateGLMappingInput = z.infer<typeof createGLMappingSchema>;
 export type CreateExportInput = z.infer<typeof createExportSchema>;
+export type CreateImportInput = z.infer<typeof createImportSchema>;
+export type ImportFieldMappingInput = z.infer<typeof importFieldMappingSchema>;

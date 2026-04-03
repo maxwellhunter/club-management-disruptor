@@ -17,6 +17,7 @@ import {
   BarChart3,
   ShoppingCart,
   BookOpen,
+  ArrowUpDown,
   Settings,
   Flag,
   Heart,
@@ -37,6 +38,7 @@ const navigation = [
   { name: "POS", href: "/dashboard/pos", icon: ShoppingCart },
   { name: "Accounting", href: "/dashboard/accounting", icon: BookOpen },
   { name: "Reports", href: "/dashboard/reports", icon: BarChart3 },
+  { name: "Migration", href: "/dashboard/migration", icon: ArrowUpDown },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ] satisfies { name: string; href: string; icon: LucideIcon }[];
 
