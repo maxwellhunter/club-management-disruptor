@@ -149,23 +149,19 @@ export default function MembershipCardScreen() {
             </View>
           </View>
 
-          {/* QR Code Area */}
+          {/* QR Code Area — deterministic pattern from member ID */}
           <View style={styles.qrSection}>
             <View style={styles.qrCode}>
-              {/* Stylized QR placeholder */}
               <View style={styles.qrGrid}>
-                {Array.from({ length: 25 }).map((_, i) => (
+                {generateQRPattern(user?.id || "member").map((filled, i) => (
                   <View
                     key={i}
                     style={[
                       styles.qrDot,
                       {
-                        backgroundColor:
-                          (i + Math.floor(i / 5)) % 3 === 0
-                            ? Colors.light.primary
-                            : (i + Math.floor(i / 5)) % 2 === 0
-                            ? Colors.light.primaryContainer
-                            : Colors.light.surfaceContainerHigh,
+                        backgroundColor: filled
+                          ? Colors.light.primary
+                          : Colors.light.surfaceContainerHigh,
                       },
                     ]}
                   />
@@ -173,7 +169,10 @@ export default function MembershipCardScreen() {
               </View>
             </View>
             <Text style={styles.qrHint}>
-              Scan for quick entry & member-only payments
+              Present at check-in or POS for member identification
+            </Text>
+            <Text style={styles.qrMemberId}>
+              {member?.member_number}
             </Text>
           </View>
 
@@ -254,6 +253,30 @@ export default function MembershipCardScreen() {
 
 function generateMemberNumber(): string {
   return `M-${String(Math.floor(Math.random() * 900000) + 100000)}`;
+}
+
+/**
+ * Generate a deterministic 7x7 QR-like pattern from a string seed.
+ * Uses a simple hash to produce a consistent pattern per member.
+ */
+function generateQRPattern(seed: string): boolean[] {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
+  }
+  const pattern: boolean[] = [];
+  for (let i = 0; i < 49; i++) {
+    // Corner anchors (always filled for QR look)
+    const row = Math.floor(i / 7);
+    const col = i % 7;
+    if ((row < 2 && col < 2) || (row < 2 && col > 4) || (row > 4 && col < 2)) {
+      pattern.push(true);
+    } else {
+      // Hash-derived data cells
+      pattern.push(((hash >> (i % 31)) & 1) === 1);
+    }
+  }
+  return pattern;
 }
 
 const styles = StyleSheet.create({
@@ -429,14 +452,21 @@ const styles = StyleSheet.create({
   qrGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    width: 90,
-    height: 90,
+    width: 98,
+    height: 98,
     gap: 2,
   },
   qrDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 3,
+    width: 12,
+    height: 12,
+    borderRadius: 2,
+  },
+  qrMemberId: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 1,
+    color: Colors.light.onSurfaceVariant,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
   qrHint: {
     fontSize: 11,
