@@ -197,6 +197,65 @@ export const updateDiningOrderStatusSchema = z.object({
   ]),
 });
 
+// Schedule configuration schema (admin — generate booking slots)
+export const scheduleConfigSchema = z.object({
+  facility_id: z.string().uuid(),
+  days_of_week: z.array(z.number().int().min(0).max(6)).min(1, "Select at least one day"),
+  start_time: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time format (HH:MM)"),
+  end_time: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time format (HH:MM)"),
+  interval_minutes: z.number().int().min(5).max(120).default(10),
+  max_bookings: z.number().int().min(1).max(100).default(1),
+});
+
+// Family schemas
+export const createFamilySchema = z.object({
+  name: z.string().min(1, "Family name is required").max(100),
+  primary_member_id: z.string().uuid("Invalid primary member").optional(),
+});
+
+export const updateFamilySchema = z.object({
+  name: z.string().min(1, "Family name is required").max(100).optional(),
+  primary_member_id: z.string().uuid("Invalid primary member").optional().nullable(),
+});
+
+export const assignFamilySchema = z.object({
+  family_id: z.string().uuid("Invalid family").nullable(),
+});
+
+// Golf scorecard schemas
+export const createGolfRoundSchema = z.object({
+  facility_id: z.string().uuid("Invalid facility"),
+  booking_id: z.string().uuid().optional(),
+  played_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format").default(new Date().toISOString().slice(0, 10)),
+  tee_set: z.enum(["back", "middle", "forward"]).default("middle"),
+  holes_played: z.union([z.literal(9), z.literal(18)]).default(18),
+  weather: z.enum(["sunny", "cloudy", "windy", "rainy", "cold"]).optional(),
+  notes: z.string().max(500).optional(),
+});
+
+export const updateGolfScoreSchema = z.object({
+  hole_number: z.number().int().min(1).max(18),
+  strokes: z.number().int().min(1).max(20).optional().nullable(),
+  putts: z.number().int().min(0).max(10).optional().nullable(),
+  fairway_hit: z.boolean().optional().nullable(),
+  green_in_regulation: z.boolean().optional().nullable(),
+  penalty_strokes: z.number().int().min(0).max(10).default(0),
+});
+
+export const submitScoresSchema = z.object({
+  scores: z.array(updateGolfScoreSchema).min(1),
+});
+
+export const createCourseHoleSchema = z.object({
+  facility_id: z.string().uuid("Invalid facility"),
+  hole_number: z.number().int().min(1).max(18),
+  par: z.number().int().min(3).max(6),
+  yardage_back: z.number().int().min(50).max(700),
+  yardage_middle: z.number().int().min(50).max(700).optional(),
+  yardage_forward: z.number().int().min(50).max(700).optional(),
+  handicap_index: z.number().int().min(1).max(18),
+});
+
 // POS schemas
 export const posProviders = ["stripe_terminal", "square", "toast", "lightspeed", "manual"] as const;
 export const posLocations = ["dining", "pro_shop", "bar", "snack_bar", "other"] as const;
@@ -234,16 +293,6 @@ export const createPOSTransactionSchema = z.object({
   metadata: z.record(z.unknown()).optional().nullable(),
 });
 
-// Schedule configuration schema (admin — generate booking slots)
-export const scheduleConfigSchema = z.object({
-  facility_id: z.string().uuid(),
-  days_of_week: z.array(z.number().int().min(0).max(6)).min(1, "Select at least one day"),
-  start_time: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time format (HH:MM)"),
-  end_time: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time format (HH:MM)"),
-  interval_minutes: z.number().int().min(5).max(120).default(10),
-  max_bookings: z.number().int().min(1).max(100).default(1),
-});
-
 // Export inferred types from schemas
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
@@ -272,6 +321,13 @@ export type CreateGolfRateInput = z.infer<typeof createGolfRateSchema>;
 export type UpdateGolfRateInput = z.infer<typeof updateGolfRateSchema>;
 export type InviteMemberInput = z.infer<typeof inviteMemberSchema>;
 export type ClaimInviteInput = z.infer<typeof claimInviteSchema>;
+export type CreateFamilyInput = z.infer<typeof createFamilySchema>;
+export type UpdateFamilyInput = z.infer<typeof updateFamilySchema>;
+export type AssignFamilyInput = z.infer<typeof assignFamilySchema>;
+export type CreateGolfRoundInput = z.infer<typeof createGolfRoundSchema>;
+export type UpdateGolfScoreInput = z.infer<typeof updateGolfScoreSchema>;
+export type SubmitScoresInput = z.infer<typeof submitScoresSchema>;
+export type CreateCourseHoleInput = z.infer<typeof createCourseHoleSchema>;
 export type CreatePOSConfigInput = z.infer<typeof createPOSConfigSchema>;
 export type UpdatePOSConfigInput = z.infer<typeof updatePOSConfigSchema>;
 export type CreatePOSTransactionInput = z.infer<typeof createPOSTransactionSchema>;

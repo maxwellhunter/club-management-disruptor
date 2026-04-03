@@ -12,13 +12,20 @@ interface MemberData {
   phone: string | null;
   role: string;
   membership_tier_id: string | null;
+  family_id: string | null;
   member_number: string | null;
   notes: string | null;
+}
+
+interface FamilyOption {
+  id: string;
+  name: string;
 }
 
 interface EditMemberModalProps {
   member: MemberData;
   tiers: { id: string; name: string; level: MembershipTierLevel }[];
+  families?: FamilyOption[];
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -26,6 +33,7 @@ interface EditMemberModalProps {
 export function EditMemberModal({
   member,
   tiers,
+  families = [],
   onClose,
   onSuccess,
 }: EditMemberModalProps) {
@@ -35,6 +43,7 @@ export function EditMemberModal({
   const [phone, setPhone] = useState(member.phone || "");
   const [role, setRole] = useState(member.role);
   const [tierId, setTierId] = useState(member.membership_tier_id || "");
+  const [familyId, setFamilyId] = useState(member.family_id || "");
   const [memberNumber, setMemberNumber] = useState(member.member_number || "");
   const [notes, setNotes] = useState(member.notes || "");
 
@@ -57,6 +66,7 @@ export function EditMemberModal({
           phone: phone || undefined,
           role,
           membership_tier_id: tierId || undefined,
+          family_id: familyId || null,
           member_number: memberNumber || undefined,
           notes: notes || undefined,
         }),
@@ -189,6 +199,27 @@ export function EditMemberModal({
               </select>
             </div>
           </div>
+
+          {families.length > 0 && (
+            <div className="space-y-1.5">
+              <label htmlFor="edit-family" className="text-sm font-medium">
+                Family
+              </label>
+              <select
+                id="edit-family"
+                value={familyId}
+                onChange={(e) => setFamilyId(e.target.value)}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              >
+                <option value="">No family</option>
+                {families.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <label htmlFor="edit-member-number" className="text-sm font-medium">

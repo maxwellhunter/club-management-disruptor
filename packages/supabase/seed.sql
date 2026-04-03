@@ -6,11 +6,11 @@
 INSERT INTO clubs (id, name, slug, address, phone, email, timezone)
 VALUES (
   '00000000-0000-0000-0000-000000000001',
-  'Greenfield Country Club',
-  'greenfield-cc',
+  'The Lakes',
+  'the-lakes',
   '100 Fairway Drive, Greenwich, CT 06830',
   '(203) 555-0100',
-  'info@greenfieldcc.com',
+  'info@thelakes.club',
   'America/New_York'
 );
 
@@ -60,6 +60,34 @@ BEGIN
     END LOOP;
   END LOOP;
 END $$;
+
+-- ============================================
+-- Golf Rates — per-round pricing
+-- Championship Course (18-hole) and Executive 9 (9-hole)
+-- ============================================
+INSERT INTO golf_rates (club_id, facility_id, name, holes, day_type, time_type, member_price, guest_price, cart_fee) VALUES
+  -- Championship Course — 18 Holes
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000101',
+   'Weekday Prime 18',      '18', 'weekday', 'prime',      0.00,  95.00, 25.00),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000101',
+   'Weekday Afternoon 18',  '18', 'weekday', 'afternoon',  0.00,  75.00, 25.00),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000101',
+   'Weekday Twilight 18',   '18', 'weekday', 'twilight',   0.00,  45.00, 15.00),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000101',
+   'Weekend Prime 18',      '18', 'weekend', 'prime',      0.00, 125.00, 25.00),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000101',
+   'Weekend Afternoon 18',  '18', 'weekend', 'afternoon',  0.00, 100.00, 25.00),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000101',
+   'Weekend Twilight 18',   '18', 'weekend', 'twilight',   0.00,  60.00, 15.00),
+  -- Executive 9 — 9 Holes
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000102',
+   'Weekday 9 Holes',       '9',  'weekday', 'prime',      0.00,  55.00, 15.00),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000102',
+   'Weekday Twilight 9',    '9',  'weekday', 'twilight',   0.00,  35.00, 10.00),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000102',
+   'Weekend 9 Holes',       '9',  'weekend', 'prime',      0.00,  70.00, 15.00),
+  ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000102',
+   'Weekend Twilight 9',    '9',  'weekend', 'twilight',   0.00,  45.00, 10.00);
 
 -- ============================================
 -- Seed events for demo

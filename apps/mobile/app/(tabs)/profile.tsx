@@ -303,8 +303,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.detailsButton}
-            onPress={handleManageBilling}
-            disabled={actionLoading}
+            onPress={() => router.push("/billing")}
             activeOpacity={0.7}
           >
             <Text style={styles.detailsButtonText}>Details</Text>
@@ -385,7 +384,7 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recent Activity</Text>
-          <TouchableOpacity activeOpacity={0.7}>
+          <TouchableOpacity activeOpacity={0.7} onPress={() => router.push("/billing")}>
             <Text style={styles.viewAllText}>VIEW ALL</Text>
           </TouchableOpacity>
         </View>

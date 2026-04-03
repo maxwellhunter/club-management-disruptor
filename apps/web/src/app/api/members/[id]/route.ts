@@ -182,6 +182,9 @@ export async function PATCH(
       if (input.member_number !== undefined)
         updateData.member_number = input.member_number || null;
       if (input.notes !== undefined) updateData.notes = input.notes || null;
+      // Handle family_id from body directly (not in updateMemberSchema)
+      if (body.family_id !== undefined)
+        updateData.family_id = body.family_id || null;
     } else {
       // Self-service: limited fields
       for (const key of allowedSelfFields) {

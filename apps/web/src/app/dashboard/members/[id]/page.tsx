@@ -17,6 +17,7 @@ import {
   Hash,
   Clock,
   StickyNote,
+  Heart,
 } from "lucide-react";
 import type { MemberRole, MembershipTierLevel } from "@club/shared";
 import { EditMemberModal } from "./edit-member-modal";
@@ -71,6 +72,7 @@ export default function MemberDetailPage() {
   const [tiers, setTiers] = useState<
     { id: string; name: string; level: MembershipTierLevel }[]
   >([]);
+  const [families, setFamilies] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -80,9 +82,10 @@ export default function MemberDetailPage() {
 
   const fetchMember = useCallback(async () => {
     try {
-      const [memberRes, tiersRes] = await Promise.all([
+      const [memberRes, tiersRes, familiesRes] = await Promise.all([
         fetch(`/api/members/${memberId}`),
         fetch("/api/members?status=active"),
+        fetch("/api/families"),
       ]);
 
       if (!memberRes.ok) {
@@ -98,6 +101,16 @@ export default function MemberDetailPage() {
       if (tiersRes.ok) {
         const tiersData = await tiersRes.json();
         setTiers(tiersData.tiers || []);
+      }
+
+      if (familiesRes.ok) {
+        const familiesData = await familiesRes.json();
+        setFamilies(
+          (familiesData.families || []).map((f: { id: string; name: string }) => ({
+            id: f.id,
+            name: f.name,
+          }))
+        );
       }
     } catch {
       setError("Failed to load member");
@@ -400,7 +413,7 @@ export default function MemberDetailPage() {
           )}
 
           {member.family && (
-            <DetailRow icon={Shield} label="Family">
+            <DetailRow icon={Heart} label="Family">
               {member.family.name}
             </DetailRow>
           )}
@@ -458,6 +471,7 @@ export default function MemberDetailPage() {
         <EditMemberModal
           member={member}
           tiers={tiers}
+          families={families}
           onClose={() => setShowEditModal(false)}
           onSuccess={() => fetchMember()}
         />

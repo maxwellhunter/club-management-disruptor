@@ -51,3 +51,4 @@ apps/mobile/.expo/
 # Branding assets
 branding/
 *.png
+.vercel
