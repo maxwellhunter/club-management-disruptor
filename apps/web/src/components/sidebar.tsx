@@ -24,15 +24,19 @@ import {
   Brain,
   Wallet,
   Settings,
+  Flag,
+  Heart,
   type LucideIcon,
 } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutGrid },
   { name: "Members", href: "/dashboard/members", icon: Users },
+  { name: "Families", href: "/dashboard/families", icon: Heart },
   { name: "Billing", href: "/dashboard/billing", icon: CreditCard },
   { name: "Advanced Billing", href: "/dashboard/billing/advanced", icon: Calculator },
   { name: "Bookings", href: "/dashboard/bookings", icon: Calendar },
+  { name: "Scorecards", href: "/dashboard/scorecards", icon: Flag },
   { name: "Dining", href: "/dashboard/dining", icon: UtensilsCrossed },
   { name: "Events", href: "/dashboard/events", icon: PartyPopper },
   { name: "Messages", href: "/dashboard/messages", icon: Mail },

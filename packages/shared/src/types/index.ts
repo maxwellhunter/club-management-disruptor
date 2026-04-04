@@ -413,6 +413,79 @@ export interface GolfRatesResponse {
   role: MemberRole;
 }
 
+// Golf Scorecard types
+export type TeeSet = "back" | "middle" | "forward";
+export type RoundStatus = "in_progress" | "completed" | "verified" | "cancelled";
+export type WeatherCondition = "sunny" | "cloudy" | "windy" | "rainy" | "cold";
+
+export interface CourseHole {
+  id: string;
+  facility_id: string;
+  hole_number: number;
+  par: number;
+  yardage_back: number;
+  yardage_middle: number | null;
+  yardage_forward: number | null;
+  handicap_index: number;
+  created_at: string;
+}
+
+export interface GolfRound {
+  id: string;
+  club_id: string;
+  facility_id: string;
+  member_id: string;
+  booking_id: string | null;
+  played_at: string;
+  tee_set: TeeSet;
+  holes_played: 9 | 18;
+  total_score: number | null;
+  total_putts: number | null;
+  total_fairways_hit: number | null;
+  total_greens_in_regulation: number | null;
+  weather: WeatherCondition | null;
+  notes: string | null;
+  status: RoundStatus;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GolfScore {
+  id: string;
+  round_id: string;
+  hole_number: number;
+  strokes: number | null;
+  putts: number | null;
+  fairway_hit: boolean | null;
+  green_in_regulation: boolean | null;
+  penalty_strokes: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GolfRoundWithDetails extends GolfRound {
+  facility_name: string;
+  member_first_name: string;
+  member_last_name: string;
+  scores: GolfScore[];
+}
+
+export interface GolfRoundSummary extends GolfRound {
+  facility_name: string;
+  member_first_name: string;
+  member_last_name: string;
+  score_to_par: number | null;
+  course_par: number | null;
+}
+
+export interface CourseLayout {
+  facility: { id: string; name: string; description: string | null };
+  holes: CourseHole[];
+  total_par: number;
+  total_yardage: { back: number; middle: number; forward: number };
+}
+
 // POS types
 export type POSProvider = "stripe_terminal" | "square" | "toast" | "lightspeed" | "manual";
 export type POSTransactionStatus = "pending" | "completed" | "refunded" | "voided" | "failed";

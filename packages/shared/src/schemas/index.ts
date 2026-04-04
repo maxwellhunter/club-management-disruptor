@@ -197,6 +197,40 @@ export const updateDiningOrderStatusSchema = z.object({
   ]),
 });
 
+// Golf scorecard schemas
+export const createGolfRoundSchema = z.object({
+  facility_id: z.string().uuid("Invalid facility"),
+  booking_id: z.string().uuid().optional(),
+  played_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format").default(new Date().toISOString().slice(0, 10)),
+  tee_set: z.enum(["back", "middle", "forward"]).default("middle"),
+  holes_played: z.union([z.literal(9), z.literal(18)]).default(18),
+  weather: z.enum(["sunny", "cloudy", "windy", "rainy", "cold"]).optional(),
+  notes: z.string().max(500).optional(),
+});
+
+export const updateGolfScoreSchema = z.object({
+  hole_number: z.number().int().min(1).max(18),
+  strokes: z.number().int().min(1).max(20).optional().nullable(),
+  putts: z.number().int().min(0).max(10).optional().nullable(),
+  fairway_hit: z.boolean().optional().nullable(),
+  green_in_regulation: z.boolean().optional().nullable(),
+  penalty_strokes: z.number().int().min(0).max(10).default(0),
+});
+
+export const submitScoresSchema = z.object({
+  scores: z.array(updateGolfScoreSchema).min(1),
+});
+
+export const createCourseHoleSchema = z.object({
+  facility_id: z.string().uuid("Invalid facility"),
+  hole_number: z.number().int().min(1).max(18),
+  par: z.number().int().min(3).max(6),
+  yardage_back: z.number().int().min(50).max(700),
+  yardage_middle: z.number().int().min(50).max(700).optional(),
+  yardage_forward: z.number().int().min(50).max(700).optional(),
+  handicap_index: z.number().int().min(1).max(18),
+});
+
 // POS schemas
 export const posProviders = ["stripe_terminal", "square", "toast", "lightspeed", "manual"] as const;
 export const posLocations = ["dining", "pro_shop", "bar", "snack_bar", "other"] as const;
@@ -423,6 +457,10 @@ export type CreateBillingCreditInput = z.infer<typeof createBillingCreditSchema>
 export type UpdateFamilyBillingInput = z.infer<typeof updateFamilyBillingSchema>;
 export type CreateGuestInput = z.infer<typeof createGuestSchema>;
 export type RegisterGuestVisitInput = z.infer<typeof registerGuestVisitSchema>;
+export type CreateGolfRoundInput = z.infer<typeof createGolfRoundSchema>;
+export type UpdateGolfScoreInput = z.infer<typeof updateGolfScoreSchema>;
+export type SubmitScoresInput = z.infer<typeof submitScoresSchema>;
+export type CreateCourseHoleInput = z.infer<typeof createCourseHoleSchema>;
 export type UpdateGuestVisitStatusInput = z.infer<typeof updateGuestVisitStatusSchema>;
 export type CreateGuestPolicyInput = z.infer<typeof createGuestPolicySchema>;
 export type CreateGuestFeeScheduleInput = z.infer<typeof createGuestFeeScheduleSchema>;
