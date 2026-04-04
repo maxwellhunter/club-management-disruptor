@@ -606,6 +606,156 @@ export interface ImportHistorySummary {
   };
 }
 
+// Advanced Billing types
+export type SpendingMinimumPeriod = "monthly" | "quarterly" | "annually";
+export type SpendingCategory = "dining" | "pro_shop" | "bar" | "total";
+export type AssessmentType = "capital_improvement" | "seasonal" | "special" | "initiation";
+export type AssessmentStatus = "draft" | "active" | "completed" | "cancelled";
+export type AssessmentMemberStatus = "pending" | "invoiced" | "partial" | "paid" | "waived";
+export type BillingCycleType = "dues" | "minimum_shortfall" | "assessment";
+export type BillingCycleStatus = "pending" | "running" | "completed" | "failed";
+
+export interface SpendingMinimum {
+  id: string;
+  club_id: string;
+  tier_id: string;
+  name: string;
+  category: SpendingCategory;
+  amount: number;
+  period: SpendingMinimumPeriod;
+  enforce_shortfall: boolean;
+  shortfall_description: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SpendingMinimumWithTier extends SpendingMinimum {
+  tier_name: string;
+  tier_level: MembershipTierLevel;
+}
+
+export interface SpendingTracking {
+  id: string;
+  club_id: string;
+  member_id: string;
+  minimum_id: string;
+  period_start: string;
+  period_end: string;
+  amount_spent: number;
+  amount_required: number;
+  shortfall: number;
+  shortfall_invoiced: boolean;
+  invoice_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SpendingTrackingWithDetails extends SpendingTracking {
+  member_name: string;
+  minimum_name: string;
+  category: SpendingCategory;
+}
+
+export interface Assessment {
+  id: string;
+  club_id: string;
+  name: string;
+  description: string | null;
+  type: AssessmentType;
+  amount: number;
+  target_all_members: boolean;
+  target_tier_ids: string[] | null;
+  target_member_ids: string[] | null;
+  due_date: string;
+  allow_installments: boolean;
+  installment_count: number;
+  installment_amount: number | null;
+  status: AssessmentStatus;
+  invoices_generated: boolean;
+  total_assessed: number;
+  total_collected: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AssessmentMember {
+  id: string;
+  assessment_id: string;
+  member_id: string;
+  amount: number;
+  paid_amount: number;
+  status: AssessmentMemberStatus;
+  waiver_reason: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AssessmentMemberWithDetails extends AssessmentMember {
+  first_name: string;
+  last_name: string;
+  email: string;
+  member_number: string | null;
+}
+
+export interface BillingCycle {
+  id: string;
+  club_id: string;
+  period_start: string;
+  period_end: string;
+  type: BillingCycleType;
+  status: BillingCycleStatus;
+  invoices_created: number;
+  total_amount: number;
+  error_message: string | null;
+  run_by: string;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface BillingCredit {
+  id: string;
+  club_id: string;
+  member_id: string;
+  amount: number;
+  reason: string;
+  applied_to_invoice_id: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+export interface FamilyBillingInfo {
+  family_id: string;
+  family_name: string;
+  primary_member_id: string;
+  primary_member_name: string;
+  billing_consolidated: boolean;
+  billing_email: string | null;
+  members: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    outstanding_balance: number;
+  }[];
+  total_outstanding: number;
+}
+
+export interface AdvancedBillingSummary {
+  spending_minimums: SpendingMinimumWithTier[];
+  assessments: Assessment[];
+  recent_cycles: BillingCycle[];
+  families: FamilyBillingInfo[];
+  stats: {
+    active_minimums: number;
+    active_assessments: number;
+    total_assessed: number;
+    total_collected: number;
+    families_with_consolidation: number;
+    shortfall_pending: number;
+  };
+}
+
 // Chat types
 export interface ChatConversation {
   id: string;

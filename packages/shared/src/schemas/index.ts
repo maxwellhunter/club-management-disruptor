@@ -269,6 +269,57 @@ export const scheduleConfigSchema = z.object({
   max_bookings: z.number().int().min(1).max(100).default(1),
 });
 
+// Advanced Billing schemas
+export const spendingCategories = ["dining", "pro_shop", "bar", "total"] as const;
+export const spendingPeriods = ["monthly", "quarterly", "annually"] as const;
+export const assessmentTypes = ["capital_improvement", "seasonal", "special", "initiation"] as const;
+
+export const createSpendingMinimumSchema = z.object({
+  tier_id: z.string().uuid("Invalid tier"),
+  name: z.string().min(1, "Name is required").max(100),
+  category: z.enum(spendingCategories),
+  amount: z.number().min(0.01, "Amount must be positive"),
+  period: z.enum(spendingPeriods).default("monthly"),
+  enforce_shortfall: z.boolean().default(true),
+  shortfall_description: z.string().optional(),
+});
+
+export const updateSpendingMinimumSchema = createSpendingMinimumSchema.partial().extend({
+  is_active: z.boolean().optional(),
+});
+
+export const createAssessmentSchema = z.object({
+  name: z.string().min(1, "Name is required").max(200),
+  description: z.string().optional(),
+  type: z.enum(assessmentTypes),
+  amount: z.number().min(0.01, "Amount must be positive"),
+  target_all_members: z.boolean().default(false),
+  target_tier_ids: z.array(z.string().uuid()).optional().nullable(),
+  target_member_ids: z.array(z.string().uuid()).optional().nullable(),
+  due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date"),
+  allow_installments: z.boolean().default(false),
+  installment_count: z.number().int().min(1).max(60).default(1),
+});
+
+export const runBillingCycleSchema = z.object({
+  type: z.enum(["dues", "minimum_shortfall", "assessment"]),
+  period_start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  period_end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  assessment_id: z.string().uuid().optional(), // Required when type = assessment
+});
+
+export const createBillingCreditSchema = z.object({
+  member_id: z.string().uuid(),
+  amount: z.number().refine((v) => v !== 0, "Amount cannot be zero"),
+  reason: z.string().min(1, "Reason is required"),
+});
+
+export const updateFamilyBillingSchema = z.object({
+  family_id: z.string().uuid(),
+  billing_consolidated: z.boolean(),
+  billing_email: z.string().email().optional().nullable(),
+});
+
 // Data Migration schemas
 export const importSourceSystems = ["jonas", "northstar", "clubessential", "generic_csv"] as const;
 export const importEntityTypes = ["members", "invoices", "payments", "bookings", "events"] as const;
@@ -319,3 +370,9 @@ export type CreateGLMappingInput = z.infer<typeof createGLMappingSchema>;
 export type CreateExportInput = z.infer<typeof createExportSchema>;
 export type CreateImportInput = z.infer<typeof createImportSchema>;
 export type ImportFieldMappingInput = z.infer<typeof importFieldMappingSchema>;
+export type CreateSpendingMinimumInput = z.infer<typeof createSpendingMinimumSchema>;
+export type UpdateSpendingMinimumInput = z.infer<typeof updateSpendingMinimumSchema>;
+export type CreateAssessmentInput = z.infer<typeof createAssessmentSchema>;
+export type RunBillingCycleInput = z.infer<typeof runBillingCycleSchema>;
+export type CreateBillingCreditInput = z.infer<typeof createBillingCreditSchema>;
+export type UpdateFamilyBillingInput = z.infer<typeof updateFamilyBillingSchema>;
