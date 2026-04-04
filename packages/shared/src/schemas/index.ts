@@ -379,6 +379,51 @@ export const updateFamilyBillingSchema = z.object({
   billing_email: z.string().email().optional().nullable(),
 });
 
+// Guest Management schemas
+export const guestVisitStatuses = ["registered", "checked_in", "checked_out", "no_show", "cancelled"] as const;
+export const facilityTypes = ["golf", "tennis", "dining", "pool", "fitness", "other"] as const;
+
+export const createGuestSchema = z.object({
+  first_name: z.string().min(1, "First name is required").max(100),
+  last_name: z.string().min(1, "Last name is required").max(100),
+  email: z.string().email().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+});
+
+export const registerGuestVisitSchema = z.object({
+  guest_id: z.string().uuid().optional(), // Omit to create new guest inline
+  guest: createGuestSchema.optional(),     // Inline guest creation
+  visit_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date"),
+  facility_type: z.enum(facilityTypes).optional().nullable(),
+  booking_id: z.string().uuid().optional().nullable(),
+  notes: z.string().optional().nullable(),
+});
+
+export const updateGuestVisitStatusSchema = z.object({
+  status: z.enum(guestVisitStatuses),
+});
+
+export const createGuestPolicySchema = z.object({
+  name: z.string().min(1, "Name is required").max(100),
+  facility_type: z.enum(facilityTypes).optional().nullable(),
+  max_guests_per_visit: z.number().int().min(1).max(20).default(4),
+  max_guest_visits_per_month: z.number().int().min(1).optional().nullable(),
+  max_same_guest_per_month: z.number().int().min(1).default(4),
+  guest_fee: z.number().min(0).default(0),
+  require_member_present: z.boolean().default(true),
+  blackout_days: z.array(z.number().int().min(0).max(6)).default([]),
+  advance_registration_required: z.boolean().default(false),
+  notes: z.string().optional().nullable(),
+});
+
+export const createGuestFeeScheduleSchema = z.object({
+  facility_type: z.enum(facilityTypes),
+  tier_id: z.string().uuid().optional().nullable(),
+  guest_fee: z.number().min(0),
+  weekend_surcharge: z.number().min(0).default(0),
+});
+
 // Data Migration schemas
 export const importSourceSystems = ["jonas", "northstar", "clubessential", "generic_csv"] as const;
 export const importEntityTypes = ["members", "invoices", "payments", "bookings", "events"] as const;
@@ -442,3 +487,8 @@ export type CreateAssessmentInput = z.infer<typeof createAssessmentSchema>;
 export type RunBillingCycleInput = z.infer<typeof runBillingCycleSchema>;
 export type CreateBillingCreditInput = z.infer<typeof createBillingCreditSchema>;
 export type UpdateFamilyBillingInput = z.infer<typeof updateFamilyBillingSchema>;
+export type CreateGuestInput = z.infer<typeof createGuestSchema>;
+export type RegisterGuestVisitInput = z.infer<typeof registerGuestVisitSchema>;
+export type UpdateGuestVisitStatusInput = z.infer<typeof updateGuestVisitStatusSchema>;
+export type CreateGuestPolicyInput = z.infer<typeof createGuestPolicySchema>;
+export type CreateGuestFeeScheduleInput = z.infer<typeof createGuestFeeScheduleSchema>;

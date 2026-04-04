@@ -845,6 +845,94 @@ export interface AdvancedBillingSummary {
   };
 }
 
+// Guest Management types
+export type GuestVisitStatus = "registered" | "checked_in" | "checked_out" | "no_show" | "cancelled";
+
+export interface GuestPolicy {
+  id: string;
+  club_id: string;
+  name: string;
+  facility_type: FacilityType | null;
+  max_guests_per_visit: number;
+  max_guest_visits_per_month: number | null;
+  max_same_guest_per_month: number;
+  guest_fee: number;
+  require_member_present: boolean;
+  blackout_days: number[];
+  advance_registration_required: boolean;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Guest {
+  id: string;
+  club_id: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  phone: string | null;
+  notes: string | null;
+  is_blocked: boolean;
+  block_reason: string | null;
+  total_visits: number;
+  last_visit_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GuestVisit {
+  id: string;
+  club_id: string;
+  guest_id: string;
+  host_member_id: string;
+  visit_date: string;
+  facility_type: FacilityType | null;
+  check_in_time: string | null;
+  check_out_time: string | null;
+  guest_fee: number;
+  fee_invoiced: boolean;
+  invoice_id: string | null;
+  booking_id: string | null;
+  status: GuestVisitStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GuestVisitWithDetails extends GuestVisit {
+  guest_first_name: string;
+  guest_last_name: string;
+  host_first_name: string;
+  host_last_name: string;
+}
+
+export interface GuestFeeSchedule {
+  id: string;
+  club_id: string;
+  facility_type: FacilityType;
+  tier_id: string | null;
+  guest_fee: number;
+  weekend_surcharge: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface GuestManagementSummary {
+  policies: GuestPolicy[];
+  guests: Guest[];
+  recent_visits: GuestVisitWithDetails[];
+  fee_schedules: (GuestFeeSchedule & { tier_name: string | null })[];
+  stats: {
+    total_guests: number;
+    visits_this_month: number;
+    guest_fees_this_month: number;
+    blocked_guests: number;
+    upcoming_visits: number;
+  };
+}
+
 // Chat types
 export interface ChatConversation {
   id: string;
