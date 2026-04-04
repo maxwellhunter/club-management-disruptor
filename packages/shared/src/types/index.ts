@@ -844,6 +844,59 @@ export interface GuestManagementSummary {
   };
 }
 
+// Push Notification types
+export type NotificationChannel = "push" | "email" | "in_app";
+export type NotificationStatus = "pending" | "sent" | "delivered" | "failed" | "skipped";
+export type NotificationCategory = "bookings" | "events" | "announcements" | "billing" | "dining" | "marketing" | "guests";
+
+export interface NotificationPreference {
+  id: string;
+  member_id: string;
+  category: NotificationCategory;
+  push_enabled: boolean;
+  email_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationLogEntry {
+  id: string;
+  club_id: string;
+  member_id: string | null;
+  category: string;
+  title: string;
+  body: string;
+  data: Record<string, unknown> | null;
+  channel: NotificationChannel;
+  status: NotificationStatus;
+  error_message: string | null;
+  expo_receipt_id: string | null;
+  sent_at: string | null;
+  created_at: string;
+}
+
+export interface NotificationTemplate {
+  id: string;
+  club_id: string;
+  name: string;
+  category: string;
+  title_template: string;
+  body_template: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface NotificationDashboard {
+  log: NotificationLogEntry[];
+  templates: NotificationTemplate[];
+  stats: {
+    sent_this_month: number;
+    failed_this_month: number;
+    skipped_this_month: number;
+    members_with_tokens: number;
+  };
+}
+
 // Chat types
 export interface ChatConversation {
   id: string;
