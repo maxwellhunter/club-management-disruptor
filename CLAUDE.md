@@ -12,7 +12,8 @@ AI-powered country club management SaaS ("ClubOS") — built to disrupt legacy c
 - **AI Chat**: Claude API via `@anthropic-ai/sdk`
 - **Styling**: Tailwind CSS v4 + CSS custom properties (green primary theme)
 - **Validation**: Zod (shared between web and API)
-- **Email** (planned): Resend
+- **Email**: Resend (invite, invoice, announcement, booking confirmation templates)
+- **Testing**: Jest 30 + ts-jest
 - **Deployment** (planned): Vercel (web) + EAS (mobile)
 
 ## Project Structure
@@ -22,25 +23,51 @@ apps/
     src/
       app/                  # App Router pages
         (auth routes)       # /login, /signup, /auth/callback
-        dashboard/          # Authenticated pages (members, billing, bookings, events, messages, chat)
-        api/chat/           # Claude AI chat endpoint
-      components/           # React components (sidebar.tsx)
-      lib/supabase/         # Supabase client helpers (server.ts, client.ts, middleware.ts)
+        invite/[token]/     # Public invite claim page (password set + account activation)
+        dashboard/          # Authenticated pages
+          members/          # Member list, detail, add/edit modals
+          billing/          # Billing dashboard, invoices, spending tracking
+          bookings/         # Tee time wizard, my bookings, admin schedule/rates
+          events/           # Event list, detail, RSVP, admin CRUD
+          messages/         # Announcements (admin create/publish, member view)
+          chat/             # AI chat with Claude
+          digital-cards/    # NFC wallet passes, tap history, card design
+          reports/          # Reporting dashboard
+          ai-insights/      # AI-powered analytics
+          guests/           # Guest management
+          data-migration/   # Jonas/Northstar/CSV import tools
+        api/                # REST API routes
+          members/          # GET/POST, [id] GET/PATCH/DELETE, status, resend-invite
+          bookings/         # CRUD, tee-times, cancel, modify, admin/schedule, admin/golf-rates
+          events/           # GET, [id] GET, rsvp POST, admin CRUD + attendees
+          announcements/    # GET/POST, [id] GET/PATCH/DELETE
+          guests/           # Visits POST/PATCH with policy enforcement
+          wallet/           # passes GET/POST/DELETE, nfc POST, templates GET/POST
+          invite/[token]/   # GET (load invite) / POST (claim invite)
+          chat/             # Claude AI chat endpoint
+      components/           # React components (sidebar, event-card, etc.)
+      lib/
+        supabase/           # Supabase client helpers (server.ts, client.ts, middleware.ts)
+        billing/            # Billing engine, spending tracker
+        wallet/             # Pass generator (Apple/Google Wallet, NFC, barcodes)
+        golf-eligibility.ts # Member tier lookup + golf access check
+        email.ts            # Resend email service (invite, invoice, announcement, booking)
       middleware.ts          # Auth middleware — redirects unauthenticated users
   mobile/                     # Expo React Native app
     app/                    # Expo Router screens (file-based routing)
       (auth)/               # Login, signup screens (Stack navigator)
       (tabs)/               # Authenticated tab screens (Home, Bookings, Events, Chat, Profile)
+      membership-card.tsx   # Digital wallet card with NFC tap-to-check-in
     lib/                    # Supabase client + AuthContext provider
     constants/              # Theme colors (matches web CSS custom properties)
 packages/
   shared/                   # @club/shared — shared types + Zod schemas
-    src/types/index.ts      # All entity types (Member, Booking, Event, Invoice, etc.)
+    src/types/index.ts      # All entity types (Member, Booking, Event, Invoice, DigitalPass, etc.)
     src/schemas/index.ts    # Zod validation schemas for all entities
     src/index.ts            # Re-exports everything
   supabase/                 # @club/supabase — DB config + migrations
-    migrations/             # SQL migrations (00001_initial_schema.sql)
-    seed.sql                # Dev seed data (demo club, tiers, facilities)
+    migrations/             # 15 SQL migrations (00001–00015)
+    seed.sql                # Dev seed data (demo club, tiers, facilities, menus)
     config.toml             # Supabase local config
 ```
 
@@ -51,11 +78,33 @@ packages/
 - **AI Chat**: POST `/api/chat` → authenticates user via Supabase → sends messages to Claude API. Gracefully handles missing `ANTHROPIC_API_KEY`. Mobile calls the same endpoint.
 - **Mobile auth**: Expo SecureStore for token persistence. `AuthProvider` context wraps the app, Expo Router file-based routing mirrors web structure. Auth state redirects between `(auth)` and `(tabs)` groups.
 - **Mobile navigation**: Tab bar with 5 tabs (Home, Bookings, Events, AI Chat, Profile). Auth screens use Stack navigator.
+- **API auth pattern**: `createApiClient()` helper handles both cookie auth (web) and Bearer token auth (mobile). Returns `{ supabase, adminClient, caller }` where `caller` has `member: MemberWithTier` with `tier_name` and `tier_level` (but NOT `member_number` — query separately if needed).
+- **Family billing**: ALL family members (including primary) go to a single consolidated invoice. Primary is NOT billed separately.
+- **Invite flow**: Admin creates member with `status: 'invited'` → generates 7-day token → member visits `/invite/[token]` → sets password → Supabase Auth user created → member activated.
 
-## Database Schema (14 tables)
-`clubs` → `membership_tiers`, `families`, `members`, `facilities`, `booking_slots`, `bookings`, `events`, `event_rsvps`, `invoices`, `payments`, `announcements`, `chat_conversations`, `chat_messages`
+## Database Schema (44 tables, all RLS-enabled)
 
-All tables have RLS enabled. Helper functions: `get_member_club_id()`, `is_club_admin()`. Auto-updated `updated_at` triggers on mutable tables.
+**Core**: `clubs`, `membership_tiers`, `families`, `members`, `facilities`, `booking_slots`, `bookings`, `booking_waitlist`, `events`, `event_rsvps`, `invoices`, `payments`, `announcements`, `chat_conversations`, `chat_messages`
+
+**Dining/POS**: `menu_categories`, `menu_items`, `dining_orders`, `dining_order_items`, `pos_configs`, `pos_transactions`, `pos_transaction_items`
+
+**Advanced Billing**: `spending_minimums`, `spending_tracking`, `assessments`, `assessment_members`, `billing_cycles`, `billing_credits`
+
+**Guest Management**: `guest_policies`, `guests`, `guest_visits`, `guest_fee_schedules`
+
+**Notifications**: `notification_preferences`, `notification_log`, `notification_templates`
+
+**Digital Cards**: `digital_passes`, `nfc_tap_log`, `card_templates`
+
+**Accounting**: `gl_accounts`, `gl_mappings`, `export_batches`, `journal_entries`
+
+**Data Migration**: `import_batches`
+
+**Golf**: `golf_rates`
+
+Helper functions: `get_member_club_id()`, `is_club_admin()`. Auto-updated `updated_at` triggers on mutable tables.
+
+**Supabase project**: `iicwnlruopqhrzkgjsmu` (us-east-1)
 
 ## Commands
 ```bash
@@ -76,6 +125,10 @@ pnpm build            # Turbo builds all packages
 
 # Type checking
 pnpm typecheck
+
+# Tests
+pnpm test             # Run all tests (Jest 30)
+pnpm test -- --watch  # Watch mode
 ```
 
 ## Environment Variables
@@ -90,13 +143,30 @@ pnpm typecheck
 - `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` — same Supabase project
 - `EXPO_PUBLIC_APP_URL` — URL of the web app (for AI chat API calls)
 
-## MVP Feature Modules (Status)
-1. **Member Management** — scaffolded (empty state UI, no CRUD yet)
-2. **Billing & Payments** — scaffolded (stat cards, no Stripe wiring yet)
-3. **Bookings** — scaffolded (facility tabs, no booking logic yet)
-4. **Events** — scaffolded (empty state, no CRUD yet)
-5. **Communications** — scaffolded (empty state, no sending yet)
-6. **AI Chat** — API route wired to Claude, chat UI with suggestions
+## Feature Modules (Status)
+
+### Core MVP (fully wired)
+1. **Member Management** — Full CRUD: list/search/filter, detail page, add/edit modals, invite system (token-based, 7-day expiry), resend invite, deactivate/reactivate, role-based access, email notifications
+2. **Bookings** — Multi-step tee time wizard, slot selection with availability, my bookings (edit/cancel), waitlist with auto-promotion on cancellation, admin schedule config (generate slots), admin golf rates CRUD, email confirmations
+3. **Events** — Event list (role-based), detail with capacity bar, RSVP flow (attending/declined/maybe) with capacity enforcement, admin CRUD with draft→publish workflow, attendee management
+4. **Communications** — Announcement list (admin: all/published/drafts tabs; member: published only), create/edit/delete, priority levels (low/normal/high/urgent), tier-targeted audience, email blast on publish
+5. **AI Chat** — Claude API endpoint, chat UI with suggested prompts, mobile support via shared endpoint
+6. **Billing & Payments** — Billing engine with dues calculation, family consolidated billing, spending minimum tracking + shortfall invoicing, assessments (capital/seasonal with installments), billing cycle tracking. **Not yet wired to Stripe** — engine is tested but payments are manual/seeded.
+
+### Competitive Analysis Features (built)
+7. **Golf Tee Times & Rates** — Dynamic pricing by facility/holes/day/time, member vs guest rates, admin CRUD
+8. **Dining & Menu Orders** — Full menu system (categories + items), POS transaction tracking across 4 locations
+9. **Guest Management** — Guest registration, configurable policies (per facility, blackout days, visit limits), fee schedules with weekend surcharges, visit tracking with auto-invoicing
+10. **Data Migration** — Import tools for Jonas/Northstar/ClubEssential/CSV with field mapping, validation, and progress tracking
+11. **Advanced Billing** — Spending minimums per tier, shortfall enforcement, capital assessments with installment plans, family billing consolidation, member credits/adjustments
+12. **Accounting & GL Export** — Chart of accounts, GL mappings, journal entries, export batches (QuickBooks/Sage/Xero/CSV)
+13. **Push Notifications** — Server infrastructure with per-member category preferences, notification templates with {{variable}} placeholders, delivery tracking with Expo receipts
+14. **AI Insights Dashboard** — AI-powered analytics dashboard
+15. **Digital Member Cards (NFC)** — Apple/Google Wallet pass generation, NFC tap-to-check-in with 30s dedup, barcode-to-member resolution, card design templates, mobile wallet buttons (platform-aware)
+
+### Testing
+- **82 unit tests** covering billing engine (dues cycles, family consolidation, shortfall), spending tracker, guest policy enforcement, and pass generator (barcode determinism, Apple/Google pass structure)
+- Test files in `__tests__/` directories alongside source files
 
 ## Conventions
 - Package names use `@club/` scope (e.g., `@club/web`, `@club/mobile`, `@club/shared`)
@@ -108,6 +178,28 @@ pnpm typecheck
 - Web dashboard pages are server components by default; add `"use client"` only when needed
 - Mobile uses Expo Router file-based routing with `(auth)` and `(tabs)` route groups
 - Green theme: primary color is `#16a34a` (light) / `#22c55e` (dark) — consistent across web and mobile
+
+## Demo Accounts (Supabase Auth)
+| Role | Email | Name | Tier |
+|------|-------|------|------|
+| Admin | `admin@greenfieldcc.com` | Max Hunter | — |
+| Staff | `staff@greenfieldcc.com` | Sarah Chen | Standard |
+| Member | `member@greenfieldcc.com` | James Wilson | Standard |
+| Member | `golf@greenfieldcc.com` | Emily Brooks | Golf |
+
+16 additional seeded members (no auth users — use invite flow or create manually).
+
+## Seed Data (live DB)
+- 1 club (Greenfield CC), 4 tiers, 7 facilities, 20 members, 3 families
+- 1,008 booking slots (golf tee times + dining), 22 bookings
+- 4 events, 16 RSVPs
+- 20 invoices (paid/sent/overdue), 8 payments
+- 5 guests (1 blocked), 7 guest visits, 3 guest policies, 4 fee schedules
+- 4 POS configs, 10 POS transactions (dining, bar, pro shop, snack bar + 1 refund)
+- 4 spending minimums, 2 assessments, 3 billing cycles
+- 5 announcements, 5 notification templates, 1 card template
+- 10 GL accounts, 4 GL mappings
+- 8 menu categories, 57 menu items (Main Dining + Grill Room)
 
 ## GitHub
 Repo: https://github.com/maxwellhunter/club-management-disruptor
