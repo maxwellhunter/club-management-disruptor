@@ -318,16 +318,6 @@ export const createExportSchema = z.object({
   date_to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date (YYYY-MM-DD)"),
 });
 
-// Schedule configuration schema (admin — generate booking slots)
-export const scheduleConfigSchema = z.object({
-  facility_id: z.string().uuid(),
-  days_of_week: z.array(z.number().int().min(0).max(6)).min(1, "Select at least one day"),
-  start_time: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time format (HH:MM)"),
-  end_time: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time format (HH:MM)"),
-  interval_minutes: z.number().int().min(5).max(120).default(10),
-  max_bookings: z.number().int().min(1).max(100).default(1),
-});
-
 // Advanced Billing schemas
 export const spendingCategories = ["dining", "pro_shop", "bar", "total"] as const;
 export const spendingPeriods = ["monthly", "quarterly", "annually"] as const;
