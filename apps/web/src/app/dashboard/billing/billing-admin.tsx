@@ -10,6 +10,7 @@ import {
   MoreHorizontal,
   AlertTriangle,
   Zap,
+  Download,
 } from "lucide-react";
 import type { BillingOverview } from "@club/shared";
 import { CreateInvoiceModal } from "./create-invoice-modal";
@@ -172,6 +173,12 @@ export function BillingAdmin() {
         icon: <XCircle className="h-3.5 w-3.5" />,
       });
     }
+    // PDF download available for all invoices
+    actions.push({
+      key: "downloadPdf",
+      label: "Download PDF",
+      icon: <Download className="h-3.5 w-3.5" />,
+    });
     return actions;
   }
 
@@ -373,6 +380,14 @@ export function BillingAdmin() {
                                           "markPaidWithPayment"
                                         ) {
                                           handleMarkPaidWithPayment(invoice);
+                                        } else if (
+                                          action.key === "downloadPdf"
+                                        ) {
+                                          setOpenMenuId(null);
+                                          window.open(
+                                            `/api/billing/invoices/${invoice.id}/pdf`,
+                                            "_blank"
+                                          );
                                         } else {
                                           handleInvoiceAction(
                                             invoice.id,

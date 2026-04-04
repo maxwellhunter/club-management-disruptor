@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Download } from "lucide-react";
 import type { BillingStatus } from "@club/shared";
 
 interface Props {
@@ -195,6 +196,18 @@ export function BillingMember({ billingStatus }: Props) {
                   <span className="text-sm font-medium w-20 text-right">
                     {formatCurrency(invoice.amount)}
                   </span>
+                  <button
+                    onClick={() =>
+                      window.open(
+                        `/api/billing/invoices/${invoice.id}/pdf`,
+                        "_blank"
+                      )
+                    }
+                    className="rounded-lg p-1.5 hover:bg-[var(--muted)] transition-colors"
+                    title="Download PDF"
+                  >
+                    <Download className="h-4 w-4 text-[var(--muted-foreground)]" />
+                  </button>
                 </div>
               </div>
             ))}
