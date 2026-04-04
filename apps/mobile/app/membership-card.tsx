@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Platform,
   ActivityIndicator,
+  Alert,
+  Linking,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,17 +24,40 @@ interface MemberInfo {
   role: string;
 }
 
+interface DigitalPass {
+  id: string;
+  platform: "apple" | "google";
+  status: string;
+  barcode_payload: string;
+  installed_at: string | null;
+  created_at: string;
+}
+
+interface NfcTap {
+  id: string;
+  tap_type: string;
+  location: string | null;
+  created_at: string;
+}
+
 export default function MembershipCardScreen() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const router = useRouter();
   const [member, setMember] = useState<MemberInfo | null>(null);
+  const [passes, setPasses] = useState<DigitalPass[]>([]);
+  const [recentTaps, setRecentTaps] = useState<NfcTap[]>([]);
   const [loading, setLoading] = useState(true);
+  const [addingWallet, setAddingWallet] = useState<"apple" | "google" | null>(null);
+
+  const appUrl = process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
 
   const fetchMember = useCallback(async () => {
     try {
       const { data } = await supabase
         .from("members")
-        .select("first_name, last_name, member_number, created_at, role, membership_tiers(name)")
+        .select(
+          "first_name, last_name, member_number, created_at, role, membership_tiers(name)"
+        )
         .eq("user_id", user?.id)
         .single();
 
@@ -47,7 +72,6 @@ export default function MembershipCardScreen() {
         });
       }
     } catch {
-      // Use fallback from user metadata
       setMember({
         full_name: user?.user_metadata?.full_name || "Member",
         tier_name: "Standard",
@@ -55,14 +79,100 @@ export default function MembershipCardScreen() {
         member_since: new Date().getFullYear().toString(),
         role: "member",
       });
-    } finally {
-      setLoading(false);
     }
   }, [user?.id]);
 
+  const fetchPasses = useCallback(async () => {
+    try {
+      const res = await fetch(`${appUrl}/api/wallet/passes`, {
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPasses(data.passes || []);
+        setRecentTaps(data.recent_taps || []);
+      }
+    } catch {
+      // Wallet data is optional — don't block the card
+    }
+  }, [session?.access_token, appUrl]);
+
   useEffect(() => {
-    fetchMember();
-  }, [fetchMember]);
+    Promise.all([fetchMember(), fetchPasses()]).finally(() =>
+      setLoading(false)
+    );
+  }, [fetchMember, fetchPasses]);
+
+  async function handleAddToWallet(platform: "apple" | "google") {
+    setAddingWallet(platform);
+    try {
+      const res = await fetch(`${appUrl}/api/wallet/passes`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ platform }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        // Open the pass URL — this triggers wallet add on the device
+        if (data.pass_url) {
+          await Linking.openURL(data.pass_url);
+        }
+        Alert.alert(
+          "Pass Created",
+          `Your ${platform === "apple" ? "Apple Wallet" : "Google Wallet"} pass has been generated.`
+        );
+        fetchPasses();
+      } else if (res.status === 409) {
+        Alert.alert("Already Added", data.error);
+      } else {
+        Alert.alert("Error", data.error || "Failed to generate pass");
+      }
+    } catch {
+      Alert.alert("Error", "Network error — please try again");
+    } finally {
+      setAddingWallet(null);
+    }
+  }
+
+  async function handleNfcTap() {
+    // Record a self-check-in tap
+    try {
+      const res = await fetch(`${appUrl}/api/wallet/nfc`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          tap_type: "check_in",
+          location: "Mobile App",
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        Alert.alert(
+          "Checked In",
+          `Welcome, ${data.member_name}! Check-in recorded.`
+        );
+        fetchPasses();
+      } else if (res.status === 429) {
+        Alert.alert("Already Checked In", data.error);
+      } else {
+        Alert.alert("Error", data.error || "Check-in failed");
+      }
+    } catch {
+      Alert.alert("Error", "Network error — please try again");
+    }
+  }
 
   if (loading) {
     return (
@@ -78,6 +188,13 @@ export default function MembershipCardScreen() {
     .join("")
     .toUpperCase()
     .slice(0, 2);
+
+  const hasApplePass = passes.some(
+    (p) => p.platform === "apple" && p.status === "active"
+  );
+  const hasGooglePass = passes.some(
+    (p) => p.platform === "google" && p.status === "active"
+  );
 
   return (
     <ScrollView
@@ -149,7 +266,7 @@ export default function MembershipCardScreen() {
             </View>
           </View>
 
-          {/* QR Code Area — deterministic pattern from member ID */}
+          {/* QR Code Area */}
           <View style={styles.qrSection}>
             <View style={styles.qrCode}>
               <View style={styles.qrGrid}>
@@ -171,22 +288,180 @@ export default function MembershipCardScreen() {
             <Text style={styles.qrHint}>
               Present at check-in or POS for member identification
             </Text>
-            <Text style={styles.qrMemberId}>
-              {member?.member_number}
-            </Text>
+            <Text style={styles.qrMemberId}>{member?.member_number}</Text>
           </View>
 
-          {/* Scan to Pay Button */}
-          <TouchableOpacity style={styles.scanButton} activeOpacity={0.8}>
+          {/* Check-In Button */}
+          <TouchableOpacity
+            style={styles.scanButton}
+            activeOpacity={0.8}
+            onPress={handleNfcTap}
+          >
             <Ionicons
-              name="scan-outline"
+              name="wifi-outline"
               size={18}
               color={Colors.light.primaryForeground}
             />
-            <Text style={styles.scanButtonText}>SCAN TO PAY</Text>
+            <Text style={styles.scanButtonText}>TAP TO CHECK IN</Text>
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Add to Wallet Section */}
+      <View style={styles.walletSection}>
+        <Text style={styles.sectionTitle}>Digital Wallet</Text>
+        <Text style={styles.sectionSubtitle}>
+          Add your membership card to your phone&apos;s wallet for quick NFC
+          tap access.
+        </Text>
+
+        <View style={styles.walletButtons}>
+          {/* Apple Wallet */}
+          {Platform.OS === "ios" && (
+            <TouchableOpacity
+              style={[
+                styles.walletButton,
+                styles.appleWalletButton,
+                hasApplePass && styles.walletButtonDisabled,
+              ]}
+              activeOpacity={0.8}
+              onPress={() => handleAddToWallet("apple")}
+              disabled={hasApplePass || addingWallet === "apple"}
+            >
+              {addingWallet === "apple" ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="wallet-outline" size={20} color="#fff" />
+                  <View>
+                    <Text style={styles.walletButtonLabel}>
+                      {hasApplePass ? "Added to" : "Add to"}
+                    </Text>
+                    <Text style={styles.walletButtonTitle}>Apple Wallet</Text>
+                  </View>
+                  {hasApplePass && (
+                    <Ionicons name="checkmark-circle" size={20} color="#4ade80" />
+                  )}
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+
+          {/* Google Wallet */}
+          {Platform.OS === "android" && (
+            <TouchableOpacity
+              style={[
+                styles.walletButton,
+                styles.googleWalletButton,
+                hasGooglePass && styles.walletButtonDisabled,
+              ]}
+              activeOpacity={0.8}
+              onPress={() => handleAddToWallet("google")}
+              disabled={hasGooglePass || addingWallet === "google"}
+            >
+              {addingWallet === "google" ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="wallet-outline" size={20} color="#fff" />
+                  <View>
+                    <Text style={styles.walletButtonLabel}>
+                      {hasGooglePass ? "Added to" : "Add to"}
+                    </Text>
+                    <Text style={styles.walletButtonTitle}>Google Wallet</Text>
+                  </View>
+                  {hasGooglePass && (
+                    <Ionicons name="checkmark-circle" size={20} color="#4ade80" />
+                  )}
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+
+          {/* Show both on web/simulator for testing */}
+          {Platform.OS === "web" && (
+            <>
+              <TouchableOpacity
+                style={[styles.walletButton, styles.appleWalletButton]}
+                activeOpacity={0.8}
+                onPress={() => handleAddToWallet("apple")}
+                disabled={addingWallet !== null}
+              >
+                <Ionicons name="wallet-outline" size={20} color="#fff" />
+                <View>
+                  <Text style={styles.walletButtonLabel}>Add to</Text>
+                  <Text style={styles.walletButtonTitle}>Apple Wallet</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.walletButton, styles.googleWalletButton]}
+                activeOpacity={0.8}
+                onPress={() => handleAddToWallet("google")}
+                disabled={addingWallet !== null}
+              >
+                <Ionicons name="wallet-outline" size={20} color="#fff" />
+                <View>
+                  <Text style={styles.walletButtonLabel}>Add to</Text>
+                  <Text style={styles.walletButtonTitle}>Google Wallet</Text>
+                </View>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
+        {/* NFC Info */}
+        <View style={styles.nfcInfo}>
+          <Ionicons
+            name="information-circle-outline"
+            size={16}
+            color={Colors.light.onSurfaceVariant}
+          />
+          <Text style={styles.nfcInfoText}>
+            Once added, hold your phone near any ClubOS NFC reader to check in,
+            pay, or access facilities.
+          </Text>
+        </View>
+      </View>
+
+      {/* Recent Activity */}
+      {recentTaps.length > 0 && (
+        <View style={styles.activitySection}>
+          <Text style={styles.sectionTitle}>Recent Activity</Text>
+          {recentTaps.slice(0, 5).map((tap) => (
+            <View key={tap.id} style={styles.activityRow}>
+              <View style={styles.activityIcon}>
+                <Ionicons
+                  name={
+                    tap.tap_type === "check_in"
+                      ? "checkmark-circle"
+                      : tap.tap_type === "pos_payment"
+                        ? "card"
+                        : tap.tap_type === "access_gate"
+                          ? "shield-checkmark"
+                          : "flash"
+                  }
+                  size={16}
+                  color={Colors.light.primary}
+                />
+              </View>
+              <View style={styles.activityContent}>
+                <Text style={styles.activityTitle}>
+                  {tap.tap_type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                </Text>
+                <Text style={styles.activitySub}>
+                  {tap.location || "Club"} &middot;{" "}
+                  {new Date(tap.created_at).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
 
       {/* Nearby Services */}
       <View style={styles.servicesSection}>
@@ -257,7 +532,6 @@ function generateMemberNumber(): string {
 
 /**
  * Generate a deterministic 7x7 QR-like pattern from a string seed.
- * Uses a simple hash to produce a consistent pattern per member.
  */
 function generateQRPattern(seed: string): boolean[] {
   let hash = 0;
@@ -266,13 +540,15 @@ function generateQRPattern(seed: string): boolean[] {
   }
   const pattern: boolean[] = [];
   for (let i = 0; i < 49; i++) {
-    // Corner anchors (always filled for QR look)
     const row = Math.floor(i / 7);
     const col = i % 7;
-    if ((row < 2 && col < 2) || (row < 2 && col > 4) || (row > 4 && col < 2)) {
+    if (
+      (row < 2 && col < 2) ||
+      (row < 2 && col > 4) ||
+      (row > 4 && col < 2)
+    ) {
       pattern.push(true);
     } else {
-      // Hash-derived data cells
       pattern.push(((hash >> (i % 31)) & 1) === 1);
     }
   }
@@ -333,10 +609,10 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
 
-  // Card outer (shadow container)
+  // Card outer
   cardOuter: {
     paddingHorizontal: 24,
-    marginBottom: 32,
+    marginBottom: 24,
   },
 
   // Digital Member Card
@@ -349,7 +625,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 32,
     elevation: 4,
-    // Subtle border for glass effect
     borderWidth: 1,
     borderColor: Colors.light.outlineVariant + "30",
   },
@@ -476,7 +751,7 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
 
-  // Scan button
+  // Check-in button
   scanButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -491,6 +766,106 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 1,
     color: Colors.light.primaryForeground,
+  },
+
+  // Wallet section
+  walletSection: {
+    paddingHorizontal: 24,
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.light.foreground,
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: Colors.light.onSurfaceVariant,
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  walletButtons: {
+    gap: 10,
+    marginBottom: 12,
+  },
+  walletButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+  },
+  appleWalletButton: {
+    backgroundColor: "#1a1a1a",
+  },
+  googleWalletButton: {
+    backgroundColor: "#4285f4",
+  },
+  walletButtonDisabled: {
+    opacity: 0.7,
+  },
+  walletButtonLabel: {
+    fontSize: 10,
+    fontWeight: "500",
+    color: "#ffffffAA",
+    letterSpacing: 0.5,
+  },
+  walletButtonTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#ffffff",
+  },
+  nfcInfo: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    backgroundColor: Colors.light.surfaceContainerLow,
+    borderRadius: 12,
+    padding: 12,
+  },
+  nfcInfoText: {
+    flex: 1,
+    fontSize: 12,
+    color: Colors.light.onSurfaceVariant,
+    lineHeight: 17,
+  },
+
+  // Recent activity
+  activitySection: {
+    paddingHorizontal: 24,
+    marginBottom: 24,
+  },
+  activityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.light.outlineVariant + "30",
+  },
+  activityIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.light.surfaceContainerLow,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  activityContent: {
+    flex: 1,
+  },
+  activityTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: Colors.light.foreground,
+  },
+  activitySub: {
+    fontSize: 11,
+    color: Colors.light.onSurfaceVariant,
+    marginTop: 1,
   },
 
   // Nearby Services

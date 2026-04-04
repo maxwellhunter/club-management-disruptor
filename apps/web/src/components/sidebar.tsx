@@ -22,6 +22,7 @@ import {
   UserPlus,
   Bell,
   Brain,
+  Wallet,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -41,6 +42,7 @@ const navigation = [
   { name: "Accounting", href: "/dashboard/accounting", icon: BookOpen },
   { name: "Notifications", href: "/dashboard/notifications", icon: Bell },
   { name: "AI Insights", href: "/dashboard/insights", icon: Brain },
+  { name: "Digital Cards", href: "/dashboard/digital-cards", icon: Wallet },
   { name: "Reports", href: "/dashboard/reports", icon: BarChart3 },
   { name: "Migration", href: "/dashboard/migration", icon: ArrowUpDown },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },

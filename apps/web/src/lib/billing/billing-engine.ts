@@ -82,16 +82,14 @@ export async function runDuesCycle(
     const amount = Number(tier.monthly_dues);
     const desc = `Monthly Dues — ${tier.name} (${periodStart} to ${periodEnd})`;
 
-    // If member is in a consolidated family and is NOT the primary, add to family total
+    // If member is in a consolidated family, add to family total instead of individual invoice
     if (member.family_id && consolidatedFamilies.has(member.family_id)) {
       const primaryId = consolidatedFamilies.get(member.family_id)!;
-      if (member.id !== primaryId) {
-        const existing = familyTotals.get(primaryId) ?? { amount: 0, descriptions: [] };
-        existing.amount += amount;
-        existing.descriptions.push(`${member.first_name} ${member.last_name}: $${amount.toFixed(2)}`);
-        familyTotals.set(primaryId, existing);
-        continue; // Don't create individual invoice
-      }
+      const existing = familyTotals.get(primaryId) ?? { amount: 0, descriptions: [] };
+      existing.amount += amount;
+      existing.descriptions.push(`${member.first_name} ${member.last_name}: $${amount.toFixed(2)}`);
+      familyTotals.set(primaryId, existing);
+      continue; // Don't create individual invoice — will be in consolidated
     }
 
     try {
@@ -117,20 +115,8 @@ export async function runDuesCycle(
 
   // Create consolidated family invoices
   for (const [primaryId, totals] of familyTotals) {
-    // The primary member might also have their own dues
-    const primaryMember = members.find((m) => m.id === primaryId);
-    const primaryTiers = primaryMember?.membership_tiers as unknown as { name: string; monthly_dues: number }[] | null;
-    const primaryTier = primaryTiers?.[0];
-
-    let familyTotal = totals.amount;
+    const familyTotal = totals.amount;
     const descLines = [...totals.descriptions];
-
-    if (primaryMember && primaryTier && Number(primaryTier.monthly_dues) > 0) {
-      familyTotal += Number(primaryTier.monthly_dues);
-      descLines.unshift(
-        `${primaryMember.first_name} ${primaryMember.last_name}: $${Number(primaryTier.monthly_dues).toFixed(2)}`
-      );
-    }
 
     const desc = `Family Consolidated Dues (${periodStart} to ${periodEnd})\n${descLines.join("\n")}`;
 
