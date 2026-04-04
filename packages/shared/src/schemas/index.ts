@@ -492,3 +492,43 @@ export type RegisterGuestVisitInput = z.infer<typeof registerGuestVisitSchema>;
 export type UpdateGuestVisitStatusInput = z.infer<typeof updateGuestVisitStatusSchema>;
 export type CreateGuestPolicyInput = z.infer<typeof createGuestPolicySchema>;
 export type CreateGuestFeeScheduleInput = z.infer<typeof createGuestFeeScheduleSchema>;
+
+// ============================================
+// Digital Member Cards & NFC Schemas
+// ============================================
+
+export const generatePassSchema = z.object({
+  platform: z.enum(["apple", "google"]),
+});
+
+export const recordNfcTapSchema = z.object({
+  member_id: z.string().uuid().optional(), // resolved from barcode if not provided
+  barcode_payload: z.string().optional(),
+  tap_type: z.enum(["check_in", "pos_payment", "access_gate", "event_entry"]).default("check_in"),
+  facility_id: z.string().uuid().optional(),
+  location: z.string().max(200).optional(),
+  device_id: z.string().max(200).optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+});
+
+export const updateCardTemplateSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  apple_background_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  apple_foreground_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  apple_label_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  google_hex_background: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  google_logo_url: z.string().url().optional(),
+  logo_url: z.string().url().optional(),
+  hero_image_url: z.string().url().optional(),
+  description: z.string().max(500).optional(),
+});
+
+export const revokePassSchema = z.object({
+  pass_id: z.string().uuid(),
+});
+
+export type GeneratePassInput = z.infer<typeof generatePassSchema>;
+export type RecordNfcTapInput = z.infer<typeof recordNfcTapSchema>;
+export type UpdateCardTemplateInput = z.infer<typeof updateCardTemplateSchema>;
+export type RevokePassInput = z.infer<typeof revokePassSchema>;

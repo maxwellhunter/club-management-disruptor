@@ -986,6 +986,93 @@ export interface NotificationDashboard {
   };
 }
 
+// ============================================
+// Digital Member Cards & NFC
+// ============================================
+
+export type DigitalPassPlatform = "apple" | "google";
+export type DigitalPassStatus = "active" | "suspended" | "revoked" | "expired";
+export type NfcTapType = "check_in" | "pos_payment" | "access_gate" | "event_entry";
+
+export interface DigitalPass {
+  id: string;
+  club_id: string;
+  member_id: string;
+  platform: DigitalPassPlatform;
+  pass_serial: string;
+  pass_type_id: string | null;
+  status: DigitalPassStatus;
+  device_library_id: string | null;
+  push_token: string | null;
+  barcode_payload: string;
+  last_updated_tag: string | null;
+  metadata: Record<string, unknown>;
+  installed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DigitalPassWithMember extends DigitalPass {
+  member_name: string;
+  member_number: string | null;
+  tier_name: string | null;
+}
+
+export interface NfcTapLog {
+  id: string;
+  club_id: string;
+  member_id: string;
+  facility_id: string | null;
+  tap_type: NfcTapType;
+  location: string | null;
+  device_id: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  verified: boolean;
+  created_at: string;
+}
+
+export interface NfcTapLogWithMember extends NfcTapLog {
+  member_name: string;
+  member_number: string | null;
+}
+
+export interface CardTemplate {
+  id: string;
+  club_id: string;
+  name: string;
+  is_active: boolean;
+  apple_background_color: string;
+  apple_foreground_color: string;
+  apple_label_color: string;
+  google_hex_background: string;
+  google_logo_url: string | null;
+  logo_url: string | null;
+  hero_image_url: string | null;
+  description: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DigitalCardsSummary {
+  total_passes: number;
+  active_passes: number;
+  apple_passes: number;
+  google_passes: number;
+  taps_today: number;
+  taps_this_month: number;
+  recent_taps: NfcTapLogWithMember[];
+  passes: DigitalPassWithMember[];
+  template: CardTemplate | null;
+}
+
+export interface WalletPassPayload {
+  pass_url: string;
+  platform: DigitalPassPlatform;
+  serial: string;
+}
+
 // Chat types
 export interface ChatConversation {
   id: string;
