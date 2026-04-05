@@ -34,8 +34,38 @@ export async function POST(request: Request) {
       );
     }
 
-    const { facility_id, booking_id, table_number, notes, items } =
+    const { facility_id, member_id: overrideMemberId, booking_id, table_number, notes, items } =
       parsed.data;
+
+    // Determine which member the order is for
+    let orderMemberId = result.member.id;
+    let orderMemberFirstName = result.member.first_name;
+    let orderMemberLastName = result.member.last_name;
+
+    // Admin can place orders on behalf of another member
+    if (overrideMemberId && overrideMemberId !== result.member.id) {
+      if (result.member.role !== "admin") {
+        return NextResponse.json(
+          { error: "Only admins can place orders on behalf of members" },
+          { status: 403 }
+        );
+      }
+      const { data: targetMember } = await supabase
+        .from("members")
+        .select("id, first_name, last_name")
+        .eq("id", overrideMemberId)
+        .eq("club_id", result.member.club_id)
+        .single();
+      if (!targetMember) {
+        return NextResponse.json(
+          { error: "Target member not found" },
+          { status: 404 }
+        );
+      }
+      orderMemberId = targetMember.id;
+      orderMemberFirstName = targetMember.first_name;
+      orderMemberLastName = targetMember.last_name;
+    }
 
     // Verify facility belongs to user's club
     const { data: facility } = await supabase
@@ -107,7 +137,7 @@ export async function POST(request: Request) {
       .from("dining_orders")
       .insert({
         club_id: result.member.club_id,
-        member_id: result.member.id,
+        member_id: orderMemberId,
         facility_id,
         booking_id: booking_id ?? null,
         status: "pending",
@@ -149,7 +179,7 @@ export async function POST(request: Request) {
       .from("invoices")
       .insert({
         club_id: result.member.club_id,
-        member_id: result.member.id,
+        member_id: orderMemberId,
         amount: total,
         status: "sent",
         description: `Dining - ${facility.name} (Order #${order.id.slice(0, 8)})`,
@@ -189,8 +219,8 @@ export async function POST(request: Request) {
           ...fullOrder,
           items: fullItems ?? [],
           facility_name: facility.name,
-          member_first_name: result.member.first_name,
-          member_last_name: result.member.last_name,
+          member_first_name: orderMemberFirstName,
+          member_last_name: orderMemberLastName,
         },
       },
       { status: 201 }

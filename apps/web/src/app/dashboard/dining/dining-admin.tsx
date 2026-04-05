@@ -17,7 +17,9 @@ import {
   X,
   Check,
   Ban,
-  UserPlus,
+  Settings,
+  ShoppingCart,
+  Search,
 } from "lucide-react";
 import type {
   DiningOrderWithItems,
@@ -27,12 +29,13 @@ import type {
   BookingWithDetails,
 } from "@club/shared";
 
-type AdminTab = "orders" | "menu" | "reservations";
+type AdminTab = "orders" | "menu" | "reservations" | "settings";
 
 const TABS: { value: AdminTab; label: string; icon: typeof ClipboardList }[] = [
   { value: "orders", label: "Orders", icon: ClipboardList },
   { value: "menu", label: "Menu", icon: BookOpen },
   { value: "reservations", label: "Reservations", icon: CalendarDays },
+  { value: "settings", label: "Settings", icon: Settings },
 ];
 
 const STATUS_FLOW: Record<string, DiningOrderStatus | null> = {
@@ -126,6 +129,7 @@ export default function DiningAdmin() {
       {tab === "orders" && <OrdersTab />}
       {tab === "menu" && <MenuTab />}
       {tab === "reservations" && <ReservationsTab />}
+      {tab === "settings" && <SettingsTab />}
     </div>
   );
 }
@@ -137,6 +141,7 @@ function OrdersTab() {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"active" | "all">("active");
+  const [showCreateOrder, setShowCreateOrder] = useState(false);
 
   async function fetchOrders() {
     try {
@@ -222,11 +227,20 @@ function OrdersTab() {
 
   return (
     <div className="space-y-4">
-      {/* Filter bar */}
+      {/* Filter bar + create order */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-[var(--muted-foreground)]">
-          {filtered.length} order{filtered.length !== 1 ? "s" : ""}
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-[var(--muted-foreground)]">
+            {filtered.length} order{filtered.length !== 1 ? "s" : ""}
+          </p>
+          <button
+            onClick={() => setShowCreateOrder(!showCreateOrder)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--primary-container)] text-white px-3 py-1.5 text-xs font-bold tracking-wide uppercase hover:opacity-90 transition-opacity"
+          >
+            <ShoppingCart className="h-3.5 w-3.5" />
+            New Order
+          </button>
+        </div>
         <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--muted)]">
           {(["active", "all"] as const).map((f) => (
             <button
@@ -243,6 +257,17 @@ function OrdersTab() {
           ))}
         </div>
       </div>
+
+      {/* Admin Create Order */}
+      {showCreateOrder && (
+        <AdminCreateOrder
+          onCreated={() => {
+            setShowCreateOrder(false);
+            fetchOrders();
+          }}
+          onCancel={() => setShowCreateOrder(false)}
+        />
+      )}
 
       {filtered.length === 0 ? (
         <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-16 text-center">
@@ -1362,6 +1387,741 @@ function ReservationsTab() {
                       </button>
                     </div>
                   )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ========== Admin Create Order ==========
+
+interface AdminCreateOrderProps {
+  onCreated: () => void;
+  onCancel: () => void;
+}
+
+interface MemberOption {
+  id: string;
+  first_name: string;
+  last_name: string;
+}
+
+function AdminCreateOrder({ onCreated, onCancel }: AdminCreateOrderProps) {
+  const [members, setMembers] = useState<MemberOption[]>([]);
+  const [facilities, setFacilities] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Form
+  const [selectedMember, setSelectedMember] = useState("");
+  const [selectedFacility, setSelectedFacility] = useState("");
+  const [tableNumber, setTableNumber] = useState("");
+  const [notes, setNotes] = useState("");
+  const [cart, setCart] = useState<
+    { menu_item_id: string; quantity: number; name: string; price: number }[]
+  >([]);
+  const [memberSearch, setMemberSearch] = useState("");
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [membersRes, facilitiesRes] = await Promise.all([
+          fetch("/api/members"),
+          fetch("/api/facilities?type=dining"),
+        ]);
+        if (membersRes.ok) {
+          const data = await membersRes.json();
+          setMembers(
+            (data.members ?? []).map(
+              (m: { id: string; first_name: string; last_name: string }) => ({
+                id: m.id,
+                first_name: m.first_name,
+                last_name: m.last_name,
+              })
+            )
+          );
+        }
+        if (facilitiesRes.ok) {
+          const data = await facilitiesRes.json();
+          setFacilities(data.facilities ?? []);
+          if (data.facilities?.length > 0) {
+            setSelectedFacility(data.facilities[0].id);
+          }
+        }
+      } catch {
+        setError("Failed to load data");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  // Load menu when facility changes
+  useEffect(() => {
+    if (!selectedFacility) return;
+    async function loadMenu() {
+      try {
+        const res = await fetch(
+          `/api/dining/menu?facility_id=${selectedFacility}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const items: MenuItem[] = [];
+          for (const cat of data.categories ?? []) {
+            items.push(...(cat.items ?? []));
+          }
+          setMenuItems(items);
+        }
+      } catch {
+        setError("Failed to load menu");
+      }
+    }
+    loadMenu();
+  }, [selectedFacility]);
+
+  function addToCart(item: MenuItem) {
+    setCart((prev) => {
+      const existing = prev.find((c) => c.menu_item_id === item.id);
+      if (existing) {
+        return prev.map((c) =>
+          c.menu_item_id === item.id
+            ? { ...c, quantity: c.quantity + 1 }
+            : c
+        );
+      }
+      return [
+        ...prev,
+        {
+          menu_item_id: item.id,
+          quantity: 1,
+          name: item.name,
+          price: Number(item.price),
+        },
+      ];
+    });
+  }
+
+  function removeFromCart(menuItemId: string) {
+    setCart((prev) => prev.filter((c) => c.menu_item_id !== menuItemId));
+  }
+
+  async function handleSubmit() {
+    if (!selectedMember || !selectedFacility || cart.length === 0) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/dining/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          facility_id: selectedFacility,
+          member_id: selectedMember,
+          table_number: tableNumber || undefined,
+          notes: notes || undefined,
+          items: cart.map((c) => ({
+            menu_item_id: c.menu_item_id,
+            quantity: c.quantity,
+          })),
+        }),
+      });
+      if (res.ok) {
+        onCreated();
+      } else {
+        const data = await res.json();
+        setError(data.error || "Failed to create order");
+      }
+    } catch {
+      setError("Failed to create order");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const subtotal = cart.reduce((s, c) => s + c.price * c.quantity, 0);
+
+  const filteredMembers = memberSearch
+    ? members.filter(
+        (m) =>
+          `${m.first_name} ${m.last_name}`
+            .toLowerCase()
+            .includes(memberSearch.toLowerCase())
+      )
+    : members;
+
+  if (loading) {
+    return (
+      <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-5">
+        <div className="h-40 rounded-xl bg-[var(--muted)] animate-pulse" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-5 space-y-5">
+      <p className="font-[family-name:var(--font-headline)] font-bold text-base">
+        Create Order on Behalf of Member
+      </p>
+
+      {error && (
+        <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700 font-medium flex items-center justify-between">
+          {error}
+          <button onClick={() => setError(null)}>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-4">
+        {/* Member selector */}
+        <div>
+          <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
+            Member
+          </label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--muted-foreground)]" />
+            <input
+              type="text"
+              value={memberSearch}
+              onChange={(e) => setMemberSearch(e.target.value)}
+              placeholder="Search members..."
+              className={`w-full pl-9 ${INPUT_CLS}`}
+            />
+          </div>
+          <select
+            value={selectedMember}
+            onChange={(e) => setSelectedMember(e.target.value)}
+            className={`w-full mt-1 ${INPUT_CLS}`}
+            size={4}
+          >
+            {filteredMembers.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.first_name} {m.last_name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Facility + table */}
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
+              Venue
+            </label>
+            <select
+              value={selectedFacility}
+              onChange={(e) => setSelectedFacility(e.target.value)}
+              className={`w-full ${INPUT_CLS}`}
+            >
+              {facilities.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
+              Table Number
+            </label>
+            <input
+              type="text"
+              value={tableNumber}
+              onChange={(e) => setTableNumber(e.target.value)}
+              placeholder="e.g. 12"
+              className={`w-full ${INPUT_CLS}`}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
+              Notes
+            </label>
+            <input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Order notes..."
+              className={`w-full ${INPUT_CLS}`}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Menu items grid */}
+      <div>
+        <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-2 uppercase tracking-wide">
+          Add Items
+        </label>
+        <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+          {menuItems.map((item) => {
+            const inCart = cart.find((c) => c.menu_item_id === item.id);
+            return (
+              <button
+                key={item.id}
+                onClick={() => addToCart(item)}
+                className={`rounded-xl border p-2.5 text-left transition-all text-sm ${
+                  inCart
+                    ? "border-[var(--primary)] bg-[var(--accent)]"
+                    : "border-[var(--border)] hover:border-[var(--primary)]"
+                }`}
+              >
+                <p className="font-semibold text-xs truncate">{item.name}</p>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-[10px] font-bold text-blue-700">
+                    ${Number(item.price).toFixed(2)}
+                  </span>
+                  {inCart && (
+                    <span className="text-[10px] font-bold text-emerald-700">
+                      x{inCart.quantity}
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Cart summary */}
+      {cart.length > 0 && (
+        <div className="rounded-xl border border-[var(--border)] p-3 space-y-1.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+            Order Summary
+          </p>
+          {cart.map((c) => (
+            <div
+              key={c.menu_item_id}
+              className="flex items-center justify-between text-sm"
+            >
+              <span>
+                {c.quantity}x {c.name}
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">
+                  ${(c.price * c.quantity).toFixed(2)}
+                </span>
+                <button
+                  onClick={() => removeFromCart(c.menu_item_id)}
+                  className="text-red-500 hover:text-red-700"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+          <div className="border-t border-[var(--border)] pt-1.5 flex items-center justify-between text-sm font-bold">
+            <span>Subtotal</span>
+            <span>${subtotal.toFixed(2)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex gap-2">
+        <button
+          onClick={handleSubmit}
+          disabled={submitting || !selectedMember || cart.length === 0}
+          className="rounded-xl bg-[var(--primary-container)] text-white px-5 py-2.5 text-xs font-bold tracking-wide uppercase hover:opacity-90 transition-opacity disabled:opacity-50"
+        >
+          {submitting ? "Creating..." : "Place Order"}
+        </button>
+        <button
+          onClick={onCancel}
+          className="rounded-xl border border-[var(--border)] px-5 py-2.5 text-xs font-semibold hover:bg-[var(--muted)] transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ========== Settings Tab (Availability Management) ==========
+
+const DAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
+interface BookingSlot {
+  id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  max_bookings: number;
+  is_active: boolean;
+}
+
+function SettingsTab() {
+  const [facilities, setFacilities] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [selectedFacility, setSelectedFacility] = useState<string | null>(null);
+  const [slots, setSlots] = useState<BookingSlot[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // Generator form
+  const [showGenerator, setShowGenerator] = useState(false);
+  const [genDays, setGenDays] = useState<number[]>([1, 2, 3, 4, 5]); // Mon-Fri
+  const [genStart, setGenStart] = useState("11:00");
+  const [genEnd, setGenEnd] = useState("21:00");
+  const [genInterval, setGenInterval] = useState(30);
+  const [genMaxBookings, setGenMaxBookings] = useState(8);
+  const [generating, setGenerating] = useState(false);
+
+  useEffect(() => {
+    async function fetchFacilities() {
+      try {
+        const res = await fetch("/api/facilities?type=dining");
+        if (res.ok) {
+          const data = await res.json();
+          setFacilities(data.facilities ?? []);
+          if (data.facilities?.length > 0) {
+            setSelectedFacility(data.facilities[0].id);
+          }
+        }
+      } catch {
+        setError("Failed to load facilities");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchFacilities();
+  }, []);
+
+  useEffect(() => {
+    if (selectedFacility) fetchSlots();
+  }, [selectedFacility]);
+
+  async function fetchSlots() {
+    if (!selectedFacility) return;
+    setLoadingSlots(true);
+    try {
+      const res = await fetch(
+        `/api/bookings/admin/schedule?facility_id=${selectedFacility}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setSlots(data.slots ?? []);
+      }
+    } catch {
+      setError("Failed to load schedule");
+    } finally {
+      setLoadingSlots(false);
+    }
+  }
+
+  async function handleGenerate() {
+    if (!selectedFacility || genDays.length === 0) return;
+    setGenerating(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch("/api/bookings/admin/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          facility_id: selectedFacility,
+          days_of_week: genDays,
+          start_time: genStart,
+          end_time: genEnd,
+          interval_minutes: genInterval,
+          max_bookings: genMaxBookings,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSuccess(data.message);
+        setShowGenerator(false);
+        fetchSlots();
+      } else {
+        const data = await res.json();
+        setError(data.error || "Failed to generate schedule");
+      }
+    } catch {
+      setError("Failed to generate schedule");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function handleClearDay(dayOfWeek: number) {
+    if (!selectedFacility) return;
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/bookings/admin/schedule?facility_id=${selectedFacility}&day_of_week=${dayOfWeek}`,
+        { method: "DELETE" }
+      );
+      if (res.ok) {
+        fetchSlots();
+        setSuccess(`Cleared ${DAYS[dayOfWeek]} schedule`);
+      } else {
+        const data = await res.json();
+        setError(data.error || "Failed to clear schedule");
+      }
+    } catch {
+      setError("Failed to clear schedule");
+    }
+  }
+
+  function toggleDay(day: number) {
+    setGenDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+    );
+  }
+
+  // Group slots by day
+  const slotsByDay: Record<number, BookingSlot[]> = {};
+  for (const slot of slots) {
+    if (!slotsByDay[slot.day_of_week]) slotsByDay[slot.day_of_week] = [];
+    slotsByDay[slot.day_of_week].push(slot);
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        <div className="h-10 w-48 rounded-xl bg-[var(--muted)] animate-pulse" />
+        <div className="h-40 rounded-2xl bg-[var(--muted)] animate-pulse" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <p className="font-[family-name:var(--font-headline)] font-bold text-lg">
+        Dining Availability
+      </p>
+      <p className="text-sm text-[var(--muted-foreground)] -mt-3">
+        Configure reservation time slots for each dining venue.
+      </p>
+
+      {error && (
+        <div className="rounded-2xl bg-red-50 border border-red-200 p-4 text-sm text-red-700 font-medium flex items-center justify-between">
+          {error}
+          <button onClick={() => setError(null)}>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+      {success && (
+        <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-700 font-medium flex items-center justify-between">
+          {success}
+          <button onClick={() => setSuccess(null)}>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Facility selector */}
+      {facilities.length > 1 && (
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--muted)] w-fit">
+          {facilities.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setSelectedFacility(f.id)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold tracking-wide transition-all ${
+                selectedFacility === f.id
+                  ? "bg-[var(--surface-lowest)] text-[var(--foreground)] shadow-sm"
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              {f.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Generate button */}
+      <button
+        onClick={() => setShowGenerator(!showGenerator)}
+        className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--primary-container)] text-white px-4 py-2 text-xs font-bold tracking-wide uppercase hover:opacity-90 transition-opacity"
+      >
+        <Plus className="h-3.5 w-3.5" />
+        Generate Schedule
+      </button>
+
+      {/* Generator form */}
+      {showGenerator && (
+        <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-5 space-y-4">
+          <p className="font-[family-name:var(--font-headline)] font-bold text-base">
+            Schedule Generator
+          </p>
+          <p className="text-xs text-[var(--muted-foreground)]">
+            This will replace existing slots for the selected days.
+          </p>
+
+          {/* Day picker */}
+          <div>
+            <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-2 uppercase tracking-wide">
+              Days
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {DAYS.map((day, i) => (
+                <button
+                  key={i}
+                  onClick={() => toggleDay(i)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    genDays.includes(i)
+                      ? "bg-[var(--primary-container)] text-white"
+                      : "border border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--primary)]"
+                  }`}
+                >
+                  {day.slice(0, 3)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
+                Start Time
+              </label>
+              <input
+                type="time"
+                value={genStart}
+                onChange={(e) => setGenStart(e.target.value)}
+                className={INPUT_CLS}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
+                End Time
+              </label>
+              <input
+                type="time"
+                value={genEnd}
+                onChange={(e) => setGenEnd(e.target.value)}
+                className={INPUT_CLS}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
+                Interval
+              </label>
+              <select
+                value={genInterval}
+                onChange={(e) => setGenInterval(parseInt(e.target.value))}
+                className={INPUT_CLS}
+              >
+                <option value={15}>15 min</option>
+                <option value={30}>30 min</option>
+                <option value={45}>45 min</option>
+                <option value={60}>60 min</option>
+                <option value={90}>90 min</option>
+                <option value={120}>2 hours</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
+                Max Tables
+              </label>
+              <input
+                type="number"
+                value={genMaxBookings}
+                onChange={(e) =>
+                  setGenMaxBookings(parseInt(e.target.value) || 1)
+                }
+                min={1}
+                className={INPUT_CLS}
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={handleGenerate}
+              disabled={generating || genDays.length === 0}
+              className="rounded-xl bg-[var(--primary-container)] text-white px-5 py-2.5 text-xs font-bold tracking-wide uppercase hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {generating ? "Generating..." : "Generate Slots"}
+            </button>
+            <button
+              onClick={() => setShowGenerator(false)}
+              className="rounded-xl border border-[var(--border)] px-5 py-2.5 text-xs font-semibold hover:bg-[var(--muted)] transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Current schedule display */}
+      {loadingSlots ? (
+        <div className="h-40 rounded-2xl bg-[var(--muted)] animate-pulse" />
+      ) : slots.length === 0 ? (
+        <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-16 text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[var(--muted)] mb-4">
+            <Clock className="h-7 w-7 text-[var(--muted-foreground)]" />
+          </div>
+          <p className="font-[family-name:var(--font-headline)] font-bold text-xl">
+            No time slots configured
+          </p>
+          <p className="text-sm text-[var(--muted-foreground)] mt-1">
+            Use the generator above to create reservation slots.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {DAYS.map((day, i) => {
+            const daySlots = slotsByDay[i];
+            if (!daySlots || daySlots.length === 0) return null;
+            return (
+              <div
+                key={i}
+                className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 overflow-hidden"
+              >
+                <div className="bg-[var(--muted)]/40 px-5 py-3 border-b border-[var(--outline-variant)]/20 flex items-center justify-between">
+                  <div>
+                    <p className="font-[family-name:var(--font-headline)] font-bold text-sm">
+                      {day}
+                    </p>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      {daySlots.length} slot{daySlots.length !== 1 ? "s" : ""}{" "}
+                      &middot; {daySlots[0].max_bookings} tables per slot
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleClearDay(i)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase text-red-700 hover:bg-red-100 transition-colors"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    Clear
+                  </button>
+                </div>
+                <div className="px-5 py-3 flex flex-wrap gap-1.5">
+                  {daySlots.map((slot) => {
+                    const start = slot.start_time.slice(0, 5);
+                    return (
+                      <span
+                        key={slot.id}
+                        className={`rounded-md px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase ${
+                          slot.is_active
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-gray-100 text-gray-500"
+                        }`}
+                      >
+                        {start}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             );

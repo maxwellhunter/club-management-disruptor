@@ -180,6 +180,7 @@ export const updateMenuCategorySchema = z.object({
 // Ordering schemas
 export const createDiningOrderSchema = z.object({
   facility_id: z.string().uuid(),
+  member_id: z.string().uuid().optional(), // Admin-only: place order on behalf of member
   booking_id: z.string().uuid().optional(),
   table_number: z.string().optional(),
   notes: z.string().optional(),
