@@ -1,6 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import {
+  ClipboardList,
+  BookOpen,
+  CalendarDays,
+  ChefHat,
+  UtensilsCrossed,
+  Plus,
+  Trash2,
+  ToggleLeft,
+  ToggleRight,
+  Clock,
+  MapPin,
+  Users,
+} from "lucide-react";
 import type {
   DiningOrderWithItems,
   DiningOrderStatus,
@@ -11,6 +25,12 @@ import type {
 
 type AdminTab = "orders" | "menu" | "reservations";
 
+const TABS: { value: AdminTab; label: string; icon: typeof ClipboardList }[] = [
+  { value: "orders", label: "Orders", icon: ClipboardList },
+  { value: "menu", label: "Menu", icon: BookOpen },
+  { value: "reservations", label: "Reservations", icon: CalendarDays },
+];
+
 const STATUS_FLOW: Record<string, DiningOrderStatus | null> = {
   pending: "confirmed",
   confirmed: "preparing",
@@ -20,16 +40,49 @@ const STATUS_FLOW: Record<string, DiningOrderStatus | null> = {
   cancelled: null,
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-700",
-  confirmed: "bg-blue-100 text-blue-700",
-  preparing: "bg-orange-100 text-orange-700",
-  ready: "bg-green-100 text-green-700",
-  delivered: "bg-gray-100 text-gray-500",
-  cancelled: "bg-red-100 text-red-600",
+const STATUS_BADGE: Record<
+  string,
+  { label: string; dot: string; bg: string; text: string }
+> = {
+  pending: {
+    label: "Pending",
+    dot: "bg-amber-500",
+    bg: "bg-amber-50",
+    text: "text-amber-700",
+  },
+  confirmed: {
+    label: "Confirmed",
+    dot: "bg-blue-500",
+    bg: "bg-blue-50",
+    text: "text-blue-700",
+  },
+  preparing: {
+    label: "Preparing",
+    dot: "bg-orange-500",
+    bg: "bg-orange-50",
+    text: "text-orange-700",
+  },
+  ready: {
+    label: "Ready",
+    dot: "bg-emerald-500",
+    bg: "bg-emerald-50",
+    text: "text-emerald-700",
+  },
+  delivered: {
+    label: "Delivered",
+    dot: "bg-gray-400",
+    bg: "bg-gray-100",
+    text: "text-gray-600",
+  },
+  cancelled: {
+    label: "Cancelled",
+    dot: "bg-red-500",
+    bg: "bg-red-50",
+    text: "text-red-700",
+  },
 };
 
-const STATUS_LABELS: Record<string, string> = {
+const STATUS_ACTIONS: Record<string, string> = {
   pending: "Confirm",
   confirmed: "Start Preparing",
   preparing: "Mark Ready",
@@ -40,26 +93,26 @@ export default function DiningAdmin() {
   const [tab, setTab] = useState<AdminTab>("orders");
 
   return (
-    <div className="space-y-4">
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-[var(--border)]">
-        {(["orders", "menu", "reservations"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              tab === t
-                ? "border-[var(--primary)] text-[var(--primary)]"
-                : "border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-            }`}
-          >
-            {t === "orders"
-              ? "Orders"
-              : t === "menu"
-                ? "Menu"
-                : "Reservations"}
-          </button>
-        ))}
+    <div className="space-y-6">
+      {/* Segmented tab control */}
+      <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--muted)] w-fit">
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.value}
+              onClick={() => setTab(t.value)}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold tracking-wide transition-all ${
+                tab === t.value
+                  ? "bg-[var(--surface-lowest)] text-[var(--foreground)] shadow-sm"
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
       {tab === "orders" && <OrdersTab />}
@@ -148,29 +201,33 @@ function OrdersTab() {
 
   if (loading) {
     return (
-      <div className="animate-pulse space-y-3">
-        <div className="h-16 rounded-lg bg-[var(--muted)]" />
-        <div className="h-16 rounded-lg bg-[var(--muted)]" />
-        <div className="h-16 rounded-lg bg-[var(--muted)]" />
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="h-24 rounded-2xl bg-[var(--muted)] animate-pulse"
+          />
+        ))}
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Filter bar */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-[var(--muted-foreground)]">
           {filtered.length} order{filtered.length !== 1 ? "s" : ""}
         </p>
-        <div className="flex gap-1">
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--muted)]">
           {(["active", "all"] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold tracking-wide transition-all ${
                 filter === f
-                  ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
-                  : "text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
+                  ? "bg-[var(--surface-lowest)] text-[var(--foreground)] shadow-sm"
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
               }`}
             >
               {f === "active" ? "Active" : "All"}
@@ -180,48 +237,70 @@ function OrdersTab() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-[var(--border)] p-8 text-center">
-          <p className="text-sm text-[var(--muted-foreground)]">
-            No {filter === "active" ? "active " : ""}orders.
+        <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-16 text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[var(--muted)] mb-4">
+            <ClipboardList className="h-7 w-7 text-[var(--muted-foreground)]" />
+          </div>
+          <p className="font-[family-name:var(--font-headline)] font-bold text-xl">
+            No orders
+          </p>
+          <p className="text-sm text-[var(--muted-foreground)] mt-1">
+            {filter === "active"
+              ? "No active orders right now."
+              : "No orders found."}
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {filtered.map((order) => {
             const nextStatus = STATUS_FLOW[order.status];
+            const badge = STATUS_BADGE[order.status];
             return (
               <div
                 key={order.id}
-                className="rounded-xl border border-[var(--border)] p-4 space-y-2"
+                className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-5 transition-all hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)]"
               >
                 <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <p className="font-[family-name:var(--font-headline)] font-bold text-base">
                         {order.member_first_name} {order.member_last_name}
                       </p>
                       <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[order.status]}`}
+                        className={`shrink-0 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase ${badge.bg} ${badge.text}`}
                       >
-                        {order.status}
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${badge.dot}`}
+                        />
+                        {badge.label}
                       </span>
                     </div>
-                    <p className="text-xs text-[var(--muted-foreground)]">
-                      {order.facility_name}
-                      {order.table_number && ` · Table ${order.table_number}`}
-                      {" · "}${Number(order.total).toFixed(2)}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[var(--muted-foreground)]">
+                      <span className="inline-flex items-center gap-1.5">
+                        <MapPin className="h-3.5 w-3.5" />
+                        {order.facility_name}
+                      </span>
+                      {order.table_number && (
+                        <span className="inline-flex items-center gap-1.5">
+                          <UtensilsCrossed className="h-3.5 w-3.5" />
+                          Table {order.table_number}
+                        </span>
+                      )}
+                      <span className="shrink-0 rounded-md bg-blue-50 text-blue-700 px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase">
+                        ${Number(order.total).toFixed(2)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex gap-1.5">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     {nextStatus && (
                       <button
                         onClick={() => advanceStatus(order.id, nextStatus)}
                         disabled={updatingId === order.id}
-                        className="rounded-lg bg-[var(--primary)] px-3 py-1.5 text-xs font-medium text-[var(--primary-foreground)] hover:opacity-90 transition-opacity disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 text-emerald-700 px-3 py-1.5 text-xs font-bold tracking-wide uppercase hover:bg-emerald-100 transition-colors disabled:opacity-50"
                       >
                         {updatingId === order.id
                           ? "..."
-                          : STATUS_LABELS[order.status]}
+                          : STATUS_ACTIONS[order.status]}
                       </button>
                     )}
                     {order.status !== "cancelled" &&
@@ -229,19 +308,24 @@ function OrdersTab() {
                         <button
                           onClick={() => cancelOrder(order.id)}
                           disabled={updatingId === order.id}
-                          className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+                          className="rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold tracking-wide uppercase text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50"
                         >
                           Cancel
                         </button>
                       )}
                   </div>
                 </div>
-                <div className="text-xs text-[var(--muted-foreground)]">
+
+                {/* Order items */}
+                <div className="mt-3 pt-3 border-t border-[var(--border)]/50 text-sm text-[var(--muted-foreground)]">
                   {order.items.map((item) => (
                     <span key={item.id} className="mr-3">
-                      {item.quantity}x {item.name}
+                      <span className="font-semibold text-[var(--foreground)]">
+                        {item.quantity}x
+                      </span>{" "}
+                      {item.name}
                       {item.special_instructions && (
-                        <span className="italic">
+                        <span className="italic text-xs">
                           {" "}
                           ({item.special_instructions})
                         </span>
@@ -250,7 +334,7 @@ function OrdersTab() {
                   ))}
                 </div>
                 {order.notes && (
-                  <p className="text-xs text-[var(--muted-foreground)] italic">
+                  <p className="mt-2 text-xs text-[var(--muted-foreground)] italic">
                     Note: {order.notes}
                   </p>
                 )}
@@ -430,32 +514,32 @@ function MenuTab() {
 
   if (loading) {
     return (
-      <div className="animate-pulse space-y-3">
-        <div className="h-10 w-48 rounded bg-[var(--muted)]" />
-        <div className="h-32 rounded-lg bg-[var(--muted)]" />
+      <div className="space-y-3">
+        <div className="h-10 w-48 rounded-xl bg-[var(--muted)] animate-pulse" />
+        <div className="h-40 rounded-2xl bg-[var(--muted)] animate-pulse" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {error && (
-        <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-600">
+        <div className="rounded-2xl bg-red-50 border border-red-200 p-4 text-sm text-red-700 font-medium">
           {error}
         </div>
       )}
 
       {/* Facility selector */}
       {facilities.length > 1 && (
-        <div className="flex gap-1.5">
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--muted)] w-fit">
           {facilities.map((f) => (
             <button
               key={f.id}
               onClick={() => setSelectedFacility(f.id)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold tracking-wide transition-all ${
                 selectedFacility === f.id
-                  ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
-                  : "border border-[var(--border)] text-[var(--foreground)] hover:border-[var(--primary)]"
+                  ? "bg-[var(--surface-lowest)] text-[var(--foreground)] shadow-sm"
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
               }`}
             >
               {f.name}
@@ -471,9 +555,10 @@ function MenuTab() {
             setShowCategoryForm(true);
             setShowItemForm(false);
           }}
-          className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium hover:border-[var(--primary)] transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--outline-variant)]/30 bg-[var(--surface-lowest)] px-4 py-2 text-xs font-bold tracking-wide uppercase shadow-[0_2px_12px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)] transition-all"
         >
-          + Category
+          <Plus className="h-3.5 w-3.5" />
+          Category
         </button>
         <button
           onClick={() => {
@@ -483,30 +568,33 @@ function MenuTab() {
               setFormCategoryId(categories[0].id);
             }
           }}
-          className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium hover:border-[var(--primary)] transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--primary-container)] text-white px-4 py-2 text-xs font-bold tracking-wide uppercase hover:opacity-90 transition-opacity"
         >
-          + Menu Item
+          <Plus className="h-3.5 w-3.5" />
+          Menu Item
         </button>
       </div>
 
       {/* Add Category Form */}
       {showCategoryForm && (
-        <div className="rounded-lg border border-[var(--border)] p-4 space-y-3">
-          <p className="text-sm font-medium">New Category</p>
+        <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-5 space-y-4">
+          <p className="font-[family-name:var(--font-headline)] font-bold text-base">
+            New Category
+          </p>
           <div className="grid grid-cols-3 gap-3">
             <input
               type="text"
               value={catName}
               onChange={(e) => setCatName(e.target.value)}
               placeholder="Category name"
-              className="col-span-2 rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              className="col-span-2 rounded-xl border border-[var(--border)] bg-[var(--surface-lowest)] px-4 py-2.5 text-sm placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)] transition-all"
             />
             <input
               type="number"
               value={catSortOrder}
               onChange={(e) => setCatSortOrder(parseInt(e.target.value) || 0)}
               placeholder="Sort order"
-              className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              className="rounded-xl border border-[var(--border)] bg-[var(--surface-lowest)] px-4 py-2.5 text-sm placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)] transition-all"
             />
           </div>
           <input
@@ -514,19 +602,19 @@ function MenuTab() {
             value={catDescription}
             onChange={(e) => setCatDescription(e.target.value)}
             placeholder="Description (optional)"
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-lowest)] px-4 py-2.5 text-sm placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)] transition-all"
           />
           <div className="flex gap-2">
             <button
               onClick={handleCreateCategory}
               disabled={saving || !catName.trim()}
-              className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-foreground)] hover:opacity-90 disabled:opacity-50"
+              className="rounded-xl bg-[var(--primary-container)] text-white px-5 py-2.5 text-xs font-bold tracking-wide uppercase hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               {saving ? "Creating..." : "Create Category"}
             </button>
             <button
               onClick={() => setShowCategoryForm(false)}
-              className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium hover:bg-[var(--muted)]"
+              className="rounded-xl border border-[var(--border)] px-5 py-2.5 text-xs font-semibold hover:bg-[var(--muted)] transition-colors"
             >
               Cancel
             </button>
@@ -536,13 +624,15 @@ function MenuTab() {
 
       {/* Add Item Form */}
       {showItemForm && (
-        <div className="rounded-lg border border-[var(--border)] p-4 space-y-3">
-          <p className="text-sm font-medium">New Menu Item</p>
+        <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-5 space-y-4">
+          <p className="font-[family-name:var(--font-headline)] font-bold text-base">
+            New Menu Item
+          </p>
           <div className="grid grid-cols-3 gap-3">
             <select
               value={formCategoryId}
               onChange={(e) => setFormCategoryId(e.target.value)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              className="rounded-xl border border-[var(--border)] bg-[var(--surface-lowest)] px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)] transition-all"
             >
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -555,7 +645,7 @@ function MenuTab() {
               value={itemName}
               onChange={(e) => setItemName(e.target.value)}
               placeholder="Item name"
-              className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              className="rounded-xl border border-[var(--border)] bg-[var(--surface-lowest)] px-4 py-2.5 text-sm placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)] transition-all"
             />
             <input
               type="number"
@@ -563,7 +653,7 @@ function MenuTab() {
               onChange={(e) => setItemPrice(e.target.value)}
               placeholder="Price"
               step="0.01"
-              className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              className="rounded-xl border border-[var(--border)] bg-[var(--surface-lowest)] px-4 py-2.5 text-sm placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)] transition-all"
             />
           </div>
           <input
@@ -571,19 +661,19 @@ function MenuTab() {
             value={itemDescription}
             onChange={(e) => setItemDescription(e.target.value)}
             placeholder="Description (optional)"
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-lowest)] px-4 py-2.5 text-sm placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)] transition-all"
           />
           <div className="flex gap-2">
             <button
               onClick={handleCreateItem}
               disabled={saving || !itemName.trim() || !itemPrice}
-              className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-foreground)] hover:opacity-90 disabled:opacity-50"
+              className="rounded-xl bg-[var(--primary-container)] text-white px-5 py-2.5 text-xs font-bold tracking-wide uppercase hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               {saving ? "Creating..." : "Create Item"}
             </button>
             <button
               onClick={() => setShowItemForm(false)}
-              className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium hover:bg-[var(--muted)]"
+              className="rounded-xl border border-[var(--border)] px-5 py-2.5 text-xs font-semibold hover:bg-[var(--muted)] transition-colors"
             >
               Cancel
             </button>
@@ -593,13 +683,19 @@ function MenuTab() {
 
       {/* Menu display */}
       {loadingMenu ? (
-        <div className="animate-pulse space-y-3">
-          <div className="h-32 rounded-lg bg-[var(--muted)]" />
+        <div className="space-y-3">
+          <div className="h-40 rounded-2xl bg-[var(--muted)] animate-pulse" />
         </div>
       ) : categories.length === 0 ? (
-        <div className="rounded-xl border border-[var(--border)] p-8 text-center">
-          <p className="text-sm text-[var(--muted-foreground)]">
-            No menu categories yet. Create one to get started.
+        <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-16 text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[var(--muted)] mb-4">
+            <BookOpen className="h-7 w-7 text-[var(--muted-foreground)]" />
+          </div>
+          <p className="font-[family-name:var(--font-headline)] font-bold text-xl">
+            No menu categories
+          </p>
+          <p className="text-sm text-[var(--muted-foreground)] mt-1">
+            Create a category to start building your menu.
           </p>
         </div>
       ) : (
@@ -607,41 +703,43 @@ function MenuTab() {
           {categories.map((cat) => (
             <div
               key={cat.id}
-              className="rounded-xl border border-[var(--border)] overflow-hidden"
+              className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 overflow-hidden"
             >
-              <div className="bg-[var(--muted)]/30 px-4 py-2.5 border-b border-[var(--border)]">
-                <p className="text-sm font-semibold">{cat.name}</p>
+              <div className="bg-[var(--muted)]/40 px-5 py-3.5 border-b border-[var(--outline-variant)]/20">
+                <p className="font-[family-name:var(--font-headline)] font-bold text-sm">
+                  {cat.name}
+                </p>
                 {cat.description && (
-                  <p className="text-xs text-[var(--muted-foreground)]">
+                  <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
                     {cat.description}
                   </p>
                 )}
               </div>
               {cat.items.length === 0 ? (
-                <div className="px-4 py-3 text-xs text-[var(--muted-foreground)]">
+                <div className="px-5 py-4 text-sm text-[var(--muted-foreground)]">
                   No items in this category.
                 </div>
               ) : (
-                <div className="divide-y divide-[var(--border)]">
+                <div className="divide-y divide-[var(--outline-variant)]/20">
                   {cat.items.map((item) => (
                     <div
                       key={item.id}
-                      className="flex items-center justify-between px-4 py-2.5"
+                      className="flex items-center justify-between px-5 py-3.5 hover:bg-[var(--muted)]/20 transition-colors"
                     >
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p
-                          className={`text-sm font-medium ${!item.is_available ? "line-through text-[var(--muted-foreground)]" : "text-[var(--foreground)]"}`}
+                          className={`text-sm font-semibold ${!item.is_available ? "line-through text-[var(--muted-foreground)]" : "text-[var(--foreground)]"}`}
                         >
                           {item.name}
                         </p>
                         {item.description && (
-                          <p className="text-xs text-[var(--muted-foreground)]">
+                          <p className="text-xs text-[var(--muted-foreground)] mt-0.5 line-clamp-1">
                             {item.description}
                           </p>
                         )}
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-semibold">
+                      <div className="flex items-center gap-2.5 shrink-0 ml-4">
+                        <span className="rounded-md bg-blue-50 text-blue-700 px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase">
                           ${Number(item.price).toFixed(2)}
                         </span>
                         <button
@@ -651,19 +749,24 @@ function MenuTab() {
                               item.is_available
                             )
                           }
-                          className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                          className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase transition-colors ${
                             item.is_available
-                              ? "bg-green-100 text-green-700 hover:bg-green-200"
-                              : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-gray-100 text-gray-500"
                           }`}
                         >
-                          {item.is_available ? "Available" : "Unavailable"}
+                          {item.is_available ? (
+                            <ToggleRight className="h-3 w-3" />
+                          ) : (
+                            <ToggleLeft className="h-3 w-3" />
+                          )}
+                          {item.is_available ? "On" : "Off"}
                         </button>
                         <button
                           onClick={() => deleteItem(item.id)}
-                          className="rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+                          className="rounded-xl border border-[var(--border)] p-1.5 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors"
                         >
-                          Delete
+                          <Trash2 className="h-3.5 w-3.5 text-[var(--muted-foreground)]" />
                         </button>
                       </div>
                     </div>
@@ -720,17 +823,27 @@ function ReservationsTab() {
 
   if (loading) {
     return (
-      <div className="animate-pulse space-y-3">
-        <div className="h-16 rounded-lg bg-[var(--muted)]" />
-        <div className="h-16 rounded-lg bg-[var(--muted)]" />
+      <div className="space-y-3">
+        {[1, 2].map((i) => (
+          <div
+            key={i}
+            className="h-20 rounded-2xl bg-[var(--muted)] animate-pulse"
+          />
+        ))}
       </div>
     );
   }
 
   if (bookings.length === 0) {
     return (
-      <div className="rounded-xl border border-[var(--border)] p-8 text-center">
-        <p className="text-sm text-[var(--muted-foreground)]">
+      <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-16 text-center">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[var(--muted)] mb-4">
+          <CalendarDays className="h-7 w-7 text-[var(--muted-foreground)]" />
+        </div>
+        <p className="font-[family-name:var(--font-headline)] font-bold text-xl">
+          No reservations
+        </p>
+        <p className="text-sm text-[var(--muted-foreground)] mt-1">
           No dining reservations found.
         </p>
       </div>
@@ -738,40 +851,58 @@ function ReservationsTab() {
   }
 
   return (
-    <div className="space-y-2">
-      {bookings.map((booking) => (
-        <div
-          key={booking.id}
-          className="flex items-center justify-between rounded-xl border border-[var(--border)] px-4 py-3"
-        >
-          <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 text-lg">
-              🍽️
-            </div>
-            <div>
-              <p className="text-sm font-medium text-[var(--foreground)]">
-                {booking.member_first_name} {booking.member_last_name}
-              </p>
-              <p className="text-xs text-[var(--muted-foreground)]">
-                {booking.facility_name} &middot;{" "}
-                {formatDate(booking.date)} &middot;{" "}
-                {formatTime(booking.start_time)} &middot;{" "}
-                {booking.party_size}{" "}
-                {booking.party_size === 1 ? "guest" : "guests"}
-              </p>
-            </div>
-          </div>
-          <span
-            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-              booking.status === "confirmed"
-                ? "bg-green-100 text-green-700"
-                : "bg-yellow-100 text-yellow-700"
-            }`}
+    <div className="space-y-3">
+      {bookings.map((booking) => {
+        const isConfirmed = booking.status === "confirmed";
+        return (
+          <div
+            key={booking.id}
+            className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-5 flex items-center justify-between transition-all hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)]"
           >
-            {booking.status}
-          </span>
-        </div>
-      ))}
+            <div className="flex items-center gap-4">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--accent)]">
+                <UtensilsCrossed className="h-5 w-5 text-[var(--primary)]" />
+              </div>
+              <div>
+                <p className="font-[family-name:var(--font-headline)] font-bold text-base">
+                  {booking.member_first_name} {booking.member_last_name}
+                </p>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[var(--muted-foreground)]">
+                  <span className="inline-flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5" />
+                    {booking.facility_name}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    {formatDate(booking.date)}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5" />
+                    {formatTime(booking.start_time)}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5" />
+                    {booking.party_size}{" "}
+                    {booking.party_size === 1 ? "guest" : "guests"}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <span
+              className={`shrink-0 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase ${
+                isConfirmed
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-amber-50 text-amber-700"
+              }`}
+            >
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${isConfirmed ? "bg-emerald-500" : "bg-amber-500"}`}
+              />
+              {booking.status}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }

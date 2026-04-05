@@ -27,29 +27,46 @@ export default function DiningPage() {
     fetchRole();
   }, [fetchRole]);
 
+  const isAdmin = role === "admin";
+
   if (loading) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 w-48 rounded bg-[var(--muted)]" />
-          <div className="h-64 rounded-xl bg-[var(--muted)]" />
+      <div className="space-y-8">
+        {/* Header skeleton */}
+        <div>
+          <div className="h-8 w-48 rounded-lg bg-[var(--muted)] animate-pulse mb-2" />
+          <div className="h-4 w-72 rounded-md bg-[var(--muted)] animate-pulse" />
+        </div>
+        {/* Tab bar skeleton */}
+        <div className="h-10 w-64 rounded-xl bg-[var(--muted)] animate-pulse" />
+        {/* Content skeleton */}
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-24 rounded-2xl bg-[var(--muted)] animate-pulse"
+            />
+          ))}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-8">
+      {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold text-[var(--foreground)]">Dining</h1>
+        <h1 className="font-[family-name:var(--font-headline)] text-3xl font-bold text-[var(--foreground)]">
+          Dining
+        </h1>
         <p className="text-sm text-[var(--muted-foreground)] mt-1">
-          {role === "admin"
-            ? "Manage reservations, orders, and menus"
-            : "Reserve a table or order food"}
+          {isAdmin
+            ? "Manage reservations, orders, and menus."
+            : "Reserve a table or browse the menu."}
         </p>
       </div>
 
-      {role === "admin" ? <DiningAdmin /> : <DiningMember />}
+      {isAdmin ? <DiningAdmin /> : <DiningMember />}
     </div>
   );
 }
