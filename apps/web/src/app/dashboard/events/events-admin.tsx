@@ -10,6 +10,7 @@ import {
   Calendar,
   MapPin,
   Users,
+  Clock,
 } from "lucide-react";
 import type { EventWithRsvp, ClubEvent, EventStatus } from "@club/shared";
 import { EventFormModal } from "./event-form-modal";
@@ -24,23 +25,31 @@ interface EventsAdminProps {
 
 const STATUS_BADGE: Record<
   EventStatus,
-  { label: string; classes: string }
+  { label: string; dot: string; bg: string; text: string }
 > = {
   draft: {
     label: "Draft",
-    classes: "bg-gray-100 text-gray-700 border-gray-200",
+    dot: "bg-gray-400",
+    bg: "bg-gray-100",
+    text: "text-gray-700",
   },
   published: {
     label: "Published",
-    classes: "bg-green-50 text-green-700 border-green-200",
+    dot: "bg-emerald-500",
+    bg: "bg-emerald-50",
+    text: "text-emerald-700",
   },
   cancelled: {
     label: "Cancelled",
-    classes: "bg-red-50 text-red-700 border-red-200",
+    dot: "bg-red-500",
+    bg: "bg-red-50",
+    text: "text-red-700",
   },
   completed: {
     label: "Completed",
-    classes: "bg-blue-50 text-blue-700 border-blue-200",
+    dot: "bg-blue-500",
+    bg: "bg-blue-50",
+    text: "text-blue-700",
   },
 };
 
@@ -129,15 +138,15 @@ export function EventsAdmin({ events, onRefresh }: EventsAdminProps) {
     <>
       {/* Action bar */}
       <div className="flex items-center justify-between">
-        <div className="flex gap-1">
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--muted)]">
           {FILTER_TABS.map((tab) => (
             <button
               key={tab.value}
               onClick={() => setFilter(tab.value)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold tracking-wide transition-all ${
                 filter === tab.value
-                  ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
-                  : "text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
+                  ? "bg-[var(--surface-lowest)] text-[var(--foreground)] shadow-sm"
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
               }`}
             >
               {tab.label}
@@ -146,7 +155,7 @@ export function EventsAdmin({ events, onRefresh }: EventsAdminProps) {
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity"
+          className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary-container)] text-white px-5 py-2.5 text-xs font-bold tracking-wide uppercase hover:opacity-90 transition-opacity"
         >
           <Plus className="h-4 w-4" />
           Create Event
@@ -155,9 +164,13 @@ export function EventsAdmin({ events, onRefresh }: EventsAdminProps) {
 
       {/* Events list */}
       {filteredEvents.length === 0 ? (
-        <div className="rounded-xl border border-[var(--border)] p-12 text-center">
-          <Calendar className="h-10 w-10 mx-auto mb-3 text-[var(--muted-foreground)]" />
-          <p className="font-semibold text-lg">No events found</p>
+        <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-16 text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[var(--muted)] mb-4">
+            <Calendar className="h-7 w-7 text-[var(--muted-foreground)]" />
+          </div>
+          <p className="font-[family-name:var(--font-headline)] font-bold text-xl">
+            No events found
+          </p>
           <p className="text-sm text-[var(--muted-foreground)] mt-1">
             {filter === "all"
               ? "Create your first event to get started."
@@ -175,40 +188,44 @@ export function EventsAdmin({ events, onRefresh }: EventsAdminProps) {
             return (
               <div
                 key={event.id}
-                className="rounded-xl border border-[var(--border)] p-4 flex items-start gap-4"
+                className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-5 flex items-start gap-4 transition-all hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)]"
               >
                 {/* Event info */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-2">
                     <Link
                       href={`/dashboard/events/${event.id}`}
-                      className="font-semibold truncate hover:text-[var(--primary)] hover:underline transition-colors"
+                      className="font-[family-name:var(--font-headline)] font-bold text-base truncate hover:text-[var(--primary)] transition-colors"
                     >
                       {event.title}
                     </Link>
                     <span
-                      className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${badge.classes}`}
+                      className={`shrink-0 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase ${badge.bg} ${badge.text}`}
                     >
+                      <span className={`h-1.5 w-1.5 rounded-full ${badge.dot}`} />
                       {badge.label}
                     </span>
                     {isFree ? (
-                      <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                      <span className="shrink-0 rounded-md bg-[var(--accent)] text-[var(--primary)] px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase">
                         Free
                       </span>
                     ) : (
-                      <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                      <span className="shrink-0 rounded-md bg-blue-50 text-blue-700 px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase">
                         ${event.price}
                       </span>
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[var(--muted-foreground)]">
-                    <span className="inline-flex items-center gap-1">
+                    <span className="inline-flex items-center gap-1.5">
                       <Calendar className="h-3.5 w-3.5" />
-                      {formatDate(event.start_date)} ·{" "}
+                      {formatDate(event.start_date)}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5" />
                       {formatTime(event.start_date)}
                     </span>
                     {event.location && (
-                      <span className="inline-flex items-center gap-1">
+                      <span className="inline-flex items-center gap-1.5">
                         <MapPin className="h-3.5 w-3.5" />
                         {event.location}
                       </span>
@@ -220,7 +237,7 @@ export function EventsAdmin({ events, onRefresh }: EventsAdminProps) {
                           title: event.title,
                         })
                       }
-                      className="inline-flex items-center gap-1 hover:text-[var(--primary)] hover:underline transition-colors"
+                      className="inline-flex items-center gap-1.5 hover:text-[var(--primary)] transition-colors"
                     >
                       <Users className="h-3.5 w-3.5" />
                       {event.rsvp_count} attending
@@ -236,7 +253,7 @@ export function EventsAdmin({ events, onRefresh }: EventsAdminProps) {
                       onClick={() => handlePublish(event.id)}
                       disabled={actionLoading === event.id}
                       title="Publish"
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 text-green-700 px-3 py-1.5 text-xs font-medium hover:bg-green-100 transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 text-emerald-700 px-3 py-1.5 text-xs font-bold tracking-wide uppercase hover:bg-emerald-100 transition-colors disabled:opacity-50"
                     >
                       <Send className="h-3.5 w-3.5" />
                       Publish
@@ -245,24 +262,22 @@ export function EventsAdmin({ events, onRefresh }: EventsAdminProps) {
                   <button
                     onClick={() => setEditingEvent(event)}
                     title="Edit"
-                    className="rounded-lg border border-[var(--border)] p-1.5 hover:bg-[var(--muted)] transition-colors"
+                    className="rounded-xl border border-[var(--border)] p-2 hover:bg-[var(--muted)] transition-colors"
                   >
-                    <Pencil className="h-4 w-4" />
+                    <Pencil className="h-4 w-4 text-[var(--muted-foreground)]" />
                   </button>
                   {isDeleting ? (
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleDelete(event.id)}
                         disabled={actionLoading === event.id}
-                        className="rounded-lg bg-red-600 text-white px-2.5 py-1.5 text-xs font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+                        className="rounded-xl bg-red-600 text-white px-3 py-1.5 text-xs font-bold tracking-wide uppercase hover:bg-red-700 transition-colors disabled:opacity-50"
                       >
-                        {actionLoading === event.id
-                          ? "..."
-                          : "Confirm"}
+                        {actionLoading === event.id ? "..." : "Confirm"}
                       </button>
                       <button
                         onClick={() => setDeleteConfirm(null)}
-                        className="rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs font-medium hover:bg-[var(--muted)] transition-colors"
+                        className="rounded-xl border border-[var(--border)] px-3 py-1.5 text-xs font-semibold hover:bg-[var(--muted)] transition-colors"
                       >
                         Cancel
                       </button>
@@ -271,9 +286,9 @@ export function EventsAdmin({ events, onRefresh }: EventsAdminProps) {
                     <button
                       onClick={() => setDeleteConfirm(event.id)}
                       title="Delete"
-                      className="rounded-lg border border-[var(--border)] p-1.5 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors"
+                      className="rounded-xl border border-[var(--border)] p-2 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4 text-[var(--muted-foreground)]" />
                     </button>
                   )}
                 </div>

@@ -62,18 +62,20 @@ export default function EventsPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
+        {/* Header skeleton */}
         <div>
-          <h1 className="text-2xl font-bold">Events</h1>
-          <p className="text-[var(--muted-foreground)]">
-            Club events, tournaments, and social gatherings.
-          </p>
+          <div className="h-8 w-48 rounded-lg bg-[var(--muted)] animate-pulse mb-2" />
+          <div className="h-4 w-72 rounded-md bg-[var(--muted)] animate-pulse" />
         </div>
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
+        {/* Featured card skeleton */}
+        <div className="h-64 rounded-2xl bg-[var(--muted)] animate-pulse" />
+        {/* Grid skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[1, 2, 3, 4].map((i) => (
             <div
               key={i}
-              className="h-48 rounded-xl border border-[var(--border)] bg-[var(--muted)] animate-pulse"
+              className="h-52 rounded-2xl bg-[var(--muted)] animate-pulse"
             />
           ))}
         </div>
@@ -82,13 +84,16 @@ export default function EventsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold">Events</h1>
-        <p className="text-[var(--muted-foreground)]">
+        <h1 className="font-[family-name:var(--font-headline)] text-3xl font-bold text-[var(--foreground)]">
+          Events
+        </h1>
+        <p className="text-sm text-[var(--muted-foreground)] mt-1">
           {isAdmin
             ? "Create, manage, and publish club events."
-            : "Club events, tournaments, and social gatherings."}
+            : "Tournaments, socials, and everything happening at the club."}
         </p>
       </div>
 

@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-  --font-headline: "Noto Serif", serif;
-  --font-body: "Inter", sans-serif;
+  --font-headline: "Noto Serif", Georgia, serif;
+  --font-body: "Inter", system-ui, sans-serif;
 
   --color-reserve-primary: #012d1d;
   --color-reserve-primary-container: #1b4332;
@@ -23,40 +23,63 @@
   --color-reserve-secondary-fixed: #d7e5e5;
   --color-reserve-tertiary: #342300;
   --color-reserve-tertiary-container: #4f3800;
+  --color-reserve-tertiary-fixed: #ffdea5;
   --color-reserve-error: #ba1a1a;
   --color-reserve-error-container: #ffdad6;
+  --color-reserve-accent: #c1ecd4;
 }
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --primary: #16a34a;
+  /* Match mobile: deep forest green palette */
+  --background: #f9f9f8;
+  --foreground: #191c1c;
+  --primary: #012d1d;
+  --primary-container: #1b4332;
   --primary-foreground: #ffffff;
-  --muted: #f5f5f5;
-  --muted-foreground: #737373;
-  --border: #e5e5e5;
-  --ring: #16a34a;
-  --destructive: #ef4444;
-  --accent: #f0fdf4;
+  --muted: #f3f4f3;
+  --muted-foreground: #414844;
+  --border: #c1c8c2;
+  --ring: #012d1d;
+  --destructive: #ba1a1a;
+  --accent: #c1ecd4;
+  --outline: #717973;
+  --outline-variant: #c1c8c2;
+  --surface-lowest: #ffffff;
+  --surface-container: #edeeed;
+  --surface-container-high: #e7e8e7;
+  --secondary: #536161;
+  --secondary-container: #d4e3e2;
+  --tertiary: #342300;
+  --tertiary-fixed: #ffdea5;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --primary: #22c55e;
-    --primary-foreground: #0a0a0a;
-    --muted: #262626;
+    --background: #191c1c;
+    --foreground: #e1e3e2;
+    --primary: #a5d0b9;
+    --primary-container: #274e3d;
+    --primary-foreground: #002114;
+    --muted: #2e3131;
     --muted-foreground: #a3a3a3;
-    --border: #262626;
-    --ring: #22c55e;
-    --destructive: #ef4444;
+    --border: #414844;
+    --ring: #a5d0b9;
+    --destructive: #ffb4ab;
     --accent: #052e16;
+    --outline: #8b9390;
+    --outline-variant: #414844;
+    --surface-lowest: #0e1111;
+    --surface-container: #2e3131;
+    --surface-container-high: #383b3b;
+    --secondary: #bbc9c9;
+    --secondary-container: #3c4949;
+    --tertiary: #e9c176;
+    --tertiary-fixed: #ffdea5;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
 }
