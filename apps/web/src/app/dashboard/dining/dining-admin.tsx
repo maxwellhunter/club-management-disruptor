@@ -409,7 +409,7 @@ function MenuTab() {
     setLoadingMenu(true);
     try {
       const res = await fetch(
-        `/api/dining/menu?facility_id=${selectedFacility}`
+        `/api/dining/menu?facility_id=${selectedFacility}&include_unavailable=true`
       );
       if (res.ok) {
         const data = await res.json();
@@ -489,14 +489,43 @@ function MenuTab() {
   }
 
   async function toggleItemAvailability(itemId: string, available: boolean) {
+    // Optimistic update
+    setCategories((prev) =>
+      prev.map((cat) => ({
+        ...cat,
+        items: cat.items.map((item) =>
+          item.id === itemId ? { ...item, is_available: !available } : item
+        ),
+      }))
+    );
     try {
-      await fetch(`/api/dining/admin/items/${itemId}`, {
+      const res = await fetch(`/api/dining/admin/items/${itemId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ is_available: !available }),
       });
-      fetchMenu();
+      if (!res.ok) {
+        // Revert on failure
+        setCategories((prev) =>
+          prev.map((cat) => ({
+            ...cat,
+            items: cat.items.map((item) =>
+              item.id === itemId ? { ...item, is_available: available } : item
+            ),
+          }))
+        );
+        setError("Failed to update availability");
+      }
     } catch {
+      // Revert on error
+      setCategories((prev) =>
+        prev.map((cat) => ({
+          ...cat,
+          items: cat.items.map((item) =>
+            item.id === itemId ? { ...item, is_available: available } : item
+          ),
+        }))
+      );
       setError("Failed to update item");
     }
   }
@@ -760,7 +789,7 @@ function MenuTab() {
                           ) : (
                             <ToggleLeft className="h-3 w-3" />
                           )}
-                          {item.is_available ? "On" : "Off"}
+                          {item.is_available ? "Available" : "86'd"}
                         </button>
                         <button
                           onClick={() => deleteItem(item.id)}

@@ -63,15 +63,21 @@ export async function GET(request: Request) {
       });
     }
 
-    // Fetch available items for all categories
+    // Fetch items for all categories
+    // Admins see all items; members see only available items
+    const includeUnavailable = searchParams.get("include_unavailable") === "true"
+      && result.member.role === "admin";
     const categoryIds = categories.map((c) => c.id);
-    const { data: items } = await supabase
+    let itemsQuery = supabase
       .from("menu_items")
       .select("*")
       .in("category_id", categoryIds)
       .eq("club_id", result.member.club_id)
-      .eq("is_available", true)
       .order("sort_order", { ascending: true });
+    if (!includeUnavailable) {
+      itemsQuery = itemsQuery.eq("is_available", true);
+    }
+    const { data: items } = await itemsQuery;
 
     // Group items by category
     const itemsByCategory: Record<string, NonNullable<typeof items>> = {};
