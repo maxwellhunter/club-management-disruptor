@@ -170,6 +170,13 @@ export const createMenuItemSchema = z.object({
 
 export const updateMenuItemSchema = createMenuItemSchema.partial();
 
+export const updateMenuCategorySchema = z.object({
+  name: z.string().min(1, "Category name is required").max(100).optional(),
+  description: z.string().optional(),
+  sort_order: z.number().int().min(0).optional(),
+  is_active: z.boolean().optional(),
+});
+
 // Ordering schemas
 export const createDiningOrderSchema = z.object({
   facility_id: z.string().uuid(),
@@ -445,6 +452,7 @@ export type CreateDiningReservationInput = z.infer<
   typeof createDiningReservationSchema
 >;
 export type CreateMenuCategoryInput = z.infer<typeof createMenuCategorySchema>;
+export type UpdateMenuCategoryInput = z.infer<typeof updateMenuCategorySchema>;
 export type CreateMenuItemInput = z.infer<typeof createMenuItemSchema>;
 export type UpdateMenuItemInput = z.infer<typeof updateMenuItemSchema>;
 export type CreateDiningOrderInput = z.infer<typeof createDiningOrderSchema>;
