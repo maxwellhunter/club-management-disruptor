@@ -158,12 +158,25 @@ export const createMenuCategorySchema = z.object({
   sort_order: z.number().int().min(0).default(0),
 });
 
+const dietaryTagEnum = z.enum([
+  "vegetarian",
+  "vegan",
+  "gluten-free",
+  "nut-free",
+  "dairy-free",
+  "shellfish-free",
+  "spicy",
+  "halal",
+  "kosher",
+]);
+
 export const createMenuItemSchema = z.object({
   category_id: z.string().uuid(),
   name: z.string().min(1, "Item name is required").max(200),
   description: z.string().optional(),
   price: z.number().min(0, "Price must be non-negative"),
-  image_url: z.string().url().optional(),
+  image_url: z.string().url().optional().or(z.literal("")),
+  dietary_tags: z.array(dietaryTagEnum).default([]),
   is_available: z.boolean().default(true),
   sort_order: z.number().int().min(0).default(0),
 });
@@ -203,6 +216,7 @@ export const updateDiningOrderStatusSchema = z.object({
     "delivered",
     "cancelled",
   ]),
+  estimated_prep_minutes: z.number().int().min(1).max(120).optional(),
 });
 
 // Schedule configuration schema (admin — generate booking slots)

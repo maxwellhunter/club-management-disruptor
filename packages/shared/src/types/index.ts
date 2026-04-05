@@ -312,6 +312,35 @@ export interface MenuCategory {
   created_at: string;
 }
 
+export type DietaryTag =
+  | "vegetarian"
+  | "vegan"
+  | "gluten-free"
+  | "nut-free"
+  | "dairy-free"
+  | "shellfish-free"
+  | "spicy"
+  | "halal"
+  | "kosher";
+
+export const DIETARY_TAGS: { value: DietaryTag; label: string; emoji: string }[] = [
+  { value: "vegetarian", label: "Vegetarian", emoji: "🥬" },
+  { value: "vegan", label: "Vegan", emoji: "🌱" },
+  { value: "gluten-free", label: "Gluten-Free", emoji: "🌾" },
+  { value: "nut-free", label: "Nut-Free", emoji: "🥜" },
+  { value: "dairy-free", label: "Dairy-Free", emoji: "🥛" },
+  { value: "shellfish-free", label: "Shellfish-Free", emoji: "🦐" },
+  { value: "spicy", label: "Spicy", emoji: "🌶️" },
+  { value: "halal", label: "Halal", emoji: "☪️" },
+  { value: "kosher", label: "Kosher", emoji: "✡️" },
+];
+
+export interface FacilityTable {
+  number: string;
+  seats: number;
+  location: string;
+}
+
 export interface MenuItem {
   id: string;
   club_id: string;
@@ -320,6 +349,7 @@ export interface MenuItem {
   description: string | null;
   price: number;
   image_url: string | null;
+  dietary_tags: DietaryTag[];
   is_available: boolean;
   sort_order: number;
   created_at: string;
@@ -335,6 +365,7 @@ export interface DiningOrder {
   invoice_id: string | null;
   status: DiningOrderStatus;
   table_number: string | null;
+  estimated_prep_minutes: number | null;
   subtotal: number;
   tax: number;
   total: number;

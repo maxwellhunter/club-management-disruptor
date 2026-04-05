@@ -20,13 +20,17 @@ import {
   Settings,
   ShoppingCart,
   Search,
+  ImageIcon,
+  Timer,
 } from "lucide-react";
-import type {
-  DiningOrderWithItems,
-  DiningOrderStatus,
-  MenuCategory,
-  MenuItem,
-  BookingWithDetails,
+import {
+  DIETARY_TAGS,
+  type DiningOrderWithItems,
+  type DiningOrderStatus,
+  type DietaryTag,
+  type MenuCategory,
+  type MenuItem,
+  type BookingWithDetails,
 } from "@club/shared";
 
 type AdminTab = "orders" | "menu" | "reservations" | "settings";
@@ -142,6 +146,7 @@ function OrdersTab() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"active" | "all">("active");
   const [showCreateOrder, setShowCreateOrder] = useState(false);
+  const [prepTimeInput, setPrepTimeInput] = useState<Record<string, string>>({});
 
   async function fetchOrders() {
     try {
@@ -164,17 +169,36 @@ function OrdersTab() {
   async function advanceStatus(orderId: string, newStatus: DiningOrderStatus) {
     setUpdatingId(orderId);
     try {
+      const payload: Record<string, unknown> = { status: newStatus };
+      const prepMin = parseInt(prepTimeInput[orderId]);
+      if (
+        (newStatus === "confirmed" || newStatus === "preparing") &&
+        prepMin > 0
+      ) {
+        payload.estimated_prep_minutes = prepMin;
+      }
       const res = await fetch(`/api/dining/orders/${orderId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         setOrders((prev) =>
           prev.map((o) =>
-            o.id === orderId ? { ...o, status: newStatus } : o
+            o.id === orderId
+              ? {
+                  ...o,
+                  status: newStatus,
+                  estimated_prep_minutes: prepMin > 0 ? prepMin : o.estimated_prep_minutes,
+                }
+              : o
           )
         );
+        setPrepTimeInput((prev) => {
+          const next = { ...prev };
+          delete next[orderId];
+          return next;
+        });
       }
     } catch (err) {
       console.error("Failed to update order:", err);
@@ -325,6 +349,35 @@ function OrdersTab() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
+                    {/* Prep time input for confirm/preparing transitions */}
+                    {(order.status === "pending" ||
+                      order.status === "confirmed") &&
+                      nextStatus && (
+                        <div className="flex items-center gap-1">
+                          <Timer className="h-3.5 w-3.5 text-[var(--muted-foreground)]" />
+                          <input
+                            type="number"
+                            min={1}
+                            max={120}
+                            value={prepTimeInput[order.id] ?? ""}
+                            onChange={(e) =>
+                              setPrepTimeInput((prev) => ({
+                                ...prev,
+                                [order.id]: e.target.value,
+                              }))
+                            }
+                            placeholder="min"
+                            className="w-14 rounded-lg border border-[var(--border)] bg-[var(--surface-lowest)] px-2 py-1 text-xs text-center placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/20"
+                          />
+                        </div>
+                      )}
+                    {/* Show existing prep time */}
+                    {order.estimated_prep_minutes && (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-orange-50 text-orange-700 px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase">
+                        <Timer className="h-3 w-3" />
+                        {order.estimated_prep_minutes}m
+                      </span>
+                    )}
                     {nextStatus && (
                       <button
                         onClick={() => advanceStatus(order.id, nextStatus)}
@@ -412,6 +465,8 @@ function MenuTab() {
   const [itemDescription, setItemDescription] = useState("");
   const [itemPrice, setItemPrice] = useState("");
   const [itemSortOrder, setItemSortOrder] = useState(0);
+  const [itemImageUrl, setItemImageUrl] = useState("");
+  const [itemDietaryTags, setItemDietaryTags] = useState<DietaryTag[]>([]);
 
   // Inline editing
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(
@@ -424,6 +479,8 @@ function MenuTab() {
   const [editItemName, setEditItemName] = useState("");
   const [editItemDescription, setEditItemDescription] = useState("");
   const [editItemPrice, setEditItemPrice] = useState("");
+  const [editItemImageUrl, setEditItemImageUrl] = useState("");
+  const [editItemDietaryTags, setEditItemDietaryTags] = useState<DietaryTag[]>([]);
 
   useEffect(() => {
     async function fetchFacilities() {
@@ -555,6 +612,8 @@ function MenuTab() {
           name: itemName.trim(),
           description: itemDescription.trim() || undefined,
           price: parseFloat(itemPrice),
+          image_url: itemImageUrl.trim() || undefined,
+          dietary_tags: itemDietaryTags,
           sort_order: itemSortOrder,
         }),
       });
@@ -564,6 +623,8 @@ function MenuTab() {
         setItemDescription("");
         setItemPrice("");
         setItemSortOrder(0);
+        setItemImageUrl("");
+        setItemDietaryTags([]);
         fetchMenu();
       } else {
         const data = await res.json();
@@ -587,6 +648,8 @@ function MenuTab() {
           name: editItemName.trim(),
           description: editItemDescription.trim() || undefined,
           price: parseFloat(editItemPrice),
+          image_url: editItemImageUrl.trim() || undefined,
+          dietary_tags: editItemDietaryTags,
         }),
       });
       if (res.ok) {
@@ -667,6 +730,8 @@ function MenuTab() {
     setEditItemName(item.name);
     setEditItemDescription(item.description || "");
     setEditItemPrice(String(item.price));
+    setEditItemImageUrl(item.image_url || "");
+    setEditItemDietaryTags(item.dietary_tags ?? []);
   }
 
   if (loading) {
@@ -823,6 +888,41 @@ function MenuTab() {
             placeholder="Description (optional)"
             className={`w-full ${INPUT_CLS}`}
           />
+          <input
+            type="text"
+            value={itemImageUrl}
+            onChange={(e) => setItemImageUrl(e.target.value)}
+            placeholder="Image URL (optional)"
+            className={`w-full ${INPUT_CLS}`}
+          />
+          {/* Dietary tags */}
+          <div>
+            <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1.5 uppercase tracking-wide">
+              Dietary Tags
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {DIETARY_TAGS.map((tag) => (
+                <button
+                  key={tag.value}
+                  type="button"
+                  onClick={() =>
+                    setItemDietaryTags((prev) =>
+                      prev.includes(tag.value)
+                        ? prev.filter((t) => t !== tag.value)
+                        : [...prev, tag.value]
+                    )
+                  }
+                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                    itemDietaryTags.includes(tag.value)
+                      ? "bg-[var(--primary-container)] text-white"
+                      : "border border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--primary)]"
+                  }`}
+                >
+                  {tag.emoji} {tag.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="flex gap-2">
             <button
               onClick={handleCreateItem}
@@ -977,6 +1077,43 @@ function MenuTab() {
                               className={`text-sm ${INPUT_CLS}`}
                             />
                           </div>
+                          <div className="flex items-center gap-2">
+                            <ImageIcon className="h-3.5 w-3.5 text-[var(--muted-foreground)] shrink-0" />
+                            <input
+                              type="text"
+                              value={editItemImageUrl}
+                              onChange={(e) => setEditItemImageUrl(e.target.value)}
+                              placeholder="Image URL (optional)"
+                              className={`flex-1 text-sm ${INPUT_CLS}`}
+                            />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold tracking-widest uppercase text-[var(--muted-foreground)] mb-1">
+                              Dietary Tags
+                            </p>
+                            <div className="flex flex-wrap gap-1">
+                              {DIETARY_TAGS.map((tag) => (
+                                <button
+                                  key={tag.value}
+                                  type="button"
+                                  onClick={() =>
+                                    setEditItemDietaryTags((prev) =>
+                                      prev.includes(tag.value)
+                                        ? prev.filter((t) => t !== tag.value)
+                                        : [...prev, tag.value]
+                                    )
+                                  }
+                                  className={`rounded-md px-2 py-0.5 text-[10px] font-bold transition-all ${
+                                    editItemDietaryTags.includes(tag.value)
+                                      ? "bg-[var(--primary-container)] text-white"
+                                      : "border border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--primary)]"
+                                  }`}
+                                >
+                                  {tag.emoji} {tag.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                           <div className="flex gap-1.5">
                             <button
                               onClick={() => handleUpdateItem(item.id)}
@@ -1002,17 +1139,43 @@ function MenuTab() {
                       ) : (
                         /* Normal item display */
                         <div className="flex items-center justify-between">
-                          <div className="min-w-0 flex-1">
-                            <p
-                              className={`text-sm font-semibold ${!item.is_available ? "line-through text-[var(--muted-foreground)]" : "text-[var(--foreground)]"}`}
-                            >
-                              {item.name}
-                            </p>
-                            {item.description && (
-                              <p className="text-xs text-[var(--muted-foreground)] mt-0.5 line-clamp-1">
-                                {item.description}
-                              </p>
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            {item.image_url && (
+                              <img
+                                src={item.image_url}
+                                alt={item.name}
+                                className="h-10 w-10 rounded-lg object-cover shrink-0 border border-[var(--border)]"
+                              />
                             )}
+                            <div className="min-w-0">
+                              <p
+                                className={`text-sm font-semibold ${!item.is_available ? "line-through text-[var(--muted-foreground)]" : "text-[var(--foreground)]"}`}
+                              >
+                                {item.name}
+                              </p>
+                              {item.description && (
+                                <p className="text-xs text-[var(--muted-foreground)] mt-0.5 line-clamp-1">
+                                  {item.description}
+                                </p>
+                              )}
+                              {(item.dietary_tags?.length ?? 0) > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {item.dietary_tags.map((tag) => {
+                                    const tagInfo = DIETARY_TAGS.find(
+                                      (t) => t.value === tag
+                                    );
+                                    return (
+                                      <span
+                                        key={tag}
+                                        className="rounded-md bg-[var(--muted)] px-1.5 py-0.5 text-[9px] font-bold tracking-wide uppercase text-[var(--muted-foreground)]"
+                                      >
+                                        {tagInfo?.emoji} {tagInfo?.label ?? tag}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0 ml-4">
                             <span className="rounded-md bg-blue-50 text-blue-700 px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase">
@@ -1410,11 +1573,21 @@ interface MemberOption {
   last_name: string;
 }
 
+interface FacilityTable {
+  number: string;
+  seats: number;
+  location: string;
+}
+
+interface FacilityWithTables {
+  id: string;
+  name: string;
+  tables?: FacilityTable[];
+}
+
 function AdminCreateOrder({ onCreated, onCancel }: AdminCreateOrderProps) {
   const [members, setMembers] = useState<MemberOption[]>([]);
-  const [facilities, setFacilities] = useState<
-    { id: string; name: string }[]
-  >([]);
+  const [facilities, setFacilities] = useState<FacilityWithTables[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -1451,9 +1624,16 @@ function AdminCreateOrder({ onCreated, onCancel }: AdminCreateOrderProps) {
         }
         if (facilitiesRes.ok) {
           const data = await facilitiesRes.json();
-          setFacilities(data.facilities ?? []);
-          if (data.facilities?.length > 0) {
-            setSelectedFacility(data.facilities[0].id);
+          const facs: FacilityWithTables[] = (data.facilities ?? []).map(
+            (f: { id: string; name: string; tables?: FacilityTable[] }) => ({
+              id: f.id,
+              name: f.name,
+              tables: Array.isArray(f.tables) ? f.tables : [],
+            })
+          );
+          setFacilities(facs);
+          if (facs.length > 0) {
+            setSelectedFacility(facs[0].id);
           }
         }
       } catch {
@@ -1630,15 +1810,40 @@ function AdminCreateOrder({ onCreated, onCancel }: AdminCreateOrderProps) {
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
-              Table Number
+              Table
             </label>
-            <input
-              type="text"
-              value={tableNumber}
-              onChange={(e) => setTableNumber(e.target.value)}
-              placeholder="e.g. 12"
-              className={`w-full ${INPUT_CLS}`}
-            />
+            {(() => {
+              const currentFac = facilities.find(
+                (f) => f.id === selectedFacility
+              );
+              const tables = currentFac?.tables ?? [];
+              if (tables.length > 0) {
+                return (
+                  <select
+                    value={tableNumber}
+                    onChange={(e) => setTableNumber(e.target.value)}
+                    className={`w-full ${INPUT_CLS}`}
+                  >
+                    <option value="">Select table...</option>
+                    {tables.map((t) => (
+                      <option key={t.number} value={t.number}>
+                        Table {t.number} &mdash; {t.seats} seats
+                        {t.location ? ` (${t.location})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                );
+              }
+              return (
+                <input
+                  type="text"
+                  value={tableNumber}
+                  onChange={(e) => setTableNumber(e.target.value)}
+                  placeholder="e.g. 12"
+                  className={`w-full ${INPUT_CLS}`}
+                />
+              );
+            })()}
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
@@ -1765,16 +1970,29 @@ interface BookingSlot {
   is_active: boolean;
 }
 
+interface SettingsFacility {
+  id: string;
+  name: string;
+  tables: { number: string; seats: number; location: string }[];
+}
+
 function SettingsTab() {
-  const [facilities, setFacilities] = useState<
-    { id: string; name: string }[]
-  >([]);
+  const [facilities, setFacilities] = useState<SettingsFacility[]>([]);
   const [selectedFacility, setSelectedFacility] = useState<string | null>(null);
   const [slots, setSlots] = useState<BookingSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Table management
+  const [settingsSubTab, setSettingsSubTab] = useState<"schedule" | "tables">(
+    "schedule"
+  );
+  const [newTableNumber, setNewTableNumber] = useState("");
+  const [newTableSeats, setNewTableSeats] = useState("4");
+  const [newTableLocation, setNewTableLocation] = useState("");
+  const [savingTables, setSavingTables] = useState(false);
 
   // Generator form
   const [showGenerator, setShowGenerator] = useState(false);
@@ -1791,9 +2009,16 @@ function SettingsTab() {
         const res = await fetch("/api/facilities?type=dining");
         if (res.ok) {
           const data = await res.json();
-          setFacilities(data.facilities ?? []);
-          if (data.facilities?.length > 0) {
-            setSelectedFacility(data.facilities[0].id);
+          const facs: SettingsFacility[] = (data.facilities ?? []).map(
+            (f: { id: string; name: string; tables?: unknown }) => ({
+              id: f.id,
+              name: f.name,
+              tables: Array.isArray(f.tables) ? f.tables : [],
+            })
+          );
+          setFacilities(facs);
+          if (facs.length > 0) {
+            setSelectedFacility(facs[0].id);
           }
         }
       } catch {
@@ -1808,6 +2033,77 @@ function SettingsTab() {
   useEffect(() => {
     if (selectedFacility) fetchSlots();
   }, [selectedFacility]);
+
+  const currentFacility = facilities.find((f) => f.id === selectedFacility);
+  const facilityTables = currentFacility?.tables ?? [];
+
+  async function addTable() {
+    if (!selectedFacility || !newTableNumber.trim()) return;
+    setSavingTables(true);
+    setError(null);
+    const updatedTables = [
+      ...facilityTables,
+      {
+        number: newTableNumber.trim(),
+        seats: parseInt(newTableSeats) || 4,
+        location: newTableLocation.trim(),
+      },
+    ];
+    try {
+      const res = await fetch(`/api/facilities/${selectedFacility}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tables: updatedTables }),
+      });
+      if (res.ok) {
+        setFacilities((prev) =>
+          prev.map((f) =>
+            f.id === selectedFacility ? { ...f, tables: updatedTables } : f
+          )
+        );
+        setNewTableNumber("");
+        setNewTableSeats("4");
+        setNewTableLocation("");
+        setSuccess("Table added");
+      } else {
+        setError("Failed to save table");
+      }
+    } catch {
+      setError("Failed to save table");
+    } finally {
+      setSavingTables(false);
+    }
+  }
+
+  async function removeTable(tableNumber: string) {
+    if (!selectedFacility) return;
+    setSavingTables(true);
+    setError(null);
+    const updatedTables = facilityTables.filter(
+      (t) => t.number !== tableNumber
+    );
+    try {
+      const res = await fetch(`/api/facilities/${selectedFacility}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tables: updatedTables }),
+      });
+      if (res.ok) {
+        setFacilities((prev) =>
+          prev.map((f) =>
+            f.id === selectedFacility ? { ...f, tables: updatedTables } : f
+          )
+        );
+        setSuccess("Table removed");
+      } else {
+        setError("Failed to remove table");
+      }
+    } catch {
+      setError("Failed to remove table");
+    } finally {
+      setSavingTables(false);
+    }
+  }
 
   async function fetchSlots() {
     if (!selectedFacility) return;
@@ -1906,11 +2202,30 @@ function SettingsTab() {
   return (
     <div className="space-y-5">
       <p className="font-[family-name:var(--font-headline)] font-bold text-lg">
-        Dining Availability
+        Dining Settings
       </p>
-      <p className="text-sm text-[var(--muted-foreground)] -mt-3">
-        Configure reservation time slots for each dining venue.
-      </p>
+
+      {/* Sub-tabs: Schedule vs Tables */}
+      <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--muted)] w-fit -mt-3">
+        {(
+          [
+            { value: "schedule", label: "Schedule" },
+            { value: "tables", label: "Table Layout" },
+          ] as const
+        ).map((st) => (
+          <button
+            key={st.value}
+            onClick={() => setSettingsSubTab(st.value)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold tracking-wide transition-all ${
+              settingsSubTab === st.value
+                ? "bg-[var(--surface-lowest)] text-[var(--foreground)] shadow-sm"
+                : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+            }`}
+          >
+            {st.label}
+          </button>
+        ))}
+      </div>
 
       {error && (
         <div className="rounded-2xl bg-red-50 border border-red-200 p-4 text-sm text-red-700 font-medium flex items-center justify-between">
@@ -1948,185 +2263,305 @@ function SettingsTab() {
         </div>
       )}
 
-      {/* Generate button */}
-      <button
-        onClick={() => setShowGenerator(!showGenerator)}
-        className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--primary-container)] text-white px-4 py-2 text-xs font-bold tracking-wide uppercase hover:opacity-90 transition-opacity"
-      >
-        <Plus className="h-3.5 w-3.5" />
-        Generate Schedule
-      </button>
-
-      {/* Generator form */}
-      {showGenerator && (
-        <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-5 space-y-4">
-          <p className="font-[family-name:var(--font-headline)] font-bold text-base">
-            Schedule Generator
-          </p>
-          <p className="text-xs text-[var(--muted-foreground)]">
-            This will replace existing slots for the selected days.
+      {/* ── Schedule Sub-Tab ── */}
+      {settingsSubTab === "schedule" && (
+        <>
+          <p className="text-sm text-[var(--muted-foreground)]">
+            Configure reservation time slots for each dining venue.
           </p>
 
-          {/* Day picker */}
-          <div>
-            <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-2 uppercase tracking-wide">
-              Days
-            </label>
-            <div className="flex flex-wrap gap-1.5">
-              {DAYS.map((day, i) => (
+          {/* Generate button */}
+          <button
+            onClick={() => setShowGenerator(!showGenerator)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--primary-container)] text-white px-4 py-2 text-xs font-bold tracking-wide uppercase hover:opacity-90 transition-opacity"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Generate Schedule
+          </button>
+
+          {/* Generator form */}
+          {showGenerator && (
+            <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-5 space-y-4">
+              <p className="font-[family-name:var(--font-headline)] font-bold text-base">
+                Schedule Generator
+              </p>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                This will replace existing slots for the selected days.
+              </p>
+
+              {/* Day picker */}
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-2 uppercase tracking-wide">
+                  Days
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {DAYS.map((day, i) => (
+                    <button
+                      key={i}
+                      onClick={() => toggleDay(i)}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                        genDays.includes(i)
+                          ? "bg-[var(--primary-container)] text-white"
+                          : "border border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--primary)]"
+                      }`}
+                    >
+                      {day.slice(0, 3)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
+                    Start Time
+                  </label>
+                  <input
+                    type="time"
+                    value={genStart}
+                    onChange={(e) => setGenStart(e.target.value)}
+                    className={INPUT_CLS}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
+                    End Time
+                  </label>
+                  <input
+                    type="time"
+                    value={genEnd}
+                    onChange={(e) => setGenEnd(e.target.value)}
+                    className={INPUT_CLS}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
+                    Interval
+                  </label>
+                  <select
+                    value={genInterval}
+                    onChange={(e) => setGenInterval(parseInt(e.target.value))}
+                    className={INPUT_CLS}
+                  >
+                    <option value={15}>15 min</option>
+                    <option value={30}>30 min</option>
+                    <option value={45}>45 min</option>
+                    <option value={60}>60 min</option>
+                    <option value={90}>90 min</option>
+                    <option value={120}>2 hours</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
+                    Max Tables
+                  </label>
+                  <input
+                    type="number"
+                    value={genMaxBookings}
+                    onChange={(e) =>
+                      setGenMaxBookings(parseInt(e.target.value) || 1)
+                    }
+                    min={1}
+                    className={INPUT_CLS}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
                 <button
-                  key={i}
-                  onClick={() => toggleDay(i)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    genDays.includes(i)
-                      ? "bg-[var(--primary-container)] text-white"
-                      : "border border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--primary)]"
-                  }`}
+                  onClick={handleGenerate}
+                  disabled={generating || genDays.length === 0}
+                  className="rounded-xl bg-[var(--primary-container)] text-white px-5 py-2.5 text-xs font-bold tracking-wide uppercase hover:opacity-90 transition-opacity disabled:opacity-50"
                 >
-                  {day.slice(0, 3)}
+                  {generating ? "Generating..." : "Generate Slots"}
                 </button>
-              ))}
+                <button
+                  onClick={() => setShowGenerator(false)}
+                  className="rounded-xl border border-[var(--border)] px-5 py-2.5 text-xs font-semibold hover:bg-[var(--muted)] transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="grid grid-cols-4 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
-                Start Time
-              </label>
-              <input
-                type="time"
-                value={genStart}
-                onChange={(e) => setGenStart(e.target.value)}
-                className={INPUT_CLS}
-              />
+          {/* Current schedule display */}
+          {loadingSlots ? (
+            <div className="h-40 rounded-2xl bg-[var(--muted)] animate-pulse" />
+          ) : slots.length === 0 ? (
+            <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-16 text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[var(--muted)] mb-4">
+                <Clock className="h-7 w-7 text-[var(--muted-foreground)]" />
+              </div>
+              <p className="font-[family-name:var(--font-headline)] font-bold text-xl">
+                No time slots configured
+              </p>
+              <p className="text-sm text-[var(--muted-foreground)] mt-1">
+                Use the generator above to create reservation slots.
+              </p>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
-                End Time
-              </label>
-              <input
-                type="time"
-                value={genEnd}
-                onChange={(e) => setGenEnd(e.target.value)}
-                className={INPUT_CLS}
-              />
+          ) : (
+            <div className="space-y-3">
+              {DAYS.map((day, i) => {
+                const daySlots = slotsByDay[i];
+                if (!daySlots || daySlots.length === 0) return null;
+                return (
+                  <div
+                    key={i}
+                    className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 overflow-hidden"
+                  >
+                    <div className="bg-[var(--muted)]/40 px-5 py-3 border-b border-[var(--outline-variant)]/20 flex items-center justify-between">
+                      <div>
+                        <p className="font-[family-name:var(--font-headline)] font-bold text-sm">
+                          {day}
+                        </p>
+                        <p className="text-xs text-[var(--muted-foreground)]">
+                          {daySlots.length} slot
+                          {daySlots.length !== 1 ? "s" : ""} &middot;{" "}
+                          {daySlots[0].max_bookings} tables per slot
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleClearDay(i)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase text-red-700 hover:bg-red-100 transition-colors"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Clear
+                      </button>
+                    </div>
+                    <div className="px-5 py-3 flex flex-wrap gap-1.5">
+                      {daySlots.map((slot) => {
+                        const start = slot.start_time.slice(0, 5);
+                        return (
+                          <span
+                            key={slot.id}
+                            className={`rounded-md px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase ${
+                              slot.is_active
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-gray-100 text-gray-500"
+                            }`}
+                          >
+                            {start}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
-                Interval
-              </label>
-              <select
-                value={genInterval}
-                onChange={(e) => setGenInterval(parseInt(e.target.value))}
-                className={INPUT_CLS}
-              >
-                <option value={15}>15 min</option>
-                <option value={30}>30 min</option>
-                <option value={45}>45 min</option>
-                <option value={60}>60 min</option>
-                <option value={90}>90 min</option>
-                <option value={120}>2 hours</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
-                Max Tables
-              </label>
-              <input
-                type="number"
-                value={genMaxBookings}
-                onChange={(e) =>
-                  setGenMaxBookings(parseInt(e.target.value) || 1)
-                }
-                min={1}
-                className={INPUT_CLS}
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={handleGenerate}
-              disabled={generating || genDays.length === 0}
-              className="rounded-xl bg-[var(--primary-container)] text-white px-5 py-2.5 text-xs font-bold tracking-wide uppercase hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              {generating ? "Generating..." : "Generate Slots"}
-            </button>
-            <button
-              onClick={() => setShowGenerator(false)}
-              className="rounded-xl border border-[var(--border)] px-5 py-2.5 text-xs font-semibold hover:bg-[var(--muted)] transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+          )}
+        </>
       )}
 
-      {/* Current schedule display */}
-      {loadingSlots ? (
-        <div className="h-40 rounded-2xl bg-[var(--muted)] animate-pulse" />
-      ) : slots.length === 0 ? (
-        <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-16 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[var(--muted)] mb-4">
-            <Clock className="h-7 w-7 text-[var(--muted-foreground)]" />
-          </div>
-          <p className="font-[family-name:var(--font-headline)] font-bold text-xl">
-            No time slots configured
+      {/* ── Table Layout Sub-Tab ── */}
+      {settingsSubTab === "tables" && (
+        <>
+          <p className="text-sm text-[var(--muted-foreground)]">
+            Define tables for each venue. These appear as options when creating
+            orders.
           </p>
-          <p className="text-sm text-[var(--muted-foreground)] mt-1">
-            Use the generator above to create reservation slots.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {DAYS.map((day, i) => {
-            const daySlots = slotsByDay[i];
-            if (!daySlots || daySlots.length === 0) return null;
-            return (
-              <div
-                key={i}
-                className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 overflow-hidden"
-              >
-                <div className="bg-[var(--muted)]/40 px-5 py-3 border-b border-[var(--outline-variant)]/20 flex items-center justify-between">
+
+          {/* Current tables */}
+          {facilityTables.length === 0 ? (
+            <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-16 text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[var(--muted)] mb-4">
+                <UtensilsCrossed className="h-7 w-7 text-[var(--muted-foreground)]" />
+              </div>
+              <p className="font-[family-name:var(--font-headline)] font-bold text-xl">
+                No tables configured
+              </p>
+              <p className="text-sm text-[var(--muted-foreground)] mt-1">
+                Add tables below to enable table selection when creating orders.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              {facilityTables.map((table) => (
+                <div
+                  key={table.number}
+                  className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-4 flex items-start justify-between"
+                >
                   <div>
-                    <p className="font-[family-name:var(--font-headline)] font-bold text-sm">
-                      {day}
+                    <p className="font-[family-name:var(--font-headline)] font-bold text-base">
+                      Table {table.number}
                     </p>
-                    <p className="text-xs text-[var(--muted-foreground)]">
-                      {daySlots.length} slot{daySlots.length !== 1 ? "s" : ""}{" "}
-                      &middot; {daySlots[0].max_bookings} tables per slot
+                    <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+                      {table.seats} seats
+                      {table.location ? ` \u00B7 ${table.location}` : ""}
                     </p>
                   </div>
                   <button
-                    onClick={() => handleClearDay(i)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-bold tracking-widest uppercase text-red-700 hover:bg-red-100 transition-colors"
+                    onClick={() => removeTable(table.number)}
+                    disabled={savingTables}
+                    className="rounded-lg border border-[var(--border)] p-1.5 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors disabled:opacity-50"
+                    title="Remove table"
                   >
-                    <Trash2 className="h-3 w-3" />
-                    Clear
+                    <Trash2 className="h-3 w-3 text-[var(--muted-foreground)]" />
                   </button>
                 </div>
-                <div className="px-5 py-3 flex flex-wrap gap-1.5">
-                  {daySlots.map((slot) => {
-                    const start = slot.start_time.slice(0, 5);
-                    return (
-                      <span
-                        key={slot.id}
-                        className={`rounded-md px-2 py-0.5 text-[10px] font-bold tracking-widest uppercase ${
-                          slot.is_active
-                            ? "bg-emerald-50 text-emerald-700"
-                            : "bg-gray-100 text-gray-500"
-                        }`}
-                      >
-                        {start}
-                      </span>
-                    );
-                  })}
-                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add table form */}
+          <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-5 space-y-3">
+            <p className="font-[family-name:var(--font-headline)] font-bold text-base">
+              Add Table
+            </p>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
+                  Table Number
+                </label>
+                <input
+                  type="text"
+                  value={newTableNumber}
+                  onChange={(e) => setNewTableNumber(e.target.value)}
+                  placeholder="e.g. 1, A1"
+                  className={`w-full ${INPUT_CLS}`}
+                />
               </div>
-            );
-          })}
-        </div>
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
+                  Seats
+                </label>
+                <input
+                  type="number"
+                  value={newTableSeats}
+                  onChange={(e) => setNewTableSeats(e.target.value)}
+                  min={1}
+                  className={`w-full ${INPUT_CLS}`}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1 uppercase tracking-wide">
+                  Location
+                </label>
+                <select
+                  value={newTableLocation}
+                  onChange={(e) => setNewTableLocation(e.target.value)}
+                  className={`w-full ${INPUT_CLS}`}
+                >
+                  <option value="">Select...</option>
+                  <option value="main">Main Dining</option>
+                  <option value="patio">Patio</option>
+                  <option value="bar">Bar Area</option>
+                  <option value="private">Private Room</option>
+                  <option value="window">Window</option>
+                </select>
+              </div>
+            </div>
+            <button
+              onClick={addTable}
+              disabled={savingTables || !newTableNumber.trim()}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--primary-container)] text-white px-4 py-2 text-xs font-bold tracking-wide uppercase hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {savingTables ? "Saving..." : "Add Table"}
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

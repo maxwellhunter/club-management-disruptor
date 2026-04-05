@@ -134,10 +134,16 @@ export async function PATCH(
       );
     }
 
-    // Update status
+    // Build update payload
+    const updatePayload: Record<string, unknown> = { status: parsed.data.status };
+    if (parsed.data.estimated_prep_minutes !== undefined) {
+      updatePayload.estimated_prep_minutes = parsed.data.estimated_prep_minutes;
+    }
+
+    // Update status (+ optional prep time)
     const { data: updated, error } = await supabaseAdmin
       .from("dining_orders")
-      .update({ status: parsed.data.status })
+      .update(updatePayload)
       .eq("id", id)
       .select()
       .single();
