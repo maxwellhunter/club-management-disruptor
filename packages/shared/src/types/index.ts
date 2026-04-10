@@ -1161,6 +1161,43 @@ export interface WalletPassPayload {
   serial: string;
 }
 
+// Member Charge Posting types
+export interface MemberChargeTransaction {
+  id: string;
+  created_at: string;
+  location: string;
+  description: string | null;
+  subtotal: number;
+  tax: number;
+  tip: number;
+  total: number;
+  items: { id: string; name: string; quantity: number; unit_price: number; total: number; category: string | null }[];
+}
+
+export interface MemberChargeTab {
+  member_id: string;
+  member_name: string;
+  period: string;
+  transactions: MemberChargeTransaction[];
+  summary: {
+    transaction_count: number;
+    subtotal_total: number;
+    tax_total: number;
+    tip_total: number;
+    grand_total: number;
+    invoice_id: string | null;
+  };
+}
+
+export interface OpenTab {
+  member_id: string;
+  first_name: string;
+  last_name: string;
+  member_number: string | null;
+  tx_count: number;
+  tab_total: number;
+}
+
 // Chat types
 export interface ChatConversation {
   id: string;

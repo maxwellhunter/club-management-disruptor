@@ -52,20 +52,20 @@ actor APIClient {
     // Fire-and-forget variants (no response body needed)
     func post(_ path: String, body: Encodable? = nil) async throws {
         let request = try buildRequest(path: path, method: "POST", body: body)
-        let (_, response) = try await session.data(for: request)
-        try validateResponse(response)
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data)
     }
 
     func patch(_ path: String, body: Encodable? = nil) async throws {
         let request = try buildRequest(path: path, method: "PATCH", body: body)
-        let (_, response) = try await session.data(for: request)
-        try validateResponse(response)
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data)
     }
 
     func delete(_ path: String) async throws {
         let request = try buildRequest(path: path, method: "DELETE")
-        let (_, response) = try await session.data(for: request)
-        try validateResponse(response)
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data)
     }
 
     // MARK: - Raw data (for non-JSON responses)
@@ -116,14 +116,20 @@ actor APIClient {
 
     private func execute<T: Decodable>(_ request: URLRequest) async throws -> T {
         let (data, response) = try await session.data(for: request)
-        try validateResponse(response)
+        try validateResponse(response, data: data)
 
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return try decoder.decode(T.self, from: data)
     }
 
-    private func validateResponse(_ response: URLResponse) throws {
+    /// Try to extract the "error" field from an API JSON error response.
+    private func extractErrorMessage(from data: Data) -> String? {
+        struct ErrorBody: Decodable { let error: String }
+        return try? JSONDecoder().decode(ErrorBody.self, from: data).error
+    }
+
+    private func validateResponse(_ response: URLResponse, data: Data) throws {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }
@@ -133,13 +139,15 @@ actor APIClient {
         case 401:
             throw APIError.unauthorized
         case 403:
-            throw APIError.forbidden
+            let msg = extractErrorMessage(from: data)
+            throw APIError.forbidden(msg)
         case 404:
             throw APIError.notFound
         case 429:
             throw APIError.rateLimited
         default:
-            throw APIError.httpError(httpResponse.statusCode)
+            let msg = extractErrorMessage(from: data)
+            throw APIError.httpError(httpResponse.statusCode, msg)
         }
     }
 }
@@ -150,20 +158,20 @@ enum APIError: LocalizedError {
     case invalidURL(String)
     case invalidResponse
     case unauthorized
-    case forbidden
+    case forbidden(String?)
     case notFound
     case rateLimited
-    case httpError(Int)
+    case httpError(Int, String?)
 
     var errorDescription: String? {
         switch self {
         case .invalidURL(let path): return "Invalid URL: \(path)"
         case .invalidResponse: return "Invalid response from server"
         case .unauthorized: return "Session expired. Please sign in again."
-        case .forbidden: return "You don't have permission to do that."
+        case .forbidden(let msg): return msg ?? "You don't have permission to do that."
         case .notFound: return "Not found."
         case .rateLimited: return "Too many requests. Please wait."
-        case .httpError(let code): return "Server error (\(code))"
+        case .httpError(let code, let msg): return msg ?? "Server error (\(code))"
         }
     }
 }

@@ -135,22 +135,21 @@ struct PlayerPricing: Decodable, Identifiable {
 
 // MARK: - Rate Category
 
-struct RateCategory {
+struct TimeCategory {
     let label: String
-    let price: Int
     let color: Color
 }
 
-private func rateCategory(for time: String) -> RateCategory {
+private func timeCategory(for time: String) -> TimeCategory {
     let hour = Int(time.prefix(2)) ?? 0
     if hour < 8 {
-        return RateCategory(label: "Member Exclusive", price: 165, color: Color(hex: "7c3aed"))
-    } else if hour < 11 {
-        return RateCategory(label: "Prime Time", price: 195, color: Color(hex: "ea580c"))
-    } else if hour >= 15 {
-        return RateCategory(label: "Twilight", price: 145, color: Color(hex: "0284c7"))
+        return TimeCategory(label: "Early Bird", color: Color(hex: "7c3aed"))
+    } else if hour < 12 {
+        return TimeCategory(label: "Prime Time", color: Color(hex: "ea580c"))
+    } else if hour < 16 {
+        return TimeCategory(label: "Afternoon", color: Color(hex: "0369a1"))
     } else {
-        return RateCategory(label: "Standard", price: 185, color: Color.club.primary)
+        return TimeCategory(label: "Twilight", color: Color(hex: "0284c7"))
     }
 }
 
@@ -228,6 +227,7 @@ struct GolfBookingView: View {
     @State private var selectedDate = ""
     @State private var slots: [TeeTimeSlot] = []
     @State private var loadingSlots = false
+    @State private var slotsError: String?
     @State private var selectedSlot: TeeTimeSlot?
     @State private var transportMode = "cart"
 
@@ -1225,6 +1225,18 @@ struct GolfBookingView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 24)
+            } else if let error = slotsError {
+                VStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 24))
+                        .foregroundStyle(.orange)
+                    Text(error)
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.club.onSurfaceVariant)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
             } else if slots.isEmpty {
                 VStack(spacing: 10) {
                     Image(systemName: "clock")
@@ -1249,7 +1261,7 @@ struct GolfBookingView: View {
 
     private func slotCard(_ slot: TeeTimeSlot) -> some View {
         let isSelected = selectedSlot?.startTime == slot.startTime
-        let category = rateCategory(for: slot.startTime)
+        let category = timeCategory(for: slot.startTime)
 
         return VStack(spacing: 0) {
             Button {
@@ -1278,27 +1290,24 @@ struct GolfBookingView: View {
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(category.color)
 
-                            HStack(spacing: 3) {
-                                Image(systemName: "person.2.fill")
-                                    .font(.system(size: 10))
-                                Text(slot.isAvailable ? "Up to 4 players" : "Booked")
-                                    .font(.system(size: 11))
+                            if slot.isAvailable {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "person.2.fill")
+                                        .font(.system(size: 10))
+                                    Text("Up to 4 players")
+                                        .font(.system(size: 11))
+                                }
+                                .foregroundStyle(Color.club.onSurfaceVariant)
                             }
-                            .foregroundStyle(Color.club.onSurfaceVariant)
                         }
                     }
 
                     Spacer()
 
-                    if slot.isAvailable {
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("$\(category.price)")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle(isSelected ? Color.club.primary : Color.club.foreground)
-                            Text("per player")
-                                .font(.system(size: 10))
-                                .foregroundStyle(Color.club.onSurfaceVariant)
-                        }
+                    if !slot.isAvailable {
+                        Text("Booked")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.red.opacity(0.7))
                     }
                 }
                 .padding(isSelected ? EdgeInsets(top: 14, leading: 12, bottom: 14, trailing: 16) : EdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 16))
@@ -1354,15 +1363,13 @@ struct GolfBookingView: View {
     // MARK: - Confirm Bar
 
     private func confirmBar(slot: TeeTimeSlot) -> some View {
-        let category = rateCategory(for: slot.startTime)
         let allIncludedOrNoRate = pricingResult?.players.allSatisfy { $0.included || $0.noRate } ?? false
         let displayTotal: String = {
             if let pricing = pricingResult {
                 if allIncludedOrNoRate { return "Included" }
                 return String(format: "$%.2f", pricing.total)
             }
-            let fallback = category.price * partySize
-            return "$\(fallback).00"
+            return "—"
         }()
 
         return VStack(spacing: 0) {
@@ -1501,6 +1508,7 @@ struct GolfBookingView: View {
     private func fetchSlots(facilityId: String, date: String) async {
         loadingSlots = true
         slots = []
+        slotsError = nil
         defer { loadingSlots = false }
 
         do {
@@ -1511,6 +1519,7 @@ struct GolfBookingView: View {
             slots = response.slots
         } catch {
             print("Failed to fetch slots:", error)
+            slotsError = error.localizedDescription
         }
     }
 

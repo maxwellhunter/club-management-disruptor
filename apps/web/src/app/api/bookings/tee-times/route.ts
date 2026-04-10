@@ -42,7 +42,7 @@ export async function GET(request: Request) {
       );
     }
 
-    if (!result.isGolfEligible) {
+    if (!result.isGolfEligible && result.member.role !== "admin") {
       return NextResponse.json(
         { error: "Golf booking requires a Golf, Platinum, or Legacy membership" },
         { status: 403 }

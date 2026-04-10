@@ -548,6 +548,34 @@ export type CreateGuestPolicyInput = z.infer<typeof createGuestPolicySchema>;
 export type CreateGuestFeeScheduleInput = z.infer<typeof createGuestFeeScheduleSchema>;
 
 // ============================================
+// Member Charge Posting Schemas
+// ============================================
+
+export const postMemberChargeSchema = z.object({
+  member_id: z.string().uuid(),
+  pos_config_id: z.string().uuid(),
+  items: z.array(z.object({
+    name: z.string().min(1),
+    sku: z.string().optional(),
+    quantity: z.number().int().min(1),
+    unit_price: z.number().min(0),
+    category: z.string().optional(),
+  })).min(1),
+  subtotal: z.number().min(0),
+  tax: z.number().min(0),
+  tip: z.number().min(0).default(0),
+  description: z.string().optional(),
+});
+
+export const consolidateChargesSchema = z.object({
+  member_id: z.string().uuid(),
+  period: z.string().regex(/^\d{4}-\d{2}$/),
+});
+
+export type PostMemberChargeInput = z.infer<typeof postMemberChargeSchema>;
+export type ConsolidateChargesInput = z.infer<typeof consolidateChargesSchema>;
+
+// ============================================
 // Digital Member Cards & NFC Schemas
 // ============================================
 
