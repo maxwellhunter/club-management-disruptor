@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { Link } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import * as AppleAuthentication from "expo-apple-authentication";
 import { useAuth } from "@/lib/auth-context";
 import { Colors } from "@/constants/theme";
 import { haptics } from "@/lib/haptics";
@@ -68,10 +69,14 @@ export default function LoginScreen() {
   const [rememberMe, setRememberMe] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricType, setBiometricType] = useState<BiometricType>("none");
-  const { signIn } = useAuth();
+  const [appleAuthAvailable, setAppleAuthAvailable] = useState(false);
+  const { signIn, signInWithApple } = useAuth();
 
   useEffect(() => {
     checkBiometrics();
+    if (Platform.OS === "ios") {
+      AppleAuthentication.isAvailableAsync().then(setAppleAuthAvailable);
+    }
   }, []);
 
   async function checkBiometrics() {
@@ -134,6 +139,35 @@ export default function LoginScreen() {
       haptics.success();
     }
     setLoading(false);
+  }
+
+  async function handleAppleSignIn() {
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (credential.identityToken) {
+        setLoading(true);
+        haptics.medium();
+        const { error } = await signInWithApple(credential.identityToken);
+        if (error) {
+          haptics.error();
+          Alert.alert("Error", error.message);
+        } else {
+          haptics.success();
+        }
+        setLoading(false);
+      }
+    } catch (e: unknown) {
+      const err = e as { code?: string };
+      if (err.code !== "ERR_REQUEST_CANCELED") {
+        Alert.alert("Error", "Apple Sign-In failed. Please try again.");
+      }
+    }
   }
 
   function handleDevSelect(account: (typeof DEV_ACCOUNTS)[number]) {
@@ -330,6 +364,17 @@ export default function LoginScreen() {
                 : "Fast Sign-in with Biometrics"}
             </Text>
           </TouchableOpacity>
+
+          {/* Apple Sign-In Button */}
+          {appleAuthAvailable && (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              cornerRadius={16}
+              style={styles.appleButton}
+              onPress={handleAppleSignIn}
+            />
+          )}
         </View>
 
         {/* Footer Links */}
@@ -606,6 +651,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     color: Colors.light.foreground,
+  },
+
+  // Apple Sign-In
+  appleButton: {
+    height: 50,
+    width: "100%",
   },
 
   // Footer links
