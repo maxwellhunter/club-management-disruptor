@@ -1,12 +1,13 @@
 import { Stack, useRouter, useSegments } from "expo-router";
-import { useEffect } from "react";
-import { View } from "react-native";
+import { useEffect, useRef } from "react";
+import { AppState, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { Colors } from "@/constants/theme";
 import { setupNotificationDeepLinking, clearBadge } from "@/lib/notifications";
 import { setupDeepLinking } from "@/lib/deep-linking";
 import { OfflineBanner } from "@/components/offline-banner";
+import { checkClipboardForInvite } from "@/lib/clipboard-detection";
 
 function RootLayoutNav() {
   const { user, loading } = useAuth();
@@ -37,6 +38,22 @@ function RootLayoutNav() {
     const cleanup = setupDeepLinking();
     return cleanup;
   }, []);
+
+  // Check clipboard for invite links on app launch and foreground resume
+  const clipboardChecked = useRef(false);
+  useEffect(() => {
+    if (user && !clipboardChecked.current) {
+      clipboardChecked.current = true;
+      checkClipboardForInvite();
+    }
+
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active" && user) {
+        checkClipboardForInvite();
+      }
+    });
+    return () => sub.remove();
+  }, [user]);
 
   return (
     <View style={{ flex: 1 }}>

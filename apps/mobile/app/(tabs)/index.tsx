@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Pressable,
   Image,
   Platform,
   RefreshControl,
@@ -18,6 +19,8 @@ import { getCurrentLocation, formatDistance, getDistanceMiles, type UserLocation
 import { useOnForeground } from "@/lib/app-state";
 import { indexForSpotlight, SpotlightHelpers } from "@/lib/spotlight";
 import { getBadgeCount } from "@/lib/notifications";
+import { showContextMenu } from "@/lib/context-menu";
+import { shareEvent } from "@/lib/sharing";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -432,13 +435,33 @@ export default function HomeScreen() {
         <Text style={styles.sectionTitle}>Club News & Events</Text>
         {events.length > 0 ? (
           events.map((event, index) => (
-            <TouchableOpacity
+            <Pressable
               key={event.id}
               style={[
                 index === 0 ? styles.heroEventCard : styles.eventCard,
               ]}
-              activeOpacity={0.7}
               onPress={() => router.push(`/event/${event.id}`)}
+              onLongPress={() => {
+                showContextMenu(event.title, [
+                  {
+                    label: "View Details",
+                    onPress: () => router.push(`/event/${event.id}`),
+                  },
+                  {
+                    label: "Share Event",
+                    onPress: () =>
+                      shareEvent({
+                        title: event.title,
+                        date: new Date().toISOString(),
+                        description: event.description,
+                      }),
+                  },
+                ]);
+              }}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={`${event.title}, ${event.category}`}
+              accessibilityHint="Tap to view details, long press for options"
             >
               {index === 0 && event.image_url ? (
                 <Image
@@ -477,7 +500,7 @@ export default function HomeScreen() {
                   </View>
                 )}
               </View>
-            </TouchableOpacity>
+            </Pressable>
           ))
         ) : (
           <View style={styles.emptyEventsCard}>
