@@ -33,24 +33,7 @@ struct Member: Codable, Identifiable, Sendable {
         return "\(f)\(l)"
     }
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case clubId = "club_id"
-        case firstName = "first_name"
-        case lastName = "last_name"
-        case email, phone, role, status
-        case memberNumber = "member_number"
-        case membershipTierId = "membership_tier_id"
-        case familyId = "family_id"
-        case familyRole = "family_role"
-        case joinDate = "join_date"
-        case avatarUrl = "avatar_url"
-        case pushToken = "push_token"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
-        case tierName = "tier_name"
-        case tierLevel = "tier_level"
-    }
+    // No CodingKeys needed — APIClient uses .convertFromSnakeCase / .convertToSnakeCase
 }
 
 enum MemberRole: String, Codable, Sendable {
@@ -76,18 +59,7 @@ struct Booking: Codable, Identifiable, Sendable {
     let notes: String?
     let facilityName: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case memberId = "member_id"
-        case facilityId = "facility_id"
-        case slotId = "slot_id"
-        case date
-        case startTime = "start_time"
-        case endTime = "end_time"
-        case partySize = "party_size"
-        case status, notes
-        case facilityName = "facility_name"
-    }
+    // No CodingKeys needed — APIClient uses .convertFromSnakeCase / .convertToSnakeCase
 }
 
 // MARK: - Event
@@ -144,14 +116,7 @@ struct Invoice: Codable, Identifiable, Sendable {
     let paidAt: String?
     let createdAt: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case memberId = "member_id"
-        case amount, status, description
-        case dueDate = "due_date"
-        case paidAt = "paid_at"
-        case createdAt = "created_at"
-    }
+    // No CodingKeys needed — APIClient uses .convertFromSnakeCase / .convertToSnakeCase
 }
 
 // MARK: - Announcement
@@ -165,12 +130,7 @@ struct Announcement: Codable, Identifiable, Sendable {
     let status: String?
     let createdAt: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case clubId = "club_id"
-        case title, content, priority, status
-        case createdAt = "created_at"
-    }
+    // No CodingKeys needed — APIClient uses .convertFromSnakeCase / .convertToSnakeCase
 }
 
 // MARK: - Facility
@@ -183,12 +143,7 @@ struct Facility: Codable, Identifiable, Sendable {
     let description: String?
     let imageUrl: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case clubId = "club_id"
-        case name, type, description
-        case imageUrl = "image_url"
-    }
+    // No CodingKeys needed — APIClient uses .convertFromSnakeCase / .convertToSnakeCase
 }
 
 // Chat models moved to Views/Chat/ChatView.swift

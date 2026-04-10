@@ -66,15 +66,7 @@ struct SearchableMember: Decodable, Identifiable {
     let tierName: String?
     let tierLevel: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case firstName = "first_name"
-        case lastName = "last_name"
-        case email
-        case avatarUrl = "avatar_url"
-        case tierName = "tier_name"
-        case tierLevel = "tier_level"
-    }
+    // No CodingKeys needed — APIClient uses .convertFromSnakeCase
 
     var fullName: String { "\(firstName) \(lastName)" }
     var initials: String { "\(firstName.prefix(1))\(lastName.prefix(1))" }
@@ -100,11 +92,7 @@ struct BookingPlayerPayload: Encodable {
     let memberId: String?
     let guestName: String?
 
-    enum CodingKeys: String, CodingKey {
-        case playerType = "player_type"
-        case memberId = "member_id"
-        case guestName = "guest_name"
-    }
+    // No CodingKeys needed — APIClient uses .convertToSnakeCase for encoding
 }
 
 // MARK: - Rate Lookup Models
@@ -116,13 +104,7 @@ struct RateLookupRequest: Encodable {
     let holes: String
     let players: [BookingPlayerPayload]
 
-    enum CodingKeys: String, CodingKey {
-        case facilityId = "facility_id"
-        case date
-        case startTime = "start_time"
-        case holes
-        case players
-    }
+    // No CodingKeys needed — APIClient uses .convertToSnakeCase for encoding
 }
 
 struct RateLookupResponse: Decodable {
@@ -132,13 +114,7 @@ struct RateLookupResponse: Decodable {
     let players: [PlayerPricing]
     let total: Double
 
-    enum CodingKeys: String, CodingKey {
-        case dayType = "day_type"
-        case timeType = "time_type"
-        case holes
-        case players
-        case total
-    }
+    // No CodingKeys needed — APIClient uses .convertFromSnakeCase for decoding
 }
 
 struct PlayerPricing: Decodable, Identifiable {
@@ -151,17 +127,10 @@ struct PlayerPricing: Decodable, Identifiable {
     let caddieFee: Double
     let totalFee: Double
     let rateName: String?
+    let included: Bool
+    let noRate: Bool
 
-    enum CodingKeys: String, CodingKey {
-        case playerType = "player_type"
-        case displayName = "display_name"
-        case tierName = "tier_name"
-        case greensFee = "greens_fee"
-        case cartFee = "cart_fee"
-        case caddieFee = "caddie_fee"
-        case totalFee = "total_fee"
-        case rateName = "rate_name"
-    }
+    // No CodingKeys needed — APIClient uses .convertFromSnakeCase for decoding
 }
 
 // MARK: - Rate Category
@@ -1386,22 +1355,24 @@ struct GolfBookingView: View {
 
     private func confirmBar(slot: TeeTimeSlot) -> some View {
         let category = rateCategory(for: slot.startTime)
+        let allIncludedOrNoRate = pricingResult?.players.allSatisfy { $0.included || $0.noRate } ?? false
         let displayTotal: String = {
             if let pricing = pricingResult {
-                return pricing.total == 0 ? "Included" : String(format: "$%.2f", pricing.total)
+                if allIncludedOrNoRate { return "Included" }
+                return String(format: "$%.2f", pricing.total)
             }
             let fallback = category.price * partySize
             return "$\(fallback).00"
         }()
 
         return VStack(spacing: 0) {
-            // Per-player breakdown (expandable)
+            // Per-player breakdown
             if let pricing = pricingResult, !pricing.players.isEmpty {
                 VStack(spacing: 0) {
                     ForEach(Array(pricing.players.enumerated()), id: \.offset) { _, p in
                         HStack {
                             Circle()
-                                .fill(p.playerType == "guest" ? Color.orange : Color.blue)
+                                .fill(p.noRate ? Color.gray : p.playerType == "guest" ? Color.orange : Color.blue)
                                 .frame(width: 6, height: 6)
                             Text(p.displayName)
                                 .font(.system(size: 12))
@@ -1412,11 +1383,19 @@ struct GolfBookingView: View {
                                 Text(tier)
                                     .font(.system(size: 10))
                                     .foregroundStyle(Color.club.onSurfaceVariant)
+                            } else if p.playerType == "member" {
+                                Text("No tier")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.orange)
                             }
 
                             Spacer()
 
-                            if p.totalFee == 0 {
+                            if p.noRate {
+                                Text("No rate set")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.orange)
+                            } else if p.included {
                                 Text("Included")
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundStyle(Color.club.primary)
@@ -1428,6 +1407,14 @@ struct GolfBookingView: View {
                         }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 4)
+                    }
+
+                    if pricing.players.contains(where: { $0.noRate }) {
+                        Text("Some players have no rate configured")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.orange)
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 4)
                     }
                 }
                 .padding(.vertical, 8)
@@ -1543,14 +1530,7 @@ struct GolfBookingView: View {
             let partySize: Int
             let players: [BookingPlayerPayload]?
 
-            enum CodingKeys: String, CodingKey {
-                case facilityId = "facility_id"
-                case date
-                case startTime = "start_time"
-                case endTime = "end_time"
-                case partySize = "party_size"
-                case players
-            }
+            // No CodingKeys needed — APIClient uses .convertToSnakeCase for encoding
         }
 
         let playerPayloads: [BookingPlayerPayload]? = addedPlayers.isEmpty ? nil : addedPlayers.map { p in

@@ -36,6 +36,8 @@ interface PlayerPricing {
   caddie_fee: number;
   total_fee: number;
   rate_name: string | null;
+  included: boolean;
+  no_rate: boolean;
 }
 
 interface RateLookupResponse {
@@ -849,20 +851,26 @@ export default function TeeTimeBooking({
                     <div className="flex items-center gap-2 min-w-0">
                       <span
                         className={`inline-block h-2 w-2 rounded-full ${
-                          p.player_type === "guest" ? "bg-amber-400" : "bg-blue-400"
+                          p.player_type === "guest" ? "bg-amber-400" : p.no_rate ? "bg-gray-300" : "bg-blue-400"
                         }`}
                       />
                       <span className="truncate">
                         {p.display_name}
                       </span>
-                      {p.tier_name && (
+                      {p.tier_name ? (
                         <span className="text-xs text-[var(--muted-foreground)]">
-                          ({p.tier_name})
+                          {p.tier_name}
                         </span>
-                      )}
+                      ) : p.player_type === "member" ? (
+                        <span className="text-xs text-amber-500">
+                          No tier
+                        </span>
+                      ) : null}
                     </div>
                     <span className="font-medium tabular-nums whitespace-nowrap ml-3">
-                      {p.total_fee === 0 ? (
+                      {p.no_rate ? (
+                        <span className="text-amber-500 text-xs">No rate set</span>
+                      ) : p.included ? (
                         <span className="text-green-600">Included</span>
                       ) : (
                         `$${p.total_fee.toFixed(2)}`
@@ -874,16 +882,21 @@ export default function TeeTimeBooking({
               <div className="border-t border-[var(--border)] pt-2 flex items-center justify-between">
                 <span className="text-sm font-semibold">Total</span>
                 <span className="text-sm font-bold tabular-nums">
-                  {pricing.total === 0 ? (
-                    <span className="text-green-600">All Included</span>
+                  {pricing.players.every((p) => p.included || p.no_rate) ? (
+                    <span className="text-green-600">Included</span>
                   ) : (
                     `$${pricing.total.toFixed(2)}`
                   )}
                 </span>
               </div>
-              {pricing.players.some((p) => p.greens_fee === 0 && p.cart_fee === 0 && p.player_type === "member") && (
+              {pricing.players.some((p) => p.no_rate) && (
+                <p className="text-xs text-amber-600">
+                  Some players have no rate configured. Contact the pro shop for pricing.
+                </p>
+              )}
+              {pricing.players.some((p) => p.included) && (
                 <p className="text-xs text-[var(--muted-foreground)]">
-                  Greens fees included with membership. Cart fees may apply.
+                  Greens fees included with membership.
                 </p>
               )}
             </div>

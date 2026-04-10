@@ -41,6 +41,10 @@ export interface PlayerRateResult {
   caddie_fee: number;
   total_fee: number;
   rate_name: string | null;
+  /** true when fees are $0 because the rate is genuinely included in membership */
+  included: boolean;
+  /** true when no matching rate was found (member has no tier or tier has no rate) */
+  no_rate: boolean;
 }
 
 /**
@@ -103,6 +107,9 @@ export async function lookupPlayerRates(
     if (player.player_type === "guest") {
       // Find guest rate (is_guest = true)
       const guestRate = allRates.find((r) => r.is_guest);
+      const gf = guestRate?.greens_fee ?? 0;
+      const cf = guestRate?.cart_fee ?? 0;
+      const cdf = guestRate?.caddie_fee ?? 0;
       return {
         player_type: "guest" as const,
         member_id: null,
@@ -110,11 +117,13 @@ export async function lookupPlayerRates(
         display_name: player.guest_name ?? "Guest",
         tier_name: null,
         rate_id: guestRate?.id ?? null,
-        greens_fee: guestRate?.greens_fee ?? 0,
-        cart_fee: guestRate?.cart_fee ?? 0,
-        caddie_fee: guestRate?.caddie_fee ?? 0,
-        total_fee: (guestRate?.greens_fee ?? 0) + (guestRate?.cart_fee ?? 0) + (guestRate?.caddie_fee ?? 0),
+        greens_fee: gf,
+        cart_fee: cf,
+        caddie_fee: cdf,
+        total_fee: gf + cf + cdf,
         rate_name: guestRate?.name ?? null,
+        included: false,
+        no_rate: !guestRate,
       };
     }
 
@@ -129,6 +138,13 @@ export async function lookupPlayerRates(
       (r) => !r.is_guest && r.tier_id === tierId
     );
 
+    // Distinguish "included in membership" ($0 rate exists) from "no rate found"
+    const hasRate = !!memberRate;
+    const gf = memberRate?.greens_fee ?? 0;
+    const cf = memberRate?.cart_fee ?? 0;
+    const cdf = memberRate?.caddie_fee ?? 0;
+    const total = gf + cf + cdf;
+
     return {
       player_type: "member" as const,
       member_id: player.member_id ?? null,
@@ -136,11 +152,13 @@ export async function lookupPlayerRates(
       display_name: firstName && lastName ? `${firstName} ${lastName}` : "Member",
       tier_name: tierName,
       rate_id: memberRate?.id ?? null,
-      greens_fee: memberRate?.greens_fee ?? 0,
-      cart_fee: memberRate?.cart_fee ?? 0,
-      caddie_fee: memberRate?.caddie_fee ?? 0,
-      total_fee: (memberRate?.greens_fee ?? 0) + (memberRate?.cart_fee ?? 0) + (memberRate?.caddie_fee ?? 0),
+      greens_fee: gf,
+      cart_fee: cf,
+      caddie_fee: cdf,
+      total_fee: total,
       rate_name: memberRate?.name ?? null,
+      included: hasRate && total === 0,
+      no_rate: !hasRate,
     };
   });
 }

@@ -42,9 +42,7 @@ struct CourseHole: Decodable, Identifiable {
     let yardageForward: Int?
     let handicapIndex: Int
 
-    private enum CodingKeys: String, CodingKey {
-        case facilityId, holeNumber, par, yardageBack, yardageMiddle, yardageForward, handicapIndex
-    }
+    // No CodingKeys needed — APIClient uses .convertFromSnakeCase
 }
 
 struct RoundDetailResponse: Decodable {

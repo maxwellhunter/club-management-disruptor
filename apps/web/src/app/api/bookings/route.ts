@@ -56,7 +56,8 @@ export async function POST(request: Request) {
 
     // Golf-specific checks
     if (facility.type === "golf") {
-      if (!result.isGolfEligible) {
+      // Admins can always book golf (even without a golf-eligible tier)
+      if (!result.isGolfEligible && result.member.role !== "admin") {
         return NextResponse.json(
           {
             error:

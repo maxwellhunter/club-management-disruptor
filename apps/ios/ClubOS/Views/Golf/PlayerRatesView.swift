@@ -26,23 +26,7 @@ struct PlayerRate: Decodable, Identifiable {
     let facilityName: String
     let tierName: String?
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case clubId = "club_id"
-        case facilityId = "facility_id"
-        case name
-        case tierId = "tier_id"
-        case isGuest = "is_guest"
-        case dayType = "day_type"
-        case timeType = "time_type"
-        case holes
-        case greensFee = "greens_fee"
-        case cartFee = "cart_fee"
-        case caddieFee = "caddie_fee"
-        case isActive = "is_active"
-        case facilityName = "facility_name"
-        case tierName = "tier_name"
-    }
+    // No CodingKeys needed — APIClient uses .convertFromSnakeCase for decoding
 }
 
 struct RateFacility: Decodable, Identifiable, Hashable {
@@ -68,18 +52,7 @@ struct CreateRateBody: Encodable {
     let cartFee: Double
     let caddieFee: Double
 
-    enum CodingKeys: String, CodingKey {
-        case facilityId = "facility_id"
-        case name
-        case tierId = "tier_id"
-        case isGuest = "is_guest"
-        case dayType = "day_type"
-        case timeType = "time_type"
-        case holes
-        case greensFee = "greens_fee"
-        case cartFee = "cart_fee"
-        case caddieFee = "caddie_fee"
-    }
+    // No CodingKeys needed — APIClient uses .convertToSnakeCase for encoding
 }
 
 struct UpdateRateBody: Encodable {
@@ -89,13 +62,7 @@ struct UpdateRateBody: Encodable {
     let caddieFee: Double?
     let isActive: Bool?
 
-    enum CodingKeys: String, CodingKey {
-        case id
-        case greensFee = "greens_fee"
-        case cartFee = "cart_fee"
-        case caddieFee = "caddie_fee"
-        case isActive = "is_active"
-    }
+    // No CodingKeys needed — APIClient uses .convertToSnakeCase for encoding
 }
 
 struct RateActionResponse: Decodable {

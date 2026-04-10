@@ -396,11 +396,7 @@ private struct NotificationPref: Decodable, Identifiable {
     var pushEnabled: Bool
     var emailEnabled: Bool
 
-    enum CodingKeys: String, CodingKey {
-        case id, category
-        case pushEnabled = "push_enabled"
-        case emailEnabled = "email_enabled"
-    }
+    // No CodingKeys needed — APIClient uses .convertFromSnakeCase
 }
 
 private struct NotificationPrefUpsert: Encodable {
@@ -409,10 +405,5 @@ private struct NotificationPrefUpsert: Encodable {
     let pushEnabled: Bool
     let emailEnabled: Bool
 
-    enum CodingKeys: String, CodingKey {
-        case memberId = "member_id"
-        case category
-        case pushEnabled = "push_enabled"
-        case emailEnabled = "email_enabled"
-    }
+    // No CodingKeys needed — APIClient uses .convertToSnakeCase
 }
