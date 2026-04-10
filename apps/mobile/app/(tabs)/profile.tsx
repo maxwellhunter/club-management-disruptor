@@ -267,6 +267,7 @@ export default function ProfileScreen() {
         <RefreshControl
           refreshing={refreshing}
           onRefresh={() => {
+            haptics.light();
             setRefreshing(true);
             fetchBilling();
             fetchInvoices();

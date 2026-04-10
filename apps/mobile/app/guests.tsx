@@ -152,7 +152,7 @@ export default function GuestsScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => { setRefreshing(true); fetchGuests(); }}
+            onRefresh={() => { haptics.light(); setRefreshing(true); fetchGuests(); }}
             tintColor={Colors.light.primary}
           />
         }
