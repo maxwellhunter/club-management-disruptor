@@ -15,6 +15,8 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/lib/auth-context";
+import { shareScorecard } from "@/lib/sharing";
+import { haptics } from "@/lib/haptics";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -382,23 +384,42 @@ export default function ScorecardScreen() {
                   )}
                 </View>
                 {round.total_score != null && (
-                  <View style={{ alignItems: "flex-end" }}>
-                    <Text style={styles.roundScore}>{round.total_score}</Text>
-                    <Text
-                      style={[
-                        styles.roundToPar,
-                        {
-                          color:
-                            (round.score_to_par ?? 0) < 0
-                              ? "#dc2626"
-                              : (round.score_to_par ?? 0) === 0
-                                ? Colors.light.primary
-                                : Colors.light.foreground,
-                        },
-                      ]}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        haptics.light();
+                        shareScorecard({
+                          facilityName: round.facility_name,
+                          date: round.played_at,
+                          score: round.total_score!,
+                          par: round.course_par || 72,
+                          holes: round.holes_played,
+                        });
+                      }}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      {formatScoreToPar(round.score_to_par)}
-                    </Text>
+                      <Ionicons name="share-outline" size={18} color={Colors.light.onSurfaceVariant} />
+                    </TouchableOpacity>
+                    <View style={{ alignItems: "flex-end" }}>
+                      <Text style={styles.roundScore}>{round.total_score}</Text>
+                      <Text
+                        style={[
+                          styles.roundToPar,
+                          {
+                            color:
+                              (round.score_to_par ?? 0) < 0
+                                ? "#dc2626"
+                                : (round.score_to_par ?? 0) === 0
+                                  ? Colors.light.primary
+                                  : Colors.light.foreground,
+                          },
+                        ]}
+                      >
+                        {formatScoreToPar(round.score_to_par)}
+                      </Text>
+                    </View>
                   </View>
                 )}
               </TouchableOpacity>

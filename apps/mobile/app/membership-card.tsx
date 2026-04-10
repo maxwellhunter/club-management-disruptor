@@ -15,6 +15,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth-context";
 import { Colors } from "@/constants/theme";
 import { supabase } from "@/lib/supabase";
+import { trackPositiveAction } from "@/lib/store-review";
+import { copyToClipboard } from "@/lib/sharing";
 
 interface MemberInfo {
   full_name: string;
@@ -159,6 +161,7 @@ export default function MembershipCardScreen() {
       const data = await res.json();
 
       if (res.ok) {
+        trackPositiveAction();
         Alert.alert(
           "Checked In",
           `Welcome, ${data.member_name}! Check-in recorded.`
@@ -288,7 +291,12 @@ export default function MembershipCardScreen() {
             <Text style={styles.qrHint}>
               Present at check-in or POS for member identification
             </Text>
-            <Text style={styles.qrMemberId}>{member?.member_number}</Text>
+            <TouchableOpacity
+              onPress={() => copyToClipboard(member?.member_number || "", "Member number copied")}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.qrMemberId}>{member?.member_number}</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Check-In Button */}
