@@ -19,6 +19,10 @@ module.exports = {
       bundleIdentifier: "com.clubos.app",
       icon: path.resolve(__dirname, "assets/icon.png"),
       usesAppleSignIn: true,
+      associatedDomains: [
+        "applinks:app.clubos.com",
+        "webcredentials:app.clubos.com",
+      ],
       entitlements: {
         "com.apple.developer.nfc.readersession.formats": ["NDEF", "TAG"],
         "com.apple.developer.associated-domains": [
@@ -39,6 +43,32 @@ module.exports = {
           },
         },
         ITSAppUsesNonExemptEncryption: false,
+        UIApplicationShortcutItems: [
+          {
+            UIApplicationShortcutItemType: "com.clubos.app.book-tee-time",
+            UIApplicationShortcutItemTitle: "Book Tee Time",
+            UIApplicationShortcutItemSubtitle: "Reserve your next round",
+            UIApplicationShortcutItemIconType: "UIApplicationShortcutIconTypeCompose",
+          },
+          {
+            UIApplicationShortcutItemType: "com.clubos.app.check-in",
+            UIApplicationShortcutItemTitle: "Check In",
+            UIApplicationShortcutItemSubtitle: "Tap to check in at the club",
+            UIApplicationShortcutItemIconType: "UIApplicationShortcutIconTypeConfirmation",
+          },
+          {
+            UIApplicationShortcutItemType: "com.clubos.app.concierge",
+            UIApplicationShortcutItemTitle: "AI Concierge",
+            UIApplicationShortcutItemSubtitle: "Ask The Lakes anything",
+            UIApplicationShortcutItemIconType: "UIApplicationShortcutIconTypeSearch",
+          },
+          {
+            UIApplicationShortcutItemType: "com.clubos.app.events",
+            UIApplicationShortcutItemTitle: "Events",
+            UIApplicationShortcutItemSubtitle: "Browse upcoming events",
+            UIApplicationShortcutItemIconType: "UIApplicationShortcutIconTypeDate",
+          },
+        ],
         NSFaceIDUsageDescription:
           "Use Face ID to quickly sign in to your ClubOS account.",
         NSCalendarsFullAccessUsageDescription:
@@ -51,6 +81,7 @@ module.exports = {
           "Choose a photo from your library for your member profile.",
         NSLocationWhenInUseUsageDescription:
           "See nearby club facilities and get directions.",
+        UIBackgroundModes: ["fetch", "remote-notification"],
       },
     },
     android: {
