@@ -1,52 +1,77 @@
-import { ActionSheetIOS, Platform, Alert } from "react-native";
+import { ActionSheetIOS, Alert, Platform, Share } from "react-native";
 import { haptics } from "./haptics";
 
-export interface ContextMenuItem {
+interface MenuAction {
   label: string;
   icon?: string;
   destructive?: boolean;
   onPress: () => void;
 }
 
-/**
- * Show a native iOS action sheet (context menu) or Android alert fallback.
- * Trigger on long-press for a native-feeling interaction.
- */
 export function showContextMenu(
   title: string,
-  items: ContextMenuItem[]
+  actions: MenuAction[],
 ): void {
   haptics.medium();
 
   if (Platform.OS === "ios") {
-    const labels = items.map((i) => i.label);
-    labels.push("Cancel");
-
-    const destructiveIndex = items.findIndex((i) => i.destructive);
-    const cancelIndex = labels.length - 1;
+    const labels = [...actions.map((a) => a.label), "Cancel"];
+    const destructiveIndex = actions.findIndex((a) => a.destructive);
 
     ActionSheetIOS.showActionSheetWithOptions(
       {
-        title,
         options: labels,
+        cancelButtonIndex: labels.length - 1,
         destructiveButtonIndex: destructiveIndex >= 0 ? destructiveIndex : undefined,
-        cancelButtonIndex: cancelIndex,
+        title,
       },
       (index) => {
-        if (index < items.length) {
-          items[index].onPress();
+        if (index < actions.length) {
+          actions[index].onPress();
         }
-      }
+      },
     );
   } else {
-    // Android fallback using Alert
-    const buttons = items.map((item) => ({
-      text: item.label,
-      style: (item.destructive ? "destructive" : "default") as "destructive" | "default",
-      onPress: item.onPress,
-    }));
-    buttons.push({ text: "Cancel", style: "default" as "destructive" | "default", onPress: () => {} });
-
-    Alert.alert(title, undefined, buttons);
+    Alert.alert(
+      title,
+      undefined,
+      [
+        ...actions.map((a) => ({
+          text: a.label,
+          onPress: a.onPress,
+          style: (a.destructive ? "destructive" : "default") as "destructive" | "default",
+        })),
+        { text: "Cancel", style: "cancel" as const },
+      ],
+    );
   }
+}
+
+export function showBookingContextMenu(options: {
+  bookingId: string;
+  facilityName: string;
+  date: string;
+  time: string;
+  onAddToCalendar: () => void;
+  onShare: () => void;
+  onCancel: () => void;
+}): void {
+  showContextMenu(`${options.facilityName} — ${options.date}`, [
+    { label: "Add to Calendar", onPress: options.onAddToCalendar },
+    { label: "Share Tee Time", onPress: options.onShare },
+    { label: "Cancel Booking", destructive: true, onPress: options.onCancel },
+  ]);
+}
+
+export function showEventContextMenu(options: {
+  title: string;
+  onAddToCalendar: () => void;
+  onShare: () => void;
+  onViewDetails: () => void;
+}): void {
+  showContextMenu(options.title, [
+    { label: "Add to Calendar", onPress: options.onAddToCalendar },
+    { label: "Share Event", onPress: options.onShare },
+    { label: "View Details", onPress: options.onViewDetails },
+  ]);
 }

@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Pressable,
   ActivityIndicator,
   Alert,
   RefreshControl,
@@ -20,8 +19,7 @@ import { haptics } from "@/lib/haptics";
 import { addTeeTimeToCalendar } from "@/lib/calendar";
 import { trackPositiveAction } from "@/lib/store-review";
 import { shareTeeTime } from "@/lib/sharing";
-import { showContextMenu } from "@/lib/context-menu";
-import { announceForAccessibility } from "@/lib/accessibility";
+import { showBookingContextMenu } from "@/lib/context-menu";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -1283,6 +1281,7 @@ export default function BookingsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => {
+              haptics.light();
               setRefreshing(true);
               fetchBookings();
             }}
@@ -1348,54 +1347,34 @@ export default function BookingsScreen() {
 
             <View style={s.bookingsList}>
               {upcomingBookings.map((b) => (
-                <Pressable
+                <TouchableOpacity
                   key={b.id}
                   style={s.bookingCard}
-                  onLongPress={() => {
-                    showContextMenu(
-                      `${b.facility_name} — ${formatDate(b.date)}`,
-                      [
-                        {
-                          label: "Share Tee Time",
-                          onPress: () =>
-                            shareTeeTime({
-                              facilityName: b.facility_name,
-                              date: b.date,
-                              time: b.start_time,
-                              partySize: b.party_size,
-                            }),
-                        },
-                        {
-                          label: "Add to Calendar",
-                          onPress: async () => {
-                            const added = await addTeeTimeToCalendar({
-                              facilityName: b.facility_name,
-                              date: b.date,
-                              startTime: b.start_time,
-                              partySize: b.party_size,
-                            });
-                            if (added) {
-                              announceForAccessibility("Tee time added to calendar");
-                              Alert.alert("Added", "Tee time added to your calendar.");
-                            }
-                          },
-                        },
-                        {
-                          label: "Modify Booking",
-                          onPress: () => startEdit(b),
-                        },
-                        {
-                          label: "Cancel Booking",
-                          destructive: true,
-                          onPress: () => handleCancel(b.id),
-                        },
-                      ]
-                    );
-                  }}
-                  accessible={true}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${b.facility_name}, ${formatDate(b.date)} at ${formatTime(b.start_time)}, ${b.party_size} players`}
-                  accessibilityHint="Long press for more options"
+                  activeOpacity={0.9}
+                  onLongPress={() =>
+                    showBookingContextMenu({
+                      bookingId: b.id,
+                      facilityName: b.facility_name,
+                      date: formatDate(b.date),
+                      time: formatTime(b.start_time),
+                      onAddToCalendar: () =>
+                        addTeeTimeToCalendar({
+                          facilityName: b.facility_name,
+                          date: b.date,
+                          startTime: b.start_time,
+                          partySize: b.party_size,
+                          holes: b.holes,
+                        }),
+                      onShare: () =>
+                        shareTeeTime({
+                          facilityName: b.facility_name,
+                          date: b.date,
+                          time: b.start_time,
+                          partySize: b.party_size,
+                        }),
+                      onCancel: () => handleCancel(b.id),
+                    })
+                  }
                 >
                   {/* Course Image */}
                   <Image
@@ -1465,7 +1444,7 @@ export default function BookingsScreen() {
                       </TouchableOpacity>
                     </View>
                   </View>
-                </Pressable>
+                </TouchableOpacity>
               ))}
             </View>
 

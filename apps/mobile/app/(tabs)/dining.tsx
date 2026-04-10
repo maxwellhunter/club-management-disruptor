@@ -18,6 +18,7 @@ import { Colors } from "@/constants/theme";
 import { useAuth } from "@/lib/auth-context";
 import { haptics } from "@/lib/haptics";
 import { addDiningToCalendar } from "@/lib/calendar";
+import { trackPositiveAction } from "@/lib/store-review";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -304,6 +305,7 @@ export default function DiningScreen() {
 
       if (res.ok) {
         haptics.success();
+        trackPositiveAction();
         Alert.alert("Reserved!", "Your dining reservation has been confirmed.", [
           {
             text: "Add to Calendar",
@@ -355,6 +357,7 @@ export default function DiningScreen() {
 
       if (res.ok) {
         haptics.success();
+        trackPositiveAction();
         Alert.alert(
           "Order Placed!",
           "Your order has been submitted and charged to your member account."
@@ -1412,6 +1415,7 @@ export default function DiningScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => {
+              haptics.light();
               setRefreshing(true);
               fetchHomeData();
             }}

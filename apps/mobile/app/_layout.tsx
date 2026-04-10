@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { AppState, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
-import { Colors } from "@/constants/theme";
+import { ThemeProvider, useTheme } from "@/lib/theme-context";
 import { setupNotificationDeepLinking, clearBadge } from "@/lib/notifications";
 import { setupDeepLinking } from "@/lib/deep-linking";
 import { OfflineBanner } from "@/components/offline-banner";
@@ -55,9 +55,11 @@ function RootLayoutNav() {
     return () => sub.remove();
   }, [user]);
 
+  const { colors, isDark } = useTheme();
+
   return (
     <View style={{ flex: 1 }}>
-      <StatusBar style="auto" />
+      <StatusBar style={isDark ? "light" : "dark"} />
       <OfflineBanner />
       <Stack>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -67,7 +69,7 @@ function RootLayoutNav() {
           options={{
             headerTitle: "Event Details",
             headerBackTitle: "Back",
-            headerTintColor: Colors.light.primary,
+            headerTintColor: colors.primary,
           }}
         />
         <Stack.Screen
@@ -75,7 +77,7 @@ function RootLayoutNav() {
           options={{
             headerTitle: "Announcements",
             headerBackTitle: "Back",
-            headerTintColor: Colors.light.primary,
+            headerTintColor: colors.primary,
           }}
         />
         <Stack.Screen
@@ -108,6 +110,16 @@ function RootLayoutNav() {
             headerShown: false,
           }}
         />
+        <Stack.Screen
+          name="settings/appearance"
+          options={{
+            headerShown: true,
+            headerTitle: "Appearance",
+            headerBackTitle: "Back",
+            headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.background },
+          }}
+        />
       </Stack>
     </View>
   );
@@ -115,8 +127,10 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <RootLayoutNav />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <RootLayoutNav />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
