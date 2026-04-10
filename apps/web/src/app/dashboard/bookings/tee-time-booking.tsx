@@ -437,7 +437,7 @@ export default function TeeTimeBooking({
   }
 
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--background)] overflow-hidden">
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--background)]">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-3">
         <div className="flex items-center gap-2">
