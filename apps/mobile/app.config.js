@@ -21,6 +21,10 @@ module.exports = {
       usesAppleSignIn: true,
       entitlements: {
         "com.apple.developer.nfc.readersession.formats": ["NDEF", "TAG"],
+        "com.apple.developer.associated-domains": [
+          "applinks:app.clubos.com",
+          "activitycontinuation:app.clubos.com",
+        ],
       },
       infoPlist: {
         NFCReaderUsageDescription:

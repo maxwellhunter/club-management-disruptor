@@ -15,6 +15,8 @@ import { useAuth } from "@/lib/auth-context";
 import { Colors } from "@/constants/theme";
 import { supabase } from "@/lib/supabase";
 import { getCurrentLocation, formatDistance, getDistanceMiles, type UserLocation } from "@/lib/location";
+import { useOnForeground } from "@/lib/app-state";
+import { indexForSpotlight, SpotlightHelpers } from "@/lib/spotlight";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -172,6 +174,29 @@ export default function HomeScreen() {
     });
   }, [fetchDashboardData]);
 
+  // Refresh dashboard data when returning from background
+  useOnForeground(fetchDashboardData);
+
+  // Index events for iOS Spotlight search
+  useEffect(() => {
+    if (events.length > 0) {
+      const spotlightItems = events.map((e) =>
+        SpotlightHelpers.event(e.id, e.title, e.description)
+      );
+      indexForSpotlight(spotlightItems);
+    }
+  }, [events]);
+
+  // Index announcements for iOS Spotlight search
+  useEffect(() => {
+    if (announcements.length > 0) {
+      const spotlightItems = announcements.map((a) =>
+        SpotlightHelpers.announcement(a.id, a.title, a.content)
+      );
+      indexForSpotlight(spotlightItems);
+    }
+  }, [announcements]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchDashboardData();
@@ -197,7 +222,13 @@ export default function HomeScreen() {
               color={Colors.light.primaryForeground}
             />
           </View>
-          <TouchableOpacity activeOpacity={0.7}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Notifications"
+            accessibilityHint="View your notifications"
+          >
             <Ionicons
               name="notifications-outline"
               size={22}
@@ -473,6 +504,10 @@ function ServiceButton({
       style={styles.serviceButton}
       onPress={onPress}
       activeOpacity={0.7}
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={`Navigate to ${label}`}
     >
       <View style={styles.serviceIconWrap}>
         <Ionicons name={icon} size={22} color={Colors.light.primary} />
