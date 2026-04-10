@@ -1280,6 +1280,7 @@ export default function BookingsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => {
+              haptics.light();
               setRefreshing(true);
               fetchBookings();
             }}

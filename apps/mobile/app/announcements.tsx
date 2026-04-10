@@ -11,6 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth-context";
 import { Colors } from "@/constants/theme";
+import { haptics } from "@/lib/haptics";
 
 const SERIF_FONT = Platform.select({
   ios: "Georgia",
@@ -118,6 +119,7 @@ export default function AnnouncementsScreen() {
   }, [fetchAnnouncements]);
 
   const onRefresh = useCallback(async () => {
+    haptics.light();
     setRefreshing(true);
     await fetchAnnouncements();
     setRefreshing(false);

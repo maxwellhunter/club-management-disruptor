@@ -21,6 +21,7 @@ import { EventFormModal } from "@/components/event-form-modal";
 import { AttendeesModal } from "@/components/attendees-modal";
 import { haptics } from "@/lib/haptics";
 import { addEventToCalendar } from "@/lib/calendar";
+import { trackPositiveAction } from "@/lib/store-review";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -158,6 +159,7 @@ export default function EventsScreen() {
       if (res.ok) {
         if (newStatus === "attending") {
           haptics.success();
+          trackPositiveAction();
           const event = events.find((e) => e.id === eventId);
           if (event) {
             Alert.alert("RSVP Confirmed!", `You're attending ${event.title}.`, [
@@ -348,6 +350,7 @@ export default function EventsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => {
+              haptics.light();
               setRefreshing(true);
               fetchEvents();
             }}

@@ -302,6 +302,7 @@ export default function ScorecardScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => {
+                haptics.light();
                 setRefreshing(true);
                 fetchRounds();
               }}
