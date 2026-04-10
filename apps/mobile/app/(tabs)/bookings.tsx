@@ -15,6 +15,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/lib/auth-context";
+import { haptics } from "@/lib/haptics";
+import { addTeeTimeToCalendar } from "@/lib/calendar";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -275,15 +277,31 @@ export default function BookingsScreen() {
       });
 
       if (res.ok) {
-        Alert.alert("Booked!", "Your tee time has been confirmed.");
+        haptics.success();
+        Alert.alert("Booked!", "Your tee time has been confirmed.", [
+          {
+            text: "Add to Calendar",
+            onPress: () =>
+              addTeeTimeToCalendar({
+                facilityName: selectedFacility.name,
+                date: selectedDate,
+                startTime: selectedTime.start_time,
+                partySize,
+                holes: 18,
+              }),
+          },
+          { text: "Done" },
+        ]);
         resetBookingFlow();
         setView("list");
         fetchBookings();
       } else {
+        haptics.error();
         const data = await res.json();
         Alert.alert("Error", data.error || "Failed to book tee time");
       }
     } catch {
+      haptics.error();
       Alert.alert("Error", "Failed to book tee time");
     } finally {
       setBooking(false);
