@@ -18,7 +18,9 @@ import { getCurrentLocation, formatDistance, getDistanceMiles, type UserLocation
 import { useOnForeground } from "@/lib/app-state";
 import { indexForSpotlight, SpotlightHelpers } from "@/lib/spotlight";
 import { getBadgeCount } from "@/lib/notifications";
-import { addTeeTimeToCalendar, addDiningToCalendar } from "@/lib/calendar";
+import { showEventContextMenu } from "@/lib/context-menu";
+import { shareEvent } from "@/lib/sharing";
+import { addEventToCalendar, addTeeTimeToCalendar, addDiningToCalendar } from "@/lib/calendar";
 import { haptics } from "@/lib/haptics";
 
 const API_URL =
@@ -59,6 +61,8 @@ type ClubEvent = {
   category: string;
   description: string;
   image_url?: string;
+  start_datetime?: string;
+  location?: string;
 };
 
 function formatAnnouncementTime(dateString: string): string {
@@ -128,7 +132,7 @@ export default function HomeScreen() {
       // Fetch upcoming events
       const { data: eventData } = await supabase
         .from("events")
-        .select("id, title, description, image_url, event_type")
+        .select("id, title, description, image_url, event_type, start_datetime, location")
         .gte("start_datetime", new Date().toISOString())
         .eq("status", "published")
         .order("start_datetime", { ascending: true })
@@ -141,6 +145,8 @@ export default function HomeScreen() {
           category: formatCategory(e.event_type),
           description: e.description?.slice(0, 120) || "",
           image_url: e.image_url,
+          start_datetime: e.start_datetime,
+          location: e.location,
         }))
       );
 
@@ -484,6 +490,26 @@ export default function HomeScreen() {
               ]}
               activeOpacity={0.7}
               onPress={() => router.push(`/event/${event.id}`)}
+              onLongPress={() =>
+                showEventContextMenu({
+                  title: event.title,
+                  onAddToCalendar: () =>
+                    addEventToCalendar({
+                      title: event.title,
+                      startDate: event.start_datetime || new Date().toISOString(),
+                      location: event.location,
+                      description: event.description,
+                    }),
+                  onShare: () =>
+                    shareEvent({
+                      title: event.title,
+                      date: event.start_datetime || new Date().toISOString(),
+                      location: event.location,
+                      description: event.description,
+                    }),
+                  onViewDetails: () => router.push(`/event/${event.id}`),
+                })
+              }
             >
               {index === 0 && event.image_url ? (
                 <Image
