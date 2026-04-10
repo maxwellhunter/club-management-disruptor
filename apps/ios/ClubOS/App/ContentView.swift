@@ -1,0 +1,137 @@
+import SwiftUI
+
+// MARK: - Main Tab Container (Authenticated)
+
+struct ContentView: View {
+    @State private var selectedTab = 0 // Home
+
+    var body: some View {
+        TabView(selection: $selectedTab) {
+            // Tab 0: Home (profile accessible via avatar in nav bar)
+            NavigationStack {
+                HomeView()
+            }
+            .tabItem {
+                Label("Home", systemImage: "house.fill")
+            }
+            .tag(0)
+
+            // Tab 1: Golf
+            NavigationStack {
+                GolfBookingView()
+            }
+            .tabItem {
+                Label("Golf", systemImage: "figure.golf")
+            }
+            .tag(1)
+
+            // Tab 2: Dining
+            NavigationStack {
+                DiningView()
+            }
+            .tabItem {
+                Label("Dining", systemImage: "fork.knife")
+            }
+            .tag(2)
+
+            // Tab 3: Events
+            NavigationStack {
+                EventsView()
+            }
+            .tabItem {
+                Label("Events", systemImage: "calendar")
+            }
+            .tag(3)
+
+            // Tab 4: AI Chat
+            NavigationStack {
+                ChatView()
+            }
+            .tabItem {
+                Label("Chat", systemImage: "sparkles")
+            }
+            .tag(4)
+        }
+        .tint(Color.club.primary)
+    }
+}
+
+// MARK: - Placeholder Views (Phase 2+)
+
+struct ChatPlaceholderView: View {
+    var body: some View {
+        PlaceholderScreen(
+            icon: "message.fill",
+            title: "AI Concierge",
+            subtitle: "Coming in Phase 4"
+        )
+    }
+}
+
+struct GolfPlaceholderView: View {
+    var body: some View {
+        PlaceholderScreen(
+            icon: "figure.golf",
+            title: "Golf Bookings",
+            subtitle: "Coming in Phase 3"
+        )
+    }
+}
+
+struct DiningPlaceholderView: View {
+    var body: some View {
+        PlaceholderScreen(
+            icon: "fork.knife",
+            title: "Dining",
+            subtitle: "Coming in Phase 3"
+        )
+    }
+}
+
+struct EventsPlaceholderView: View {
+    var body: some View {
+        PlaceholderScreen(
+            icon: "calendar",
+            title: "Events",
+            subtitle: "Coming in Phase 3"
+        )
+    }
+}
+
+struct ProfilePlaceholderView: View {
+    var body: some View {
+        PlaceholderScreen(
+            icon: "person.fill",
+            title: "Profile",
+            subtitle: "Coming in Phase 2"
+        )
+    }
+}
+
+// MARK: - Reusable Placeholder
+
+struct PlaceholderScreen: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 48))
+                .foregroundStyle(Color.club.primary)
+                .frame(width: 80, height: 80)
+                .background(Color.club.accent, in: RoundedRectangle(cornerRadius: 20))
+
+            Text(title)
+                .font(.clubTitle)
+                .foregroundStyle(Color.club.foreground)
+
+            Text(subtitle)
+                .font(.clubCaption)
+                .foregroundStyle(Color.club.onSurfaceVariant)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.club.background)
+    }
+}

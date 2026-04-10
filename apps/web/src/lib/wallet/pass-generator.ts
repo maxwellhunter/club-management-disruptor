@@ -201,7 +201,8 @@ export function buildGooglePassObject(
 export async function provisionPass(
   member: MemberPassData,
   platform: "apple" | "google",
-  template: CardTemplateData
+  template: CardTemplateData,
+  appUrl?: string
 ): Promise<{
   serial: string;
   barcodePayload: string;
@@ -211,13 +212,13 @@ export async function provisionPass(
   const serial = generatePassSerial();
   const barcodePayload = generateBarcodePayload(member.clubId, member.memberId);
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const baseUrl = appUrl || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
   if (platform === "apple") {
     const passData = buildApplePassJson(member, template, serial, barcodePayload);
     // In production: sign the pass, upload to CDN, return download URL
     // For now: return a URL to our API that would serve the .pkpass file
-    const passUrl = `${appUrl}/api/wallet/passes/${serial}/download?platform=apple`;
+    const passUrl = `${baseUrl}/api/wallet/passes/${serial}/download?platform=apple`;
     return { serial, barcodePayload, passData, passUrl };
   } else {
     const passData = buildGooglePassObject(member, template, serial, barcodePayload);

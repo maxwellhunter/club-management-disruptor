@@ -201,5 +201,15 @@ pnpm test -- --watch  # Watch mode
 - 10 GL accounts, 4 GL mappings
 - 8 menu categories, 57 menu items (Main Dining + Grill Room)
 
+## Workflow: "Commit and Push"
+When the user says **"commit and push"** (or similar), always perform ALL of the following steps in order:
+1. **Run tests** — `pnpm test` must pass before committing
+2. **Commit** — stage relevant files and commit with a descriptive message
+3. **Push** — `git push origin main` (or current branch)
+4. **Deploy to Vercel** — run `vercel --prod` from the repo root to trigger a production deployment (don't wait for build to finish, just confirm it was triggered)
+5. **Migrations reminder** — if any new or modified files exist in `packages/supabase/migrations/`, list them and remind the user to run the SQL manually in the Supabase dashboard SQL Editor (`https://supabase.com/dashboard/project/iicwnlruopqhrzkgjsmu/sql/new`).
+
+**Important**: Always confirm each step's result before moving to the next. If any step fails, stop and report the error rather than continuing.
+
 ## GitHub
 Repo: https://github.com/maxwellhunter/club-management-disruptor

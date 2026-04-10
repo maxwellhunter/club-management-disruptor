@@ -26,7 +26,7 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from("facilities")
-      .select("id, name, type, description, capacity, is_active, tables")
+      .select("id, name, type, description, capacity, is_active")
       .eq("club_id", result.member.club_id)
       .eq("is_active", true)
       .order("name", { ascending: true });

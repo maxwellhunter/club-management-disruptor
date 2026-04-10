@@ -133,6 +133,10 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    // Derive app URL from request if NEXT_PUBLIC_APP_URL isn't set
+    const requestUrl = new URL(request.url);
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || `${requestUrl.protocol}//${requestUrl.host}`;
+
     const supabase = await createApiClient(request);
     const {
       data: { user },
@@ -168,11 +172,19 @@ export async function POST(request: Request) {
       .eq("platform", platform)
       .single();
 
+    // If an active pass already exists, return it instead of blocking.
+    // Apple/Google handle dedup natively — the app should always allow "Add to Wallet".
     if (existing && existing.status === "active") {
-      return NextResponse.json(
-        { error: `You already have an active ${platform === "apple" ? "Apple Wallet" : "Google Wallet"} pass` },
-        { status: 409 }
-      );
+      const barcodePayload = generateBarcodePayload(clubId, caller.member.id);
+      const passUrl = platform === "apple"
+        ? `${appUrl}/api/wallet/passes/${existing.id}/download?platform=apple`
+        : `https://pay.google.com/gp/v/save/${existing.id}`;
+      return NextResponse.json({
+        pass_url: passUrl,
+        platform,
+        serial: existing.id,
+        barcode_payload: barcodePayload,
+      });
     }
 
     // Get club info
@@ -216,7 +228,7 @@ export async function POST(request: Request) {
       email: caller.member.email,
     };
 
-    const result = await provisionPass(memberData, platform, templateData);
+    const result = await provisionPass(memberData, platform, templateData, appUrl);
 
     // Upsert pass record
     if (existing) {

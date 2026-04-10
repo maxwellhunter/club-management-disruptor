@@ -7,8 +7,10 @@ import TeeTimeBooking from "./tee-time-booking";
 import MyBookings from "./my-bookings";
 import ScheduleAdmin from "./schedule-admin";
 import GolfRatesAdmin from "./golf-rates-admin";
+import PlayerRatesAdmin from "./player-rates-admin";
+import CourseSetupAdmin from "./course-setup-admin";
 
-type BookingsTab = "bookings" | "schedule" | "pricing";
+type BookingsTab = "bookings" | "schedule" | "pricing" | "player-rates" | "course";
 
 export default function BookingsPage() {
   const [showBooking, setShowBooking] = useState(false);
@@ -91,6 +93,8 @@ export default function BookingsPage() {
               { key: "bookings", label: "Bookings" },
               { key: "schedule", label: "Schedule Config" },
               { key: "pricing", label: "Golf Pricing" },
+              { key: "player-rates", label: "Player Rates" },
+              { key: "course", label: "Course Setup" },
             ] as const
           ).map((t) => (
             <button
@@ -112,6 +116,10 @@ export default function BookingsPage() {
         <ScheduleAdmin />
       ) : tab === "pricing" && isAdmin ? (
         <GolfRatesAdmin />
+      ) : tab === "player-rates" && isAdmin ? (
+        <PlayerRatesAdmin />
+      ) : tab === "course" && isAdmin ? (
+        <CourseSetupAdmin />
       ) : (
         <>
           {/* Non-eligible upgrade prompt */}

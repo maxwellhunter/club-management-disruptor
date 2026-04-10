@@ -460,6 +460,63 @@ export interface GolfRatesResponse {
   role: MemberRole;
 }
 
+// Golf Player Rates (per-tier pricing)
+export type BookingPlayerType = "member" | "guest";
+
+export interface GolfPlayerRate {
+  id: string;
+  club_id: string;
+  facility_id: string;
+  name: string;
+  tier_id: string | null;
+  is_guest: boolean;
+  day_type: GolfDayType;
+  time_type: GolfTimeType;
+  holes: GolfHoles;
+  greens_fee: number;
+  cart_fee: number;
+  caddie_fee: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GolfPlayerRateWithDetails extends GolfPlayerRate {
+  facility_name: string;
+  tier_name: string | null;
+}
+
+export interface GolfPlayerRatesResponse {
+  rates: GolfPlayerRateWithDetails[];
+  facilities: { id: string; name: string }[];
+  tiers: { id: string; name: string; level: string }[];
+  role: MemberRole;
+}
+
+export interface BookingPlayer {
+  id: string;
+  booking_id: string;
+  player_type: BookingPlayerType;
+  member_id: string | null;
+  guest_id: string | null;
+  guest_name: string | null;
+  greens_fee: number;
+  cart_fee: number;
+  caddie_fee: number;
+  total_fee: number;
+  rate_id: string | null;
+  fee_invoiced: boolean;
+  invoice_id: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface BookingPlayerWithNames extends BookingPlayer {
+  member_first_name: string | null;
+  member_last_name: string | null;
+  tier_name: string | null;
+}
+
 // Golf Scorecard types
 export type TeeSet = "back" | "middle" | "forward";
 export type RoundStatus = "in_progress" | "completed" | "verified" | "cancelled";

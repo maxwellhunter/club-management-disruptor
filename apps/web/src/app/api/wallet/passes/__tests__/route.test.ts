@@ -81,7 +81,7 @@ describe("GET /api/wallet/passes", () => {
 describe("POST /api/wallet/passes", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it("returns 409 when pass already exists", async () => {
+  it("returns existing pass when one already exists", async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: "u-2" } } });
     mockGetMemberWithTier.mockResolvedValue({ member });
     mockAdminFrom.mockReturnValue(createChainMock({ data: { id: "p-1", status: "active" } }));
@@ -89,7 +89,9 @@ describe("POST /api/wallet/passes", () => {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ platform: "apple" }),
     }));
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.serial).toBe("p-1");
   });
 
   it("generates new pass", async () => {

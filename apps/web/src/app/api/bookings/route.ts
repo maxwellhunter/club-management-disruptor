@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createApiClient } from "@/lib/supabase/api";
 import { getMemberWithTier } from "@/lib/golf-eligibility";
+import { lookupPlayerRates } from "@/lib/golf-rate-lookup";
 import { createBookingSchema } from "@club/shared";
 import { sendBookingConfirmationEmail } from "@/lib/email";
 
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { facility_id, date, start_time, end_time, party_size, notes } =
+    const { facility_id, date, start_time, end_time, party_size, notes, players } =
       parsed.data;
 
     // Check golf eligibility
@@ -146,6 +147,58 @@ export async function POST(request: Request) {
         { error: "Failed to create booking" },
         { status: 500 }
       );
+    }
+
+    // Insert booking players with auto-pricing
+    if (players && players.length > 0 && booking) {
+      try {
+        // Build player list: booker + additional players
+        const allPlayerInputs = [
+          {
+            player_type: "member" as const,
+            member_id: result.member.id,
+            tier_id: result.member.membership_tier_id,
+          },
+          ...players.map((p) => ({
+            player_type: p.player_type as "member" | "guest",
+            member_id: p.member_id ?? null,
+            guest_name: p.guest_name ?? null,
+          })),
+        ];
+
+        // Look up rates for all players
+        const pricedPlayers = await lookupPlayerRates(supabase, {
+          facilityId: facility_id,
+          clubId: result.member.club_id,
+          date,
+          startTime: start_time,
+          holes: "18", // default to 18 holes for now
+          players: allPlayerInputs,
+        });
+
+        const playerRows = pricedPlayers.map((p) => ({
+          booking_id: booking.id,
+          player_type: p.player_type,
+          member_id: p.member_id,
+          guest_name: p.guest_name,
+          greens_fee: p.greens_fee,
+          cart_fee: p.cart_fee,
+          caddie_fee: p.caddie_fee,
+          total_fee: p.total_fee,
+          rate_id: p.rate_id,
+        }));
+
+        const { error: playersError } = await supabase
+          .from("booking_players")
+          .insert(playerRows);
+
+        if (playersError) {
+          console.error("Booking players insert error:", playersError);
+        }
+      } catch (priceErr) {
+        // Log but don't fail the booking — pricing is supplementary
+        console.error("Player pricing error:", priceErr);
+      }
     }
 
     // Send confirmation email (fire-and-forget)

@@ -52,3 +52,9 @@ apps/mobile/.expo/
 branding/
 *.png
 .vercel
+
+# Apple Wallet certificates (NEVER commit these)
+*.p12
+*.pem
+apps/web/certs/*
+!apps/web/certs/.gitkeep

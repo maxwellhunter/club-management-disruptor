@@ -47,6 +47,13 @@ export const createTierSchema = z.object({
 });
 
 // Booking schemas
+// Player entry for booking creation
+export const bookingPlayerEntrySchema = z.object({
+  player_type: z.enum(["member", "guest"]),
+  member_id: z.string().uuid().nullable().optional(),
+  guest_name: z.string().max(200).nullable().optional(),
+});
+
 export const createBookingSchema = z.object({
   facility_id: z.string().uuid("Invalid facility"),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format"),
@@ -54,6 +61,7 @@ export const createBookingSchema = z.object({
   end_time: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time format"),
   party_size: z.number().int().min(1).max(20).default(1),
   notes: z.string().optional(),
+  players: z.array(bookingPlayerEntrySchema).optional(),
 });
 
 export const modifyBookingSchema = z.object({
@@ -278,6 +286,38 @@ export const createCourseHoleSchema = z.object({
   handicap_index: z.number().int().min(1).max(18),
 });
 
+// Golf player rate schemas
+export const golfDayTypes = ["weekday", "weekend"] as const;
+export const golfTimeTypes = ["prime", "afternoon", "twilight"] as const;
+export const golfHolesOptions = ["9", "18"] as const;
+
+export const createGolfPlayerRateSchema = z.object({
+  facility_id: z.string().uuid("Invalid facility"),
+  name: z.string().min(1).max(200),
+  tier_id: z.string().uuid().nullable().optional(),
+  is_guest: z.boolean().default(false),
+  day_type: z.enum(golfDayTypes),
+  time_type: z.enum(golfTimeTypes),
+  holes: z.enum(golfHolesOptions),
+  greens_fee: z.number().min(0),
+  cart_fee: z.number().min(0).default(0),
+  caddie_fee: z.number().min(0).default(0),
+});
+
+export const updateGolfPlayerRateSchema = createGolfPlayerRateSchema.partial().extend({
+  id: z.string().uuid(),
+  is_active: z.boolean().optional(),
+});
+
+// Booking player schemas
+export const addBookingPlayerSchema = z.object({
+  booking_id: z.string().uuid(),
+  player_type: z.enum(["member", "guest"]),
+  member_id: z.string().uuid().nullable().optional(),
+  guest_id: z.string().uuid().nullable().optional(),
+  guest_name: z.string().max(200).nullable().optional(),
+});
+
 // POS schemas
 export const posProviders = ["stripe_terminal", "square", "toast", "lightspeed", "manual"] as const;
 export const posLocations = ["dining", "pro_shop", "bar", "snack_bar", "other"] as const;
@@ -454,6 +494,7 @@ export const importFieldMappingSchema = z.object({
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
 export type CreateTierInput = z.infer<typeof createTierSchema>;
+export type BookingPlayerEntry = z.infer<typeof bookingPlayerEntrySchema>;
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 export type ModifyBookingInput = z.infer<typeof modifyBookingSchema>;
 export type CreateEventInput = z.infer<typeof createEventSchema>;
