@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth-context";
 import { Colors } from "@/constants/theme";
 import { supabase } from "@/lib/supabase";
+import { getCurrentLocation, formatDistance, getDistanceMiles, type UserLocation } from "@/lib/location";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -76,6 +77,7 @@ export default function HomeScreen() {
   const [itinerary, setItinerary] = useState<ItineraryItem[]>([]);
   const [events, setEvents] = useState<ClubEvent[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [distanceText, setDistanceText] = useState<string | null>(null);
 
   const firstName =
     user?.user_metadata?.full_name?.split(" ")[0] ||
@@ -157,6 +159,17 @@ export default function HomeScreen() {
 
   useEffect(() => {
     fetchDashboardData();
+    // Fetch location for distance indicator (non-blocking)
+    getCurrentLocation().then((loc) => {
+      if (loc) {
+        // Demo club coordinates (Greenfield CC placeholder)
+        const clubLocation: UserLocation = { latitude: 40.7128, longitude: -74.006 };
+        const miles = getDistanceMiles(loc, clubLocation);
+        setDistanceText(formatDistance(miles));
+      }
+    }).catch(() => {
+      // Location is optional — don't block the home screen
+    });
   }, [fetchDashboardData]);
 
   const onRefresh = useCallback(async () => {
@@ -197,6 +210,12 @@ export default function HomeScreen() {
           {getGreeting()},{"\n"}
           {firstName}
         </Text>
+        {distanceText && (
+          <View style={styles.distanceBadge}>
+            <Ionicons name="location-outline" size={12} color={Colors.light.primary} />
+            <Text style={styles.distanceText}>{distanceText} from The Lakes</Text>
+          </View>
+        )}
       </View>
 
       {/* Today's Itinerary */}
@@ -522,6 +541,22 @@ const styles = StyleSheet.create({
     color: Colors.light.foreground,
     lineHeight: 36,
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+  },
+  distanceBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 8,
+    backgroundColor: Colors.light.accent,
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  distanceText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: Colors.light.primary,
   },
 
   // Sections

@@ -10,11 +10,15 @@ import {
   RefreshControl,
   Linking,
   Platform,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth-context";
 import { Colors } from "@/constants/theme";
+import { showImagePickerOptions, type PickedImage } from "@/lib/image-picker";
+import { haptics } from "@/lib/haptics";
+import { supabase } from "@/lib/supabase";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -137,6 +141,7 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>(MOCK_ACTIVITY);
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
   const getHeaders = useCallback(() => {
     const h: Record<string, string> = { "Content-Type": "application/json" };
@@ -265,9 +270,41 @@ export default function ProfileScreen() {
     >
       {/* Profile Header */}
       <View style={styles.profileHeader}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initials}</Text>
-        </View>
+        <TouchableOpacity
+          style={styles.avatar}
+          onPress={() => {
+            haptics.light();
+            showImagePickerOptions(async (image: PickedImage) => {
+              setAvatarUri(image.uri);
+              haptics.success();
+              // Upload to Supabase storage
+              try {
+                const ext = image.uri.split(".").pop() || "jpg";
+                const fileName = `${user?.id}/avatar.${ext}`;
+                const response = await fetch(image.uri);
+                const blob = await response.blob();
+                await supabase.storage
+                  .from("avatars")
+                  .upload(fileName, blob, { upsert: true });
+              } catch {
+                // Upload is best-effort — local URI still shown
+              }
+            });
+          }}
+          activeOpacity={0.7}
+        >
+          {avatarUri ? (
+            <Image
+              source={{ uri: avatarUri }}
+              style={styles.avatarImage}
+            />
+          ) : (
+            <Text style={styles.avatarText}>{initials}</Text>
+          )}
+          <View style={styles.avatarEditBadge}>
+            <Ionicons name="camera" size={12} color="#ffffff" />
+          </View>
+        </TouchableOpacity>
         <Text style={styles.profileName}>{fullName}</Text>
         <View style={styles.tierBadge}>
           <Text style={styles.tierBadgeText}>
@@ -539,6 +576,24 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "700",
     color: Colors.light.onSurfaceVariant,
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  avatarEditBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.light.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: Colors.light.background,
   },
   profileName: {
     fontSize: 22,

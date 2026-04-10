@@ -41,6 +41,12 @@ module.exports = {
           "Add tee times, dining reservations, and club events to your calendar.",
         NSCalendarsWriteOnlyAccessUsageDescription:
           "Add tee times, dining reservations, and club events to your calendar.",
+        NSCameraUsageDescription:
+          "Take a photo for your member profile.",
+        NSPhotoLibraryUsageDescription:
+          "Choose a photo from your library for your member profile.",
+        NSLocationWhenInUseUsageDescription:
+          "See nearby club facilities and get directions.",
       },
     },
     android: {
@@ -71,6 +77,14 @@ module.exports = {
       [
         "expo-calendar",
         { calendarPermission: "Add tee times, reservations, and events to your calendar." },
+      ],
+      [
+        "expo-image-picker",
+        { photosPermission: "Choose a photo for your member profile.", cameraPermission: "Take a photo for your member profile." },
+      ],
+      [
+        "expo-location",
+        { locationWhenInUsePermission: "See nearby club facilities and get directions." },
       ],
     ],
     experiments: {

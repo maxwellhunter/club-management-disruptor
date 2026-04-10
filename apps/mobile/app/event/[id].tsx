@@ -18,6 +18,10 @@ import { Colors } from "@/constants/theme";
 import { useAuth } from "@/lib/auth-context";
 import { EventFormModal } from "@/components/event-form-modal";
 import { AttendeesModal } from "@/components/attendees-modal";
+import { shareEvent } from "@/lib/sharing";
+import { addEventToCalendar } from "@/lib/calendar";
+import { haptics } from "@/lib/haptics";
+import { trackPositiveAction } from "@/lib/store-review";
 import type { RsvpStatus } from "@club/shared";
 
 const API_URL =
@@ -165,6 +169,9 @@ export default function EventDetailScreen() {
         }),
       });
       if (res.ok) {
+        if (newStatus === "attending") {
+          trackPositiveAction();
+        }
         await fetchEvent();
       } else {
         const data = await res.json();
@@ -243,6 +250,41 @@ export default function EventDetailScreen() {
             >
               <Ionicons name="chevron-back" size={22} color="#ffffff" />
             </TouchableOpacity>
+            {/* Share & Calendar buttons */}
+            <View style={styles.heroActions}>
+              <TouchableOpacity
+                style={styles.heroActionBtn}
+                onPress={async () => {
+                  haptics.light();
+                  await addEventToCalendar({
+                    title: event.title,
+                    startDate: event.start_date,
+                    endDate: event.end_date || undefined,
+                    location: event.location || undefined,
+                    description: event.description || undefined,
+                  });
+                  haptics.success();
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="calendar-outline" size={18} color="#ffffff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.heroActionBtn}
+                onPress={() => {
+                  haptics.light();
+                  shareEvent({
+                    title: event.title,
+                    date: event.start_date,
+                    location: event.location || undefined,
+                    description: event.description || undefined,
+                  });
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="share-outline" size={18} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
             {/* Signature Event badge (Stitch: tertiary-fixed bg) */}
             <View style={styles.heroCategoryBadge}>
               <Text style={styles.heroCategoryText}>
@@ -591,6 +633,21 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: Platform.OS === "ios" ? 52 : 12,
     left: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroActions: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 52 : 12,
+    right: 12,
+    flexDirection: "row",
+    gap: 8,
+  },
+  heroActionBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,

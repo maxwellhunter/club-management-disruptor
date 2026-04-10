@@ -17,6 +17,8 @@ import { Colors } from "@/constants/theme";
 import { useAuth } from "@/lib/auth-context";
 import { haptics } from "@/lib/haptics";
 import { addTeeTimeToCalendar } from "@/lib/calendar";
+import { trackPositiveAction } from "@/lib/store-review";
+import { shareTeeTime } from "@/lib/sharing";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -278,6 +280,7 @@ export default function BookingsScreen() {
 
       if (res.ok) {
         haptics.success();
+        trackPositiveAction();
         Alert.alert("Booked!", "Your tee time has been confirmed.", [
           {
             text: "Add to Calendar",
@@ -286,6 +289,17 @@ export default function BookingsScreen() {
                 facilityName: selectedFacility.name,
                 date: selectedDate,
                 startTime: selectedTime.start_time,
+                partySize,
+                holes: 18,
+              }),
+          },
+          {
+            text: "Share",
+            onPress: () =>
+              shareTeeTime({
+                facilityName: selectedFacility.name,
+                date: selectedDate,
+                time: selectedTime.start_time,
                 partySize,
                 holes: 18,
               }),
