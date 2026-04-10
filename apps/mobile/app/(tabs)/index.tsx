@@ -17,6 +17,7 @@ import { supabase } from "@/lib/supabase";
 import { getCurrentLocation, formatDistance, getDistanceMiles, type UserLocation } from "@/lib/location";
 import { useOnForeground } from "@/lib/app-state";
 import { indexForSpotlight, SpotlightHelpers } from "@/lib/spotlight";
+import { getBadgeCount } from "@/lib/notifications";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -80,6 +81,7 @@ export default function HomeScreen() {
   const [events, setEvents] = useState<ClubEvent[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [distanceText, setDistanceText] = useState<string | null>(null);
+  const [badgeCount, setBadgeCount] = useState(0);
 
   const firstName =
     user?.user_metadata?.full_name?.split(" ")[0] ||
@@ -161,6 +163,8 @@ export default function HomeScreen() {
 
   useEffect(() => {
     fetchDashboardData();
+    // Fetch notification badge count
+    getBadgeCount().then(setBadgeCount).catch(() => {});
     // Fetch location for distance indicator (non-blocking)
     getCurrentLocation().then((loc) => {
       if (loc) {
@@ -224,16 +228,26 @@ export default function HomeScreen() {
           </View>
           <TouchableOpacity
             activeOpacity={0.7}
+            onPress={() => router.push("/announcements")}
             accessible={true}
             accessibilityRole="button"
             accessibilityLabel="Notifications"
             accessibilityHint="View your notifications"
           >
-            <Ionicons
-              name="notifications-outline"
-              size={22}
-              color={Colors.light.onSurfaceVariant}
-            />
+            <View>
+              <Ionicons
+                name="notifications-outline"
+                size={22}
+                color={Colors.light.onSurfaceVariant}
+              />
+              {badgeCount > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>
+                    {badgeCount > 9 ? "9+" : badgeCount}
+                  </Text>
+                </View>
+              )}
+            </View>
           </TouchableOpacity>
         </View>
         <Text style={styles.welcomeLabel}>WELCOME BACK</Text>
@@ -562,6 +576,25 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.primary,
     alignItems: "center",
     justifyContent: "center",
+  },
+  notifBadge: {
+    position: "absolute",
+    top: -4,
+    right: -6,
+    backgroundColor: Colors.light.destructive,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: Colors.light.background,
+  },
+  notifBadgeText: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#ffffff",
   },
   welcomeLabel: {
     fontSize: 11,

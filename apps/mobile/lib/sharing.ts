@@ -1,11 +1,5 @@
-import * as Sharing from "expo-sharing";
 import * as Clipboard from "expo-clipboard";
-import { Alert, Platform } from "react-native";
-
-/** Check if sharing is available on this device */
-export async function isSharingAvailable(): Promise<boolean> {
-  return Sharing.isAvailableAsync();
-}
+import { Alert, Platform, Share } from "react-native";
 
 /** Copy text to clipboard with feedback */
 export async function copyToClipboard(text: string, label = "Copied to clipboard") {
@@ -121,20 +115,12 @@ export async function shareDiningReservation(reservation: {
 
 /** Share plain text via the native share sheet */
 async function shareText(text: string): Promise<void> {
-  const available = await isSharingAvailable();
-  if (!available) {
-    // Fallback: copy to clipboard
+  try {
+    await Share.share({ message: text });
+  } catch {
+    // Fallback: copy to clipboard if share sheet fails
     await copyToClipboard(text, "Copied to clipboard");
-    return;
   }
-
-  // expo-sharing requires a file URI, so we use the clipboard + share sheet approach
-  // For text sharing, we copy and alert the user, or use the native share
-  await Clipboard.setStringAsync(text);
-
-  // On iOS, we can use the share sheet via a temporary file
-  // But for simplicity and reliability, use clipboard with notification
-  Alert.alert("Copied", "Details copied to clipboard for sharing.");
 }
 
 function formatTime(time: string): string {
