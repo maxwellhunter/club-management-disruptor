@@ -13,6 +13,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth-context";
 import { Colors } from "@/constants/theme";
+import { haptics } from "@/lib/haptics";
 
 const API_URL = process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -126,7 +127,7 @@ export default function ReportsScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} />
+        <RefreshControl refreshing={refreshing} onRefresh={() => { haptics.light(); setRefreshing(true); fetchData(); }} />
       }
     >
       {/* Header */}

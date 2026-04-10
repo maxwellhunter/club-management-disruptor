@@ -13,6 +13,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/lib/auth-context";
+import { haptics } from "@/lib/haptics";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -97,6 +98,7 @@ export default function MembersScreen() {
   }, [fetchMembers]);
 
   const onRefresh = () => {
+    haptics.light();
     setRefreshing(true);
     fetchMembers();
   };
