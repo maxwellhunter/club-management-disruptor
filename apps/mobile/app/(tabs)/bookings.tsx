@@ -19,6 +19,7 @@ import { haptics } from "@/lib/haptics";
 import { addTeeTimeToCalendar } from "@/lib/calendar";
 import { trackPositiveAction } from "@/lib/store-review";
 import { shareTeeTime } from "@/lib/sharing";
+import { showBookingContextMenu } from "@/lib/context-menu";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -1345,7 +1346,35 @@ export default function BookingsScreen() {
 
             <View style={s.bookingsList}>
               {upcomingBookings.map((b) => (
-                <View key={b.id} style={s.bookingCard}>
+                <TouchableOpacity
+                  key={b.id}
+                  style={s.bookingCard}
+                  activeOpacity={0.9}
+                  onLongPress={() =>
+                    showBookingContextMenu({
+                      bookingId: b.id,
+                      facilityName: b.facility_name,
+                      date: formatDate(b.date),
+                      time: formatTime(b.start_time),
+                      onAddToCalendar: () =>
+                        addTeeTimeToCalendar({
+                          facilityName: b.facility_name,
+                          date: b.date,
+                          startTime: b.start_time,
+                          partySize: b.party_size,
+                          holes: b.holes,
+                        }),
+                      onShare: () =>
+                        shareTeeTime({
+                          facilityName: b.facility_name,
+                          date: b.date,
+                          time: b.start_time,
+                          partySize: b.party_size,
+                        }),
+                      onCancel: () => handleCancel(b.id),
+                    })
+                  }
+                >
                   {/* Course Image */}
                   <Image
                     source={{
@@ -1414,7 +1443,7 @@ export default function BookingsScreen() {
                       </TouchableOpacity>
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
 

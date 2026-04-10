@@ -21,6 +21,8 @@ import { EventFormModal } from "@/components/event-form-modal";
 import { AttendeesModal } from "@/components/attendees-modal";
 import { haptics } from "@/lib/haptics";
 import { addEventToCalendar } from "@/lib/calendar";
+import { shareEvent } from "@/lib/sharing";
+import { showEventContextMenu } from "@/lib/context-menu";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -423,6 +425,27 @@ export default function EventsScreen() {
                 style={styles.featuredCard}
                 activeOpacity={0.85}
                 onPress={() => router.push(`/event/${featuredEvent.id}`)}
+                onLongPress={() =>
+                  showEventContextMenu({
+                    title: featuredEvent.title,
+                    onAddToCalendar: () =>
+                      addEventToCalendar({
+                        title: featuredEvent.title,
+                        startDate: featuredEvent.start_date,
+                        endDate: featuredEvent.end_date || undefined,
+                        location: featuredEvent.location || undefined,
+                        description: featuredEvent.description || undefined,
+                      }),
+                    onShare: () =>
+                      shareEvent({
+                        title: featuredEvent.title,
+                        date: featuredEvent.start_date,
+                        location: featuredEvent.location || undefined,
+                        description: featuredEvent.description || undefined,
+                      }),
+                    onViewDetails: () => router.push(`/event/${featuredEvent.id}`),
+                  })
+                }
               >
                 <Image
                   source={{ uri: getEventImage(featuredEvent) }}
@@ -535,6 +558,27 @@ export default function EventsScreen() {
                   style={styles.eventCard}
                   activeOpacity={0.85}
                   onPress={() => router.push(`/event/${event.id}`)}
+                  onLongPress={() =>
+                    showEventContextMenu({
+                      title: event.title,
+                      onAddToCalendar: () =>
+                        addEventToCalendar({
+                          title: event.title,
+                          startDate: event.start_date,
+                          endDate: event.end_date || undefined,
+                          location: event.location || undefined,
+                          description: event.description || undefined,
+                        }),
+                      onShare: () =>
+                        shareEvent({
+                          title: event.title,
+                          date: event.start_date,
+                          location: event.location || undefined,
+                          description: event.description || undefined,
+                        }),
+                      onViewDetails: () => router.push(`/event/${event.id}`),
+                    })
+                  }
                 >
                   {/* Card image */}
                   <View style={styles.cardImageWrap}>
