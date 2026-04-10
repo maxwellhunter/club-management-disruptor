@@ -18,7 +18,13 @@ module.exports = {
       supportsTablet: true,
       bundleIdentifier: "com.clubos.app",
       icon: path.resolve(__dirname, "assets/icon.png"),
+      usesAppleSignIn: true,
+      entitlements: {
+        "com.apple.developer.nfc.readersession.formats": ["NDEF", "TAG"],
+      },
       infoPlist: {
+        NFCReaderUsageDescription:
+          "ClubOS uses NFC to check you in at club facilities.",
         NSAppTransportSecurity: {
           NSAllowsLocalNetworking: true,
           NSExceptionDomains: {
@@ -50,6 +56,14 @@ module.exports = {
     plugins: [
       "expo-router",
       "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/icon.png",
+          color: "#16a34a",
+        },
+      ],
+      "expo-apple-authentication",
       [
         "expo-local-authentication",
         { faceIDPermission: "Use Face ID to quickly sign in to your ClubOS account." },

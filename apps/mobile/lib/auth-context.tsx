@@ -8,6 +8,7 @@ interface AuthContextType {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
+  signInWithApple: (idToken: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -17,6 +18,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   signIn: async () => ({ error: null }),
   signUp: async () => ({ error: null }),
+  signInWithApple: async () => ({ error: null }),
   signOut: async () => {},
 });
 
@@ -61,12 +63,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error as Error | null };
   };
 
+  const signInWithApple = async (idToken: string) => {
+    const { error } = await supabase.auth.signInWithIdToken({
+      provider: "apple",
+      token: idToken,
+    });
+    return { error: error as Error | null };
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signInWithApple, signOut }}>
       {children}
     </AuthContext.Provider>
   );
