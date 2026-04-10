@@ -1,9 +1,12 @@
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
+import { View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { Colors } from "@/constants/theme";
 import { setupNotificationDeepLinking, clearBadge } from "@/lib/notifications";
+import { setupDeepLinking } from "@/lib/deep-linking";
+import { OfflineBanner } from "@/components/offline-banner";
 
 function RootLayoutNav() {
   const { user, loading } = useAuth();
@@ -29,9 +32,16 @@ function RootLayoutNav() {
     return cleanup;
   }, []);
 
+  // Set up URL deep linking (clubos:// scheme and universal links)
+  useEffect(() => {
+    const cleanup = setupDeepLinking();
+    return cleanup;
+  }, []);
+
   return (
-    <>
+    <View style={{ flex: 1 }}>
       <StatusBar style="auto" />
+      <OfflineBanner />
       <Stack>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -82,7 +92,7 @@ function RootLayoutNav() {
           }}
         />
       </Stack>
-    </>
+    </View>
   );
 }
 

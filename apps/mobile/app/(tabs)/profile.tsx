@@ -19,6 +19,7 @@ import { Colors } from "@/constants/theme";
 import { showImagePickerOptions, type PickedImage } from "@/lib/image-picker";
 import { haptics } from "@/lib/haptics";
 import { supabase } from "@/lib/supabase";
+import { useOnForeground } from "@/lib/app-state";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -192,6 +193,12 @@ export default function ProfileScreen() {
     fetchInvoices();
   }, [fetchBilling, fetchInvoices]);
 
+  // Refresh billing data when returning from background
+  useOnForeground(() => {
+    fetchBilling();
+    fetchInvoices();
+  });
+
   function handleSignOut() {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
@@ -314,7 +321,12 @@ export default function ProfileScreen() {
       </View>
 
       {/* Account Balance Card */}
-      <View style={styles.balanceCard}>
+      <View
+        style={styles.balanceCard}
+        accessible={true}
+        accessibilityRole="summary"
+        accessibilityLabel={`Current statement balance: $${sub ? sub.amount.toFixed(2) : "0.00"}`}
+      >
         <Text style={styles.balanceLabel}>CURRENT STATEMENT BALANCE</Text>
         {billingLoading ? (
           <ActivityIndicator
@@ -396,6 +408,10 @@ export default function ProfileScreen() {
         style={styles.membershipCardButton}
         onPress={() => router.push("/membership-card")}
         activeOpacity={0.7}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel="Membership Card"
+        accessibilityHint="View your digital member ID and QR code"
       >
         <View style={styles.membershipCardIcon}>
           <Ionicons
@@ -508,6 +524,9 @@ export default function ProfileScreen() {
         style={styles.signOutButton}
         onPress={handleSignOut}
         activeOpacity={0.7}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel="Sign out of ClubOS"
       >
         <Text style={styles.signOutText}>Sign Out of ClubOS</Text>
       </TouchableOpacity>
@@ -529,7 +548,15 @@ function SettingsRow({
   onPress?: () => void;
 }) {
   return (
-    <TouchableOpacity style={styles.settingsRow} activeOpacity={0.7} onPress={onPress}>
+    <TouchableOpacity
+      style={styles.settingsRow}
+      activeOpacity={0.7}
+      onPress={onPress}
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityHint={subtitle}
+    >
       <View style={styles.settingsIconWrap}>
         <Ionicons name={icon} size={20} color={Colors.light.onSurfaceVariant} />
       </View>
