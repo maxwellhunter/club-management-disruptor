@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,18 @@ import { Link } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth-context";
 import { Colors } from "@/constants/theme";
+import { haptics } from "@/lib/haptics";
+import {
+  hasBiometricHardware,
+  isBiometricEnrolled,
+  isBiometricLoginEnabled,
+  getBiometricType,
+  getBiometricLabel,
+  authenticateWithBiometrics,
+  getBiometricCredentials,
+  type BiometricType,
+} from "@/lib/biometrics";
+import { supabase } from "@/lib/supabase";
 
 const DEV_ACCOUNTS = [
   {
@@ -54,14 +66,72 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricType, setBiometricType] = useState<BiometricType>("none");
   const { signIn } = useAuth();
+
+  useEffect(() => {
+    checkBiometrics();
+  }, []);
+
+  async function checkBiometrics() {
+    const [hasHardware, isEnrolled, isEnabled] = await Promise.all([
+      hasBiometricHardware(),
+      isBiometricEnrolled(),
+      isBiometricLoginEnabled(),
+    ]);
+    if (hasHardware && isEnrolled && isEnabled) {
+      setBiometricAvailable(true);
+      const type = await getBiometricType();
+      setBiometricType(type);
+    }
+  }
 
   async function handleLogin() {
     if (!email || !password) return;
     setLoading(true);
+    haptics.medium();
     const { error } = await signIn(email, password);
     if (error) {
+      haptics.error();
       Alert.alert("Error", error.message);
+    } else {
+      haptics.success();
+    }
+    setLoading(false);
+  }
+
+  async function handleBiometricLogin() {
+    if (!biometricAvailable) {
+      Alert.alert(
+        "Biometrics Not Set Up",
+        "Sign in with your password first, then enable biometric login in Settings > Security."
+      );
+      return;
+    }
+
+    haptics.medium();
+    const authenticated = await authenticateWithBiometrics();
+    if (!authenticated) return;
+
+    setLoading(true);
+    const credentials = await getBiometricCredentials();
+    if (!credentials) {
+      haptics.error();
+      Alert.alert("Error", "No saved credentials. Please sign in with your password.");
+      setLoading(false);
+      return;
+    }
+
+    // Use refresh token to restore session
+    const { error } = await supabase.auth.refreshSession({
+      refresh_token: credentials.refreshToken,
+    });
+    if (error) {
+      haptics.error();
+      Alert.alert("Session Expired", "Please sign in with your password again.");
+    } else {
+      haptics.success();
     }
     setLoading(false);
   }
@@ -241,14 +311,23 @@ export default function LoginScreen() {
           </View>
 
           {/* Biometrics Button */}
-          <TouchableOpacity style={styles.biometricsButton} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.biometricsButton}
+            activeOpacity={0.7}
+            onPress={handleBiometricLogin}
+          >
             <Ionicons
-              name="finger-print"
+              name={biometricType === "facial" ? "scan-outline" : "finger-print"}
               size={20}
-              color={Colors.light.onSurfaceVariant}
+              color={biometricAvailable ? Colors.light.primary : Colors.light.onSurfaceVariant}
             />
-            <Text style={styles.biometricsText}>
-              Fast Sign-in with Biometrics
+            <Text style={[
+              styles.biometricsText,
+              biometricAvailable && { color: Colors.light.primary, fontWeight: "600" },
+            ]}>
+              {biometricAvailable
+                ? `Sign in with ${getBiometricLabel(biometricType)}`
+                : "Fast Sign-in with Biometrics"}
             </Text>
           </TouchableOpacity>
         </View>

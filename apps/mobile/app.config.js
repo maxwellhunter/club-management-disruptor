@@ -29,6 +29,12 @@ module.exports = {
           },
         },
         ITSAppUsesNonExemptEncryption: false,
+        NSFaceIDUsageDescription:
+          "Use Face ID to quickly sign in to your ClubOS account.",
+        NSCalendarsFullAccessUsageDescription:
+          "Add tee times, dining reservations, and club events to your calendar.",
+        NSCalendarsWriteOnlyAccessUsageDescription:
+          "Add tee times, dining reservations, and club events to your calendar.",
       },
     },
     android: {
@@ -41,7 +47,18 @@ module.exports = {
       bundler: "metro",
       output: "static",
     },
-    plugins: ["expo-router", "expo-secure-store"],
+    plugins: [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        { faceIDPermission: "Use Face ID to quickly sign in to your ClubOS account." },
+      ],
+      [
+        "expo-calendar",
+        { calendarPermission: "Add tee times, reservations, and events to your calendar." },
+      ],
+    ],
     experiments: {
       typedRoutes: true,
     },

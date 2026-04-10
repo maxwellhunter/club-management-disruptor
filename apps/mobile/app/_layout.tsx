@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { Colors } from "@/constants/theme";
+import { setupNotificationDeepLinking, clearBadge } from "@/lib/notifications";
 
 function RootLayoutNav() {
   const { user, loading } = useAuth();
@@ -15,13 +16,18 @@ function RootLayoutNav() {
     const inAuthGroup = segments[0] === "(auth)";
 
     if (!user && !inAuthGroup) {
-      // Not signed in, redirect to login
       router.replace("/(auth)/login");
     } else if (user && inAuthGroup) {
-      // Signed in, redirect to tabs
       router.replace("/(tabs)");
     }
   }, [user, loading, segments]);
+
+  // Set up notification deep linking and clear badge on launch
+  useEffect(() => {
+    const cleanup = setupNotificationDeepLinking();
+    clearBadge();
+    return cleanup;
+  }, []);
 
   return (
     <>
@@ -43,6 +49,12 @@ function RootLayoutNav() {
             headerTitle: "Announcements",
             headerBackTitle: "Back",
             headerTintColor: Colors.light.primary,
+          }}
+        />
+        <Stack.Screen
+          name="guests"
+          options={{
+            headerShown: false,
           }}
         />
         <Stack.Screen

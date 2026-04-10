@@ -54,6 +54,9 @@ importers:
       expo-blur:
         specifier: ^55.0.10
         version: 55.0.10(expo@54.0.33)(react-native@0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
+      expo-calendar:
+        specifier: ^55.0.14
+        version: 55.0.14(expo@54.0.33)(react-native@0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
       expo-constants:
         specifier: ~17.0.0
         version: 17.0.8(expo@54.0.33)(react-native@0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
@@ -66,6 +69,9 @@ importers:
       expo-linking:
         specifier: ~7.0.0
         version: 7.0.5(expo@54.0.33)(react-native@0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
+      expo-local-authentication:
+        specifier: ^55.0.13
+        version: 55.0.13(expo@54.0.33)
       expo-notifications:
         specifier: ~0.32.0
         version: 0.32.16(expo@54.0.33)(react-native@0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
@@ -2834,6 +2840,12 @@ packages:
       react: 19.1.0
       react-native: '*'
 
+  expo-calendar@55.0.14:
+    resolution: {integrity: sha512-DndwzRNrjyjaMRY9ob/X8TdptLcpckVMGnv8rMjABH2jMWToeLElgq7lttytCTAoablZfVLowcizdD+GwSqNzw==}
+    peerDependencies:
+      expo: '*'
+      react-native: '*'
+
   expo-constants@17.0.8:
     resolution: {integrity: sha512-XfWRyQAf1yUNgWZ1TnE8pFBMqGmFP5Gb+SFSgszxDdOoheB/NI5D4p7q86kI2fvGyfTrxAe+D+74nZkfsGvUlg==}
     peerDependencies:
@@ -2882,6 +2894,11 @@ packages:
     peerDependencies:
       react: 19.1.0
       react-native: '*'
+
+  expo-local-authentication@55.0.13:
+    resolution: {integrity: sha512-7m1+Roub/6xxjHtVKe0vVtsC5g0MXp1Nf0dxK0YfJ1i5314hvi/Glhl5/2loAgnplw8Nx4UVbf6L0/rDjhljsQ==}
+    peerDependencies:
+      expo: '*'
 
   expo-modules-autolinking@3.0.24:
     resolution: {integrity: sha512-TP+6HTwhL7orDvsz2VzauyQlXJcAWyU3ANsZ7JGL4DQu8XaZv/A41ZchbtAYLfozNA2Ya1Hzmhx65hXryBMjaQ==}
@@ -9029,6 +9046,11 @@ snapshots:
       react: 19.1.0
       react-native: 0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)
 
+  expo-calendar@55.0.14(expo@54.0.33)(react-native@0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)):
+    dependencies:
+      expo: 54.0.33(@babel/core@7.29.0)(@expo/metro-runtime@5.0.4(react-native@0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(expo-router@5.0.7)(react-native@0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
+      react-native: 0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)
+
   expo-constants@17.0.8(expo@54.0.33)(react-native@0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)):
     dependencies:
       '@expo/config': 10.0.11
@@ -9083,6 +9105,11 @@ snapshots:
     transitivePeerDependencies:
       - expo
       - supports-color
+
+  expo-local-authentication@55.0.13(expo@54.0.33):
+    dependencies:
+      expo: 54.0.33(@babel/core@7.29.0)(@expo/metro-runtime@5.0.4(react-native@0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(expo-router@5.0.7)(react-native@0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
+      invariant: 2.2.4
 
   expo-modules-autolinking@3.0.24:
     dependencies:

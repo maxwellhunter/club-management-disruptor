@@ -351,6 +351,11 @@ export default function HomeScreen() {
             onPress={() => router.push("/(tabs)/events")}
           />
           <ServiceButton
+            icon="people-outline"
+            label="Guest Mgmt"
+            onPress={() => router.push("/guests")}
+          />
+          <ServiceButton
             icon="chatbubble-ellipses-outline"
             label="AI Concierge"
             onPress={() => router.push("/(tabs)/chat")}

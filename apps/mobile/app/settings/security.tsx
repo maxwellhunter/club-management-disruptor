@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,15 +9,28 @@ import {
   Alert,
   Platform,
   KeyboardAvoidingView,
+  Switch,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth-context";
 import { Colors } from "@/constants/theme";
 import { supabase } from "@/lib/supabase";
+import { haptics } from "@/lib/haptics";
+import {
+  hasBiometricHardware,
+  isBiometricEnrolled,
+  isBiometricLoginEnabled,
+  getBiometricType,
+  getBiometricLabel,
+  authenticateWithBiometrics,
+  enableBiometricLogin,
+  disableBiometricLogin,
+  type BiometricType,
+} from "@/lib/biometrics";
 
 export default function SecurityScreen() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -25,6 +38,53 @@ export default function SecurityScreen() {
   const [saving, setSaving] = useState(false);
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
+  const [biometricHardware, setBiometricHardware] = useState(false);
+  const [biometricEnrolled, setBiometricEnrolled] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricType, setBiometricType] = useState<BiometricType>("none");
+
+  useEffect(() => {
+    checkBiometricStatus();
+  }, []);
+
+  async function checkBiometricStatus() {
+    const [hasHardware, isEnrolled, isEnabled] = await Promise.all([
+      hasBiometricHardware(),
+      isBiometricEnrolled(),
+      isBiometricLoginEnabled(),
+    ]);
+    setBiometricHardware(hasHardware);
+    setBiometricEnrolled(isEnrolled);
+    setBiometricEnabled(isEnabled);
+    if (hasHardware) {
+      const type = await getBiometricType();
+      setBiometricType(type);
+    }
+  }
+
+  async function handleToggleBiometric(value: boolean) {
+    if (value) {
+      // Verify identity before enabling
+      const authenticated = await authenticateWithBiometrics(
+        `Enable ${getBiometricLabel(biometricType)} for quick sign-in`
+      );
+      if (!authenticated) return;
+
+      if (!user?.email || !session?.refresh_token) {
+        Alert.alert("Error", "Could not save credentials. Please sign in again.");
+        return;
+      }
+
+      await enableBiometricLogin(user.email, session.refresh_token);
+      setBiometricEnabled(true);
+      haptics.success();
+      Alert.alert("Enabled", `${getBiometricLabel(biometricType)} sign-in is now active.`);
+    } else {
+      await disableBiometricLogin();
+      setBiometricEnabled(false);
+      haptics.medium();
+    }
+  }
 
   async function handleChangePassword() {
     if (!newPassword || newPassword.length < 8) {
@@ -44,6 +104,7 @@ export default function SecurityScreen() {
 
       if (error) throw error;
 
+      haptics.success();
       Alert.alert("Success", "Your password has been updated.", [
         { text: "OK", onPress: () => router.back() },
       ]);
@@ -147,6 +208,41 @@ export default function SecurityScreen() {
             {saving ? "Updating..." : "Update Password"}
           </Text>
         </TouchableOpacity>
+
+        {/* Biometric Authentication */}
+        {biometricHardware && biometricEnrolled && (
+          <>
+            <Text style={styles.sectionTitle}>
+              {getBiometricLabel(biometricType)}
+            </Text>
+            <View style={styles.card}>
+              <View style={styles.biometricRow}>
+                <View style={styles.biometricIconWrap}>
+                  <Ionicons
+                    name={biometricType === "facial" ? "scan-outline" : "finger-print-outline"}
+                    size={22}
+                    color={biometricEnabled ? Colors.light.primary : Colors.light.onSurfaceVariant}
+                  />
+                </View>
+                <View style={styles.biometricContent}>
+                  <Text style={styles.biometricTitle}>
+                    Quick Sign-in with {getBiometricLabel(biometricType)}
+                  </Text>
+                  <Text style={styles.biometricSubtitle}>
+                    Use {getBiometricLabel(biometricType)} to sign in without entering your password
+                  </Text>
+                </View>
+                <Switch
+                  value={biometricEnabled}
+                  onValueChange={handleToggleBiometric}
+                  trackColor={{ false: Colors.light.outlineVariant, true: Colors.light.primary + "80" }}
+                  thumbColor={biometricEnabled ? Colors.light.primary : "#f4f3f4"}
+                  ios_backgroundColor={Colors.light.outlineVariant}
+                />
+              </View>
+            </View>
+          </>
+        )}
 
         {/* Account Info */}
         <Text style={styles.sectionTitle}>Account</Text>
@@ -261,6 +357,33 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     color: Colors.light.primaryForeground,
+  },
+  biometricRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  biometricIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: Colors.light.surfaceContainerLow,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  biometricContent: {
+    flex: 1,
+    gap: 2,
+  },
+  biometricTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.light.foreground,
+  },
+  biometricSubtitle: {
+    fontSize: 12,
+    color: Colors.light.onSurfaceVariant,
+    lineHeight: 16,
   },
   infoRow: {
     flexDirection: "row",

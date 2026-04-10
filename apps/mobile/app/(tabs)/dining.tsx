@@ -16,6 +16,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/lib/auth-context";
+import { haptics } from "@/lib/haptics";
+import { addDiningToCalendar } from "@/lib/calendar";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -301,15 +303,30 @@ export default function DiningScreen() {
       });
 
       if (res.ok) {
-        Alert.alert("Reserved!", "Your dining reservation has been confirmed.");
+        haptics.success();
+        Alert.alert("Reserved!", "Your dining reservation has been confirmed.", [
+          {
+            text: "Add to Calendar",
+            onPress: () =>
+              addDiningToCalendar({
+                venueName: selectedFacility.name,
+                date: selectedDate,
+                time: selectedTime.start_time,
+                partySize,
+              }),
+          },
+          { text: "Done" },
+        ]);
         resetFlow();
         setView("home");
         fetchHomeData();
       } else {
+        haptics.error();
         const data = await res.json();
         Alert.alert("Error", data.error || "Failed to book reservation");
       }
     } catch {
+      haptics.error();
       Alert.alert("Error", "Failed to book reservation");
     } finally {
       setBookingInProgress(false);
@@ -337,6 +354,7 @@ export default function DiningScreen() {
       });
 
       if (res.ok) {
+        haptics.success();
         Alert.alert(
           "Order Placed!",
           "Your order has been submitted and charged to your member account."
@@ -345,10 +363,12 @@ export default function DiningScreen() {
         setView("home");
         fetchHomeData();
       } else {
+        haptics.error();
         const data = await res.json();
         Alert.alert("Error", data.error || "Failed to place order");
       }
     } catch {
+      haptics.error();
       Alert.alert("Error", "Failed to place order");
     } finally {
       setPlacingOrder(false);

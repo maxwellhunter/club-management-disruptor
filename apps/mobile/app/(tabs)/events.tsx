@@ -19,6 +19,8 @@ import { Colors } from "@/constants/theme";
 import { useAuth } from "@/lib/auth-context";
 import { EventFormModal } from "@/components/event-form-modal";
 import { AttendeesModal } from "@/components/attendees-modal";
+import { haptics } from "@/lib/haptics";
+import { addEventToCalendar } from "@/lib/calendar";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -154,12 +156,36 @@ export default function EventsScreen() {
       });
 
       if (res.ok) {
+        if (newStatus === "attending") {
+          haptics.success();
+          const event = events.find((e) => e.id === eventId);
+          if (event) {
+            Alert.alert("RSVP Confirmed!", `You're attending ${event.title}.`, [
+              {
+                text: "Add to Calendar",
+                onPress: () =>
+                  addEventToCalendar({
+                    title: event.title,
+                    startDate: event.start_date,
+                    endDate: event.end_date || undefined,
+                    location: event.location || undefined,
+                    description: event.description || undefined,
+                  }),
+              },
+              { text: "Done" },
+            ]);
+          }
+        } else {
+          haptics.medium();
+        }
         await fetchEvents();
       } else {
+        haptics.error();
         const data = await res.json();
         Alert.alert("Error", data.error || "Failed to RSVP");
       }
     } catch {
+      haptics.error();
       Alert.alert("Error", "Failed to RSVP");
     } finally {
       setRsvpLoading(null);
