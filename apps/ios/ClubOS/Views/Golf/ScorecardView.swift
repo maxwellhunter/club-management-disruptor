@@ -6,6 +6,7 @@ struct GolfRound: Decodable, Identifiable {
     let id: String
     let facilityId: String
     let facilityName: String
+    let bookingId: String?
     let playedAt: String
     let teeSet: String
     let holesPlayed: Int
@@ -87,6 +88,31 @@ struct EditableScore {
     var penaltyStrokes: Int = 0
 }
 
+struct CreateRoundRequest: Encodable {
+    let facilityId: String
+    let playedAt: String
+    let teeSet: String
+    let holesPlayed: Int
+    let weather: String?
+    let bookingId: String?
+}
+
+struct TodayBookingInfo: Decodable, Identifiable {
+    let id: String
+    let facilityId: String
+    let facilityName: String
+    let facilityType: String
+    let date: String
+    let startTime: String
+    let partySize: Int
+    let status: String
+    let isOwner: Bool?
+}
+
+struct TodayBookingsResponse: Decodable {
+    let bookings: [TodayBookingInfo]
+}
+
 // MARK: - Scorecard View
 
 struct ScorecardView: View {
@@ -114,6 +140,11 @@ struct ScorecardView: View {
     @State private var scores: [Int: EditableScore] = [:]
     @State private var activeHole = 1
     @State private var saving = false
+
+    // Today's bookings (for "Start Round from Booking")
+    @State private var todayBookings: [TodayBookingInfo] = []
+    @State private var pendingBookingId: String?
+    @State private var startingFromBooking = false
 
     // Course setup (admin)
     @State private var setupFacilityId = ""
@@ -150,7 +181,11 @@ struct ScorecardView: View {
         }
         .navigationTitle(screen == .history ? "Scorecard" : "")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await fetchRounds() }
+        .task {
+            async let r: () = fetchRounds()
+            async let b: () = fetchTodayBookings()
+            _ = await (r, b)
+        }
         .alert("Course Saved!", isPresented: $showCourseSaved) {
             Button("OK") { screen = .history }
         } message: {
@@ -192,18 +227,23 @@ struct ScorecardView: View {
                         if !facilities.isEmpty && selectedFacilityId.isEmpty {
                             selectedFacilityId = facilities.first?.id ?? ""
                         }
+                        pendingBookingId = nil
                         screen = .newRound
                     } label: {
                         HStack(spacing: 8) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 16))
-                            Text("New Round")
-                                .font(.system(size: 15, weight: .bold))
+                            Image(systemName: "plus")
+                                .font(.system(size: 14, weight: .bold))
+                            Text("Log Practice Round")
+                                .font(.system(size: 14, weight: .semibold))
                         }
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.club.primary)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Color.club.primary, in: RoundedRectangle(cornerRadius: 12))
+                        .padding(.vertical, 12)
+                        .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.club.primary.opacity(0.3), lineWidth: 1)
+                        )
                     }
 
                     if userRole == "admin" {
@@ -233,17 +273,49 @@ struct ScorecardView: View {
                 }
                 .padding(.horizontal, 20)
 
+                // ── Ready to Play (today's bookings without rounds) ──
+                if !eligibleBookings.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("READY TO PLAY")
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(1)
+                            .foregroundStyle(Color.club.outline)
+                            .padding(.horizontal, 20)
+
+                        ForEach(eligibleBookings) { booking in
+                            readyToPlayCard(booking)
+                        }
+                    }
+                }
+
+                // ── Active Rounds (in progress) ──
+                let activeRounds = rounds.filter { $0.status == "in_progress" }
+                if !activeRounds.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("IN PROGRESS")
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(1)
+                            .foregroundStyle(Color.club.outline)
+                            .padding(.horizontal, 20)
+
+                        ForEach(activeRounds) { round in
+                            activeRoundCard(round)
+                        }
+                    }
+                }
+
                 // Stats summary (if rounds exist)
                 if !rounds.isEmpty {
                     statsSummary
                 }
 
-                // Round list
+                // Past round list
+                let pastRounds = rounds.filter { $0.status != "in_progress" }
                 if loading {
                     ProgressView()
                         .tint(Color.club.primary)
                         .padding(.top, 40)
-                } else if rounds.isEmpty {
+                } else if rounds.isEmpty && eligibleBookings.isEmpty {
                     VStack(spacing: 12) {
                         Image(systemName: "figure.golf")
                             .font(.system(size: 32))
@@ -251,20 +323,20 @@ struct ScorecardView: View {
                         Text("No rounds yet")
                             .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(Color.club.onSurfaceVariant)
-                        Text("Start a new round to track your scores")
+                        Text("Book a tee time to get started")
                             .font(.system(size: 13))
                             .foregroundStyle(Color.club.outline)
                     }
                     .padding(.top, 32)
-                } else {
+                } else if !pastRounds.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("RECENT ROUNDS")
+                        Text("PAST ROUNDS")
                             .font(.system(size: 10, weight: .bold))
                             .tracking(1)
                             .foregroundStyle(Color.club.outline)
                             .padding(.horizontal, 20)
 
-                        ForEach(rounds) { round in
+                        ForEach(pastRounds) { round in
                             roundCard(round)
                         }
                     }
@@ -318,6 +390,106 @@ struct ScorecardView: View {
         }
         .frame(maxWidth: .infinity)
     }
+
+    // ── Ready to Play card (today's booking, no round started) ──
+
+    private func readyToPlayCard(_ booking: TodayBookingInfo) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: "flag.fill")
+                .font(.system(size: 20))
+                .foregroundStyle(.white)
+                .frame(width: 48, height: 48)
+                .background(Color.club.primary, in: RoundedRectangle(cornerRadius: 14))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(booking.facilityName)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color.club.foreground)
+
+                Text("Today at \(formatTime(booking.startTime)) \u{00B7} \(booking.partySize) \(booking.partySize == 1 ? "player" : "players")")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.club.onSurfaceVariant)
+            }
+
+            Spacer()
+
+            Button {
+                Task { await startRoundFromBooking(booking) }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "flag.fill")
+                        .font(.system(size: 11))
+                    Text("Start")
+                        .font(.system(size: 13, weight: .bold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Color.club.primary, in: RoundedRectangle(cornerRadius: 10))
+            }
+            .disabled(startingFromBooking)
+            .opacity(startingFromBooking ? 0.6 : 1.0)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.club.accent.opacity(0.3))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.club.primary.opacity(0.3), lineWidth: 1.5)
+        )
+        .padding(.horizontal, 20)
+    }
+
+    // ── Active round card (in progress, tappable to continue) ──
+
+    private func activeRoundCard(_ round: GolfRound) -> some View {
+        Button {
+            Task { await loadRoundForScoring(round.id) }
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "clock.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.orange)
+                    .frame(width: 48, height: 48)
+                    .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(round.facilityName)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Color.club.foreground)
+
+                    Text("\(round.holesPlayed)H \u{00B7} \(round.teeSet.capitalized) tees \u{00B7} \(formatDate(round.playedAt))")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.club.onSurfaceVariant)
+                }
+
+                Spacer()
+
+                HStack(spacing: 4) {
+                    Text("Continue")
+                        .font(.system(size: 13, weight: .semibold))
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundStyle(.orange)
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.orange.opacity(0.06))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.orange.opacity(0.25), lineWidth: 1.5)
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 20)
+    }
+
+    // ── Past round card ──
 
     private func roundCard(_ round: GolfRound) -> some View {
         Button {
@@ -440,9 +612,9 @@ struct ScorecardView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 24) {
                 screenHeader(
-                    title: "New Round",
-                    subtitle: "Set up your round details",
-                    backAction: { screen = .history }
+                    title: pendingBookingId != nil ? "Start Round" : "Log Practice Round",
+                    subtitle: pendingBookingId != nil ? "Starting round from your booking" : "Set up your round details",
+                    backAction: { pendingBookingId = nil; screen = .history }
                 )
 
                 // Course picker
@@ -1289,6 +1461,15 @@ struct ScorecardView: View {
         return df.string(from: date)
     }
 
+    private func formatTime(_ time: String) -> String {
+        let parts = time.split(separator: ":")
+        guard parts.count >= 2, let hour = Int(parts[0]) else { return time }
+        let minute = parts[1]
+        let ampm = hour >= 12 ? "PM" : "AM"
+        let display = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour)
+        return "\(display):\(minute) \(ampm)"
+    }
+
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // MARK: - API Calls
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1313,30 +1494,68 @@ struct ScorecardView: View {
         }
     }
 
-    private func createRound() async {
-        guard !selectedFacilityId.isEmpty else { return }
-        creating = true
-        defer { creating = false }
+    private func fetchTodayBookings() async {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        let today = df.string(from: Date())
 
-        struct CreateRequest: Encodable {
-            let facilityId: String
-            let playedAt: String
-            let teeSet: String
-            let holesPlayed: Int
-            let weather: String?
+        do {
+            let response: TodayBookingsResponse = try await APIClient.shared.get("/bookings/my")
+            // Filter to today's golf bookings only
+            todayBookings = response.bookings.filter { $0.date == today && $0.facilityType == "golf" }
+        } catch {
+            print("Failed to fetch today's bookings:", error)
         }
+    }
+
+    /// Bookings that don't already have a round started
+    private var eligibleBookings: [TodayBookingInfo] {
+        todayBookings.filter { booking in
+            !rounds.contains { $0.bookingId == booking.id }
+        }
+    }
+
+    private func startRoundFromBooking(_ booking: TodayBookingInfo) async {
+        startingFromBooking = true
+        defer { startingFromBooking = false }
 
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd"
 
         do {
-            let response: CreateRoundResponse = try await APIClient.shared.post("/scorecards", body: CreateRequest(
+            let response: CreateRoundResponse = try await APIClient.shared.post("/scorecards", body: CreateRoundRequest(
+                facilityId: booking.facilityId,
+                playedAt: booking.date,
+                teeSet: "middle",
+                holesPlayed: 18,
+                weather: nil,
+                bookingId: booking.id
+            ))
+            await fetchTodayBookings()
+            await loadRoundForScoring(response.round.id)
+        } catch {
+            print("Failed to start round from booking:", error)
+        }
+    }
+
+    private func createRound() async {
+        guard !selectedFacilityId.isEmpty else { return }
+        creating = true
+        defer { creating = false }
+
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+
+        do {
+            let response: CreateRoundResponse = try await APIClient.shared.post("/scorecards", body: CreateRoundRequest(
                 facilityId: selectedFacilityId,
                 playedAt: df.string(from: Date()),
                 teeSet: teeSet,
                 holesPlayed: holesPlayed,
-                weather: weather.isEmpty ? nil : weather
+                weather: weather.isEmpty ? nil : weather,
+                bookingId: pendingBookingId
             ))
+            pendingBookingId = nil
             await loadRoundForScoring(response.round.id)
         } catch {
             print("Failed to create round:", error)

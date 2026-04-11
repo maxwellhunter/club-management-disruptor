@@ -1,10 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Flag } from "lucide-react";
 import type { BookingWithDetails, TeeTimeSlot } from "@club/shared";
 
+type MyBooking = BookingWithDetails & { is_owner?: boolean };
+
 export default function MyBookings() {
-  const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
+  const router = useRouter();
+  const [bookings, setBookings] = useState<MyBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
@@ -132,6 +137,53 @@ export default function MyBookings() {
       setEditError("Failed to modify booking");
     } finally {
       setSaving(false);
+    }
+  }
+
+  // Check if a booking is eligible for "Start Round" — same day, within 30 min of tee time or after
+  function isStartRoundEligible(booking: BookingWithDetails): boolean {
+    const today = new Date().toISOString().split("T")[0];
+    if (booking.date !== today) return false;
+    if (booking.facility_type !== "golf") return false;
+
+    const now = new Date();
+    const [h, m] = booking.start_time.split(":").map(Number);
+    const teeTime = new Date();
+    teeTime.setHours(h, m, 0, 0);
+    // Allow starting 30 min before tee time through 4 hours after
+    const earliest = new Date(teeTime.getTime() - 30 * 60 * 1000);
+    const latest = new Date(teeTime.getTime() + 4 * 60 * 60 * 1000);
+    return now >= earliest && now <= latest;
+  }
+
+  const [startingRound, setStartingRound] = useState<string | null>(null);
+
+  async function handleStartRound(booking: BookingWithDetails) {
+    setStartingRound(booking.id);
+    try {
+      const res = await fetch("/api/scorecards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          facility_id: booking.facility_id,
+          played_at: booking.date,
+          holes_played: 18,
+          tee_set: "middle",
+          booking_id: booking.id,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        router.push(`/dashboard/scorecards/${data.round.id}`);
+      } else {
+        const data = await res.json();
+        console.error("Start round failed:", data.error);
+      }
+    } catch (err) {
+      console.error("Start round failed:", err);
+    } finally {
+      setStartingRound(null);
     }
   }
 
@@ -335,20 +387,39 @@ export default function MyBookings() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => startEdit(booking)}
-                disabled={editingBooking?.id === booking.id}
-                className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-xs font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--muted)] disabled:opacity-50"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => handleCancel(booking.id)}
-                disabled={cancellingId === booking.id}
-                className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
-              >
-                {cancellingId === booking.id ? "Cancelling..." : "Cancel"}
-              </button>
+              {isStartRoundEligible(booking) && (
+                <button
+                  onClick={() => handleStartRound(booking)}
+                  disabled={startingRound === booking.id}
+                  className="rounded-lg bg-[var(--primary)] px-3 py-1.5 text-xs font-medium text-[var(--primary-foreground)] transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <Flag className="h-3.5 w-3.5" />
+                  {startingRound === booking.id ? "Starting..." : "Start Round"}
+                </button>
+              )}
+              {booking.is_owner !== false && (
+                <>
+                  <button
+                    onClick={() => startEdit(booking)}
+                    disabled={editingBooking?.id === booking.id}
+                    className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-xs font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--muted)] disabled:opacity-50"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleCancel(booking.id)}
+                    disabled={cancellingId === booking.id}
+                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
+                  >
+                    {cancellingId === booking.id ? "Cancelling..." : "Cancel"}
+                  </button>
+                </>
+              )}
+              {booking.is_owner === false && (
+                <span className="rounded-lg bg-[var(--muted)] px-3 py-1.5 text-xs font-medium text-[var(--muted-foreground)]">
+                  Invited
+                </span>
+              )}
             </div>
           </div>
         ))}

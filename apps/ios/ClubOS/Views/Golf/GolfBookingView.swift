@@ -49,6 +49,7 @@ struct MyBooking: Decodable, Identifiable {
     let notes: String?
     let facilityName: String
     let facilityType: String
+    let isOwner: Bool?
 }
 
 struct MyBookingsResponse: Decodable {
@@ -276,36 +277,19 @@ struct GolfBookingView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 8) {
-                    NavigationLink {
-                        PlayerRatesView()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "dollarsign.circle.fill")
-                                .font(.system(size: 12))
-                            Text("Rates")
-                                .font(.system(size: 12, weight: .semibold))
-                        }
-                        .foregroundStyle(.orange)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color.orange.opacity(0.12), in: Capsule())
+                NavigationLink {
+                    ScorecardView()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "flag.fill")
+                            .font(.system(size: 12))
+                        Text("Scorecard")
+                            .font(.system(size: 12, weight: .semibold))
                     }
-
-                    NavigationLink {
-                        ScorecardView()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "flag.fill")
-                                .font(.system(size: 12))
-                            Text("Scorecard")
-                                .font(.system(size: 12, weight: .semibold))
-                        }
-                        .foregroundStyle(Color.club.primary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color.club.accent, in: Capsule())
-                    }
+                    .foregroundStyle(Color.club.primary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.club.accent, in: Capsule())
                 }
             }
         }
@@ -514,28 +498,59 @@ struct GolfBookingView: View {
 
                 // Actions
                 HStack(spacing: 10) {
-                    // Cancel button
-                    Button {
-                        bookingToCancel = booking
-                        showCancelAlert = true
-                    } label: {
-                        Group {
-                            if cancellingId == booking.id {
-                                ProgressView()
-                                    .controlSize(.small)
-                                    .tint(Color.club.destructive)
-                            } else {
-                                Image(systemName: "xmark.circle")
-                                    .font(.system(size: 16))
-                                    .foregroundStyle(Color.club.onSurfaceVariant)
-                            }
-                        }
-                        .frame(width: 40, height: 36)
-                        .background(Color.club.surfaceContainerLow, in: RoundedRectangle(cornerRadius: 10))
+                    Spacer()
+
+                    // "Invited" badge for non-owner bookings
+                    if booking.isOwner == false {
+                        Text("Invited")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Color.club.onSurfaceVariant)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.club.surfaceContainerLow, in: Capsule())
                     }
-                    .disabled(cancellingId == booking.id)
+
+                    // Start Round button — only for today's golf bookings
+                    if isStartRoundEligible(booking) {
+                        NavigationLink {
+                            ScorecardView()
+                        } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: "flag.fill")
+                                    .font(.system(size: 11))
+                                Text("Start Round")
+                                    .font(.system(size: 12, weight: .bold))
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Color.club.primary, in: RoundedRectangle(cornerRadius: 10))
+                        }
+                    }
+
+                    // Cancel button — only for booking owner
+                    if booking.isOwner != false {
+                        Button {
+                            bookingToCancel = booking
+                            showCancelAlert = true
+                        } label: {
+                            Group {
+                                if cancellingId == booking.id {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                        .tint(Color.club.destructive)
+                                } else {
+                                    Image(systemName: "xmark.circle")
+                                        .font(.system(size: 16))
+                                        .foregroundStyle(Color.club.onSurfaceVariant)
+                                }
+                            }
+                            .frame(width: 40, height: 36)
+                            .background(Color.club.surfaceContainerLow, in: RoundedRectangle(cornerRadius: 10))
+                        }
+                        .disabled(cancellingId == booking.id)
+                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .padding(14)
         }
@@ -1474,6 +1489,34 @@ struct GolfBookingView: View {
             .padding(.vertical, 14)
             .background(.ultraThinMaterial)
         }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // MARK: - Helpers
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// Check if a booking is eligible for "Start Round" — same day, within 30 min before through 4 hours after tee time
+    private func isStartRoundEligible(_ booking: MyBooking) -> Bool {
+        guard booking.facilityType == "golf" else { return false }
+
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        let today = df.string(from: Date())
+        guard booking.date == today else { return false }
+
+        let parts = booking.startTime.split(separator: ":").compactMap { Int($0) }
+        guard parts.count >= 2 else { return false }
+
+        let calendar = Calendar.current
+        var components = calendar.dateComponents([.year, .month, .day], from: Date())
+        components.hour = parts[0]
+        components.minute = parts[1]
+        guard let teeTime = calendar.date(from: components) else { return false }
+
+        let earliest = teeTime.addingTimeInterval(-30 * 60)       // 30 min before
+        let latest = teeTime.addingTimeInterval(4 * 60 * 60)      // 4 hours after
+        let now = Date()
+        return now >= earliest && now <= latest
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

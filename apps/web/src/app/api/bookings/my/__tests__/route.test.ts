@@ -17,6 +17,13 @@ jest.mock("@/lib/golf-eligibility", () => ({
   getMemberWithTier: (...args: unknown[]) => mockGetMemberWithTier(...args),
 }));
 
+const mockAdminFrom = jest.fn();
+jest.mock("@/lib/supabase/admin", () => ({
+  getSupabaseAdmin: jest.fn().mockReturnValue({
+    from: (...args: unknown[]) => mockAdminFrom(...args),
+  }),
+}));
+
 import { GET } from "../route";
 
 function createChainMock(result: { data?: unknown; error?: unknown }) {
@@ -52,6 +59,7 @@ describe("GET /api/bookings/my", () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: "u-1" } } });
     mockGetMemberWithTier.mockResolvedValue({ member });
     mockFrom.mockReturnValue(createChainMock({ data: [] }));
+    mockAdminFrom.mockReturnValue(createChainMock({ data: [] }));
     const res = await GET(new Request("http://localhost/api/bookings/my"));
     expect(res.status).toBe(200);
     const body = await res.json();
