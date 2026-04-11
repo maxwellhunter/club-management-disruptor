@@ -1,26 +1,36 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+
 /**
- * Shows a colored banner in non-production environments so you never
- * accidentally test or demo against the wrong database.
- *
- * - Staging: orange bar
- * - Local dev: blue bar
- * - Production: hidden
+ * Shows a warning banner when logged in with a demo account.
+ * Hidden for real users and when not logged in.
  */
+const DEMO_EMAILS = [
+  "admin@greenfieldcc.com",
+  "staff@greenfieldcc.com",
+  "member@greenfieldcc.com",
+  "golf@greenfieldcc.com",
+];
+
 export function EnvBanner() {
-  const env = process.env.NEXT_PUBLIC_ENV || "development";
+  const [demoEmail, setDemoEmail] = useState<string | null>(null);
 
-  if (env === "production") return null;
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user && DEMO_EMAILS.includes(user.email ?? "")) {
+        setDemoEmail(user.email!);
+      }
+    });
+  }, []);
 
-  const config = {
-    staging: { label: "STAGING", bg: "bg-orange-500", text: "text-white" },
-    development: { label: "LOCAL DEV", bg: "bg-blue-500", text: "text-white" },
-  }[env] ?? { label: env.toUpperCase(), bg: "bg-yellow-500", text: "text-black" };
+  if (!demoEmail) return null;
 
   return (
-    <div className={`${config.bg} ${config.text} text-center text-xs font-bold py-0.5 px-2 z-50`}>
-      ⚠ {config.label} ENVIRONMENT — Data here is not production
+    <div className="bg-amber-500 text-white text-center text-xs font-bold py-0.5 px-2 z-50">
+      Demo Account ({demoEmail}) — Data here is shared and may be reset
     </div>
   );
 }
