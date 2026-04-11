@@ -3,14 +3,16 @@ import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { BlurView } from "expo-blur";
-import { Colors } from "@/constants/theme";
+import { useTheme } from "@/lib/theme-context";
 
 export default function TabLayout() {
+  const { colors, isDark } = useTheme();
+
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors.light.primary,
-        tabBarInactiveTintColor: Colors.light.mutedForeground,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.mutedForeground,
         tabBarStyle: Platform.OS === "ios"
           ? {
               position: "absolute",
@@ -22,7 +24,8 @@ export default function TabLayout() {
               elevation: 0,
             }
           : {
-              borderTopColor: Colors.light.border,
+              borderTopColor: colors.border,
+              backgroundColor: colors.background,
               height: 60,
               paddingBottom: 8,
               paddingTop: 8,
@@ -31,12 +34,12 @@ export default function TabLayout() {
           Platform.OS === "ios" ? (
             <BlurView
               intensity={80}
-              tint="systemChromeMaterial"
+              tint={isDark ? "dark" : "systemChromeMaterial"}
               style={StyleSheet.absoluteFill}
             />
           ) : null,
-        headerStyle: { backgroundColor: Colors.light.background },
-        headerTintColor: Colors.light.foreground,
+        headerStyle: { backgroundColor: colors.background },
+        headerTintColor: colors.foreground,
         headerShadowVisible: false,
       }}
       screenListeners={{
