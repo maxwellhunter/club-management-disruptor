@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { EnvBanner } from "@/components/env-banner";
-
 export const metadata: Metadata = {
   title: "ClubOS - Modern Club Management",
   description:
@@ -31,7 +29,6 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased">
-        <EnvBanner />
         {children}
       </body>
     </html>
