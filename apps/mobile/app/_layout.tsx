@@ -58,7 +58,7 @@ function RootLayoutNav() {
   const { colors, isDark } = useTheme();
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar style={isDark ? "light" : "dark"} />
       <OfflineBanner />
       <Stack>
@@ -70,6 +70,7 @@ function RootLayoutNav() {
             headerTitle: "Event Details",
             headerBackTitle: "Back",
             headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.background },
           }}
         />
         <Stack.Screen
@@ -78,6 +79,7 @@ function RootLayoutNav() {
             headerTitle: "Announcements",
             headerBackTitle: "Back",
             headerTintColor: colors.primary,
+            headerStyle: { backgroundColor: colors.background },
           }}
         />
         <Stack.Screen

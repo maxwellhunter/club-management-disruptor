@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { useAuth } from "@/lib/auth-context";
 import { Colors } from "@/constants/theme";
+import { useTheme } from "@/lib/theme-context";
 import { haptics } from "@/lib/haptics";
 import {
   hasBiometricHardware,
@@ -71,6 +72,7 @@ export default function LoginScreen() {
   const [biometricType, setBiometricType] = useState<BiometricType>("none");
   const [appleAuthAvailable, setAppleAuthAvailable] = useState(false);
   const { signIn, signInWithApple } = useAuth();
+  const { colors, isDark } = useTheme();
 
   useEffect(() => {
     checkBiometrics();
@@ -178,7 +180,7 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
     >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -186,16 +188,16 @@ export default function LoginScreen() {
       >
         {/* Header / Branding */}
         <View style={styles.brandingArea}>
-          <View style={styles.logoMark}>
-            <Ionicons name="diamond" size={20} color={Colors.light.primaryForeground} />
+          <View style={[styles.logoMark, { backgroundColor: colors.primary }]}>
+            <Ionicons name="diamond" size={20} color={colors.primaryForeground} />
           </View>
-          <Text style={styles.brandName}>CLUB OS</Text>
-          <View style={styles.brandDivider} />
+          <Text style={[styles.brandName, { color: colors.onSurfaceVariant }]}>CLUB OS</Text>
+          <View style={[styles.brandDivider, { backgroundColor: colors.outlineVariant }]} />
         </View>
 
         {/* Sign In Heading */}
-        <Text style={styles.heading}>Sign In</Text>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.heading, { color: colors.foreground }]}>Sign In</Text>
+        <Text style={[styles.subtitle, { color: colors.onSurfaceVariant }]}>
           Enter your credentials to access the club.
         </Text>
 
@@ -252,43 +254,45 @@ export default function LoginScreen() {
         <View style={styles.form}>
           {/* Email Field */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>EMAIL ADDRESS</Text>
-            <View style={styles.inputWrapper}>
+            <Text style={[styles.fieldLabel, { color: colors.onSurfaceVariant }]}>EMAIL ADDRESS</Text>
+            <View style={[styles.inputWrapper, { backgroundColor: colors.surfaceContainerLowest, borderBottomColor: colors.outlineVariant }]}>
               <Ionicons
                 name="mail-outline"
                 size={18}
-                color={Colors.light.onSurfaceVariant}
+                color={colors.onSurfaceVariant}
                 style={styles.inputIcon}
               />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: colors.foreground }]}
                 placeholder="name@example.com"
-                placeholderTextColor={Colors.light.outlineVariant}
+                placeholderTextColor={colors.outlineVariant}
                 value={email}
                 onChangeText={setEmail}
                 autoCapitalize="none"
                 keyboardType="email-address"
+                keyboardAppearance={isDark ? "dark" : "light"}
               />
             </View>
           </View>
 
           {/* Password Field */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>PASSWORD</Text>
-            <View style={styles.inputWrapper}>
+            <Text style={[styles.fieldLabel, { color: colors.onSurfaceVariant }]}>PASSWORD</Text>
+            <View style={[styles.inputWrapper, { backgroundColor: colors.surfaceContainerLowest, borderBottomColor: colors.outlineVariant }]}>
               <Ionicons
                 name="lock-open-outline"
                 size={18}
-                color={Colors.light.onSurfaceVariant}
+                color={colors.onSurfaceVariant}
                 style={styles.inputIcon}
               />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: colors.foreground }]}
                 placeholder="••••••••"
-                placeholderTextColor={Colors.light.outlineVariant}
+                placeholderTextColor={colors.outlineVariant}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
+                keyboardAppearance={isDark ? "dark" : "light"}
               />
             </View>
           </View>
@@ -303,35 +307,36 @@ export default function LoginScreen() {
               <View
                 style={[
                   styles.checkbox,
-                  rememberMe && styles.checkboxChecked,
+                  { borderColor: colors.outline },
+                  rememberMe && { backgroundColor: colors.primary, borderColor: colors.primary },
                 ]}
               >
                 {rememberMe && (
-                  <Ionicons name="checkmark" size={12} color={Colors.light.primaryForeground} />
+                  <Ionicons name="checkmark" size={12} color={colors.primaryForeground} />
                 )}
               </View>
-              <Text style={styles.rememberText}>Remember Me</Text>
+              <Text style={[styles.rememberText, { color: colors.onSurfaceVariant }]}>Remember Me</Text>
             </TouchableOpacity>
             <TouchableOpacity activeOpacity={0.7}>
-              <Text style={styles.forgotText}>Forgot Password?</Text>
+              <Text style={[styles.forgotText, { color: colors.primary }]}>Forgot Password?</Text>
             </TouchableOpacity>
           </View>
 
           {/* Sign In Button */}
           <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
+            style={[styles.button, { backgroundColor: colors.primaryContainer }, loading && styles.buttonDisabled]}
             onPress={handleLogin}
             disabled={loading}
             activeOpacity={0.85}
           >
-            <Text style={styles.buttonText}>
+            <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>
               {loading ? "Signing in..." : "Sign In"}
             </Text>
             {!loading && (
               <Ionicons
                 name="arrow-forward"
                 size={18}
-                color={Colors.light.primaryForeground}
+                color={colors.primaryForeground}
                 style={{ marginLeft: 8 }}
               />
             )}
@@ -339,25 +344,26 @@ export default function LoginScreen() {
 
           {/* Or Divider */}
           <View style={styles.orDivider}>
-            <View style={styles.orLine} />
-            <Text style={styles.orText}>or</Text>
-            <View style={styles.orLine} />
+            <View style={[styles.orLine, { backgroundColor: colors.outlineVariant }]} />
+            <Text style={[styles.orText, { color: colors.onSurfaceVariant }]}>or</Text>
+            <View style={[styles.orLine, { backgroundColor: colors.outlineVariant }]} />
           </View>
 
           {/* Biometrics Button */}
           <TouchableOpacity
-            style={styles.biometricsButton}
+            style={[styles.biometricsButton, { backgroundColor: colors.surfaceContainerHigh }]}
             activeOpacity={0.7}
             onPress={handleBiometricLogin}
           >
             <Ionicons
               name={biometricType === "facial" ? "scan-outline" : "finger-print"}
               size={20}
-              color={biometricAvailable ? Colors.light.primary : Colors.light.onSurfaceVariant}
+              color={biometricAvailable ? colors.primary : colors.onSurfaceVariant}
             />
             <Text style={[
               styles.biometricsText,
-              biometricAvailable && { color: Colors.light.primary, fontWeight: "600" },
+              { color: colors.foreground },
+              biometricAvailable && { color: colors.primary, fontWeight: "600" },
             ]}>
               {biometricAvailable
                 ? `Sign in with ${getBiometricLabel(biometricType)}`
@@ -365,11 +371,15 @@ export default function LoginScreen() {
             </Text>
           </TouchableOpacity>
 
-          {/* Apple Sign-In Button */}
+          {/* Apple Sign-In Button — adapts to system appearance */}
           {appleAuthAvailable && (
             <AppleAuthentication.AppleAuthenticationButton
               buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              buttonStyle={
+                isDark
+                  ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                  : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+              }
               cornerRadius={16}
               style={styles.appleButton}
               onPress={handleAppleSignIn}
@@ -383,32 +393,32 @@ export default function LoginScreen() {
             <Ionicons
               name="help-circle-outline"
               size={16}
-              color={Colors.light.onSurfaceVariant}
+              color={colors.onSurfaceVariant}
             />
-            <Text style={styles.footerLinkText}>Need help?</Text>
+            <Text style={[styles.footerLinkText, { color: colors.onSurfaceVariant }]}>Need help?</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.footerLink} activeOpacity={0.7}>
             <Ionicons
               name="shield-checkmark-outline"
               size={16}
-              color={Colors.light.onSurfaceVariant}
+              color={colors.onSurfaceVariant}
             />
-            <Text style={styles.footerLinkText}>Security</Text>
+            <Text style={[styles.footerLinkText, { color: colors.onSurfaceVariant }]}>Security</Text>
           </TouchableOpacity>
         </View>
 
         {/* Sign Up Link */}
         <View style={styles.signupRow}>
-          <Text style={styles.signupText}>Don't have an account? </Text>
+          <Text style={[styles.signupText, { color: colors.onSurfaceVariant }]}>Don't have an account? </Text>
           <Link href="/(auth)/signup" asChild>
             <TouchableOpacity>
-              <Text style={styles.signupLink}>Sign up</Text>
+              <Text style={[styles.signupLink, { color: colors.primary }]}>Sign up</Text>
             </TouchableOpacity>
           </Link>
         </View>
 
         {/* Legal Footer */}
-        <Text style={styles.legalText}>
+        <Text style={[styles.legalText, { color: colors.outline }]}>
           Reserved access for registered members of ClubOS.{"\n"}
           Unauthorized access is strictly prohibited.
         </Text>
