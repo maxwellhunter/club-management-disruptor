@@ -17,6 +17,8 @@ import { Colors } from "@/constants/theme";
 import { supabase } from "@/lib/supabase";
 import { trackPositiveAction } from "@/lib/store-review";
 import { copyToClipboard } from "@/lib/sharing";
+import { useMaxBrightness } from "@/lib/screen-brightness";
+import { haptics } from "@/lib/haptics";
 
 interface MemberInfo {
   full_name: string;
@@ -52,6 +54,9 @@ export default function MembershipCardScreen() {
   const [addingWallet, setAddingWallet] = useState<"apple" | "google" | null>(null);
 
   const appUrl = process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
+
+  // Boost screen brightness to max for QR code scanning
+  useMaxBrightness();
 
   const fetchMember = useCallback(async () => {
     try {
@@ -108,6 +113,7 @@ export default function MembershipCardScreen() {
   }, [fetchMember, fetchPasses]);
 
   async function handleAddToWallet(platform: "apple" | "google") {
+    haptics.medium();
     setAddingWallet(platform);
     try {
       const res = await fetch(`${appUrl}/api/wallet/passes`, {
@@ -144,6 +150,7 @@ export default function MembershipCardScreen() {
   }
 
   async function handleNfcTap() {
+    haptics.heavy();
     // Record a self-check-in tap
     try {
       const res = await fetch(`${appUrl}/api/wallet/nfc`, {

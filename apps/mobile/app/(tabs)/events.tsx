@@ -11,6 +11,7 @@ import {
   Platform,
   Image,
   Dimensions,
+  ActionSheetIOS,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
@@ -21,6 +22,7 @@ import { EventFormModal } from "@/components/event-form-modal";
 import { AttendeesModal } from "@/components/attendees-modal";
 import { haptics } from "@/lib/haptics";
 import { addEventToCalendar } from "@/lib/calendar";
+import { shareEvent } from "@/lib/sharing";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -327,6 +329,51 @@ export default function EventsScreen() {
     return new Date(event.start_date) < new Date();
   }
 
+  /** iOS-native long-press context menu for event cards */
+  function handleEventContextMenu(event: EventWithRsvp) {
+    if (Platform.OS !== "ios") return;
+    haptics.medium();
+    const options = ["Share Event", "Add to Calendar", "View Details"];
+    if (isAdmin) options.push("Edit Event");
+    options.push("Cancel");
+
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options,
+        cancelButtonIndex: options.length - 1,
+        title: event.title,
+        message: `${formatDate(event.start_date)} at ${formatTime(event.start_date)}`,
+      },
+      (buttonIndex) => {
+        if (buttonIndex === 0) {
+          shareEvent({
+            title: event.title,
+            date: event.start_date,
+            location: event.location || undefined,
+            description: event.description || undefined,
+          });
+        } else if (buttonIndex === 1) {
+          addEventToCalendar({
+            title: event.title,
+            startDate: event.start_date,
+            endDate: event.end_date || undefined,
+            location: event.location || undefined,
+            description: event.description || undefined,
+          }).then((added) => {
+            if (added) {
+              haptics.success();
+              Alert.alert("Added", "Event added to your calendar.");
+            }
+          });
+        } else if (buttonIndex === 2) {
+          router.push(`/event/${event.id}`);
+        } else if (buttonIndex === 3 && isAdmin) {
+          showAdminMenu(event);
+        }
+      }
+    );
+  }
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -382,7 +429,10 @@ export default function EventsScreen() {
                   styles.filterPill,
                   isActive && styles.filterPillActive,
                 ]}
-                onPress={() => setActiveCategory(cat)}
+                onPress={() => {
+                  haptics.selection();
+                  setActiveCategory(cat);
+                }}
                 activeOpacity={0.7}
               >
                 <Text
@@ -423,6 +473,7 @@ export default function EventsScreen() {
                 style={styles.featuredCard}
                 activeOpacity={0.85}
                 onPress={() => router.push(`/event/${featuredEvent.id}`)}
+                onLongPress={() => handleEventContextMenu(featuredEvent)}
               >
                 <Image
                   source={{ uri: getEventImage(featuredEvent) }}
@@ -535,6 +586,7 @@ export default function EventsScreen() {
                   style={styles.eventCard}
                   activeOpacity={0.85}
                   onPress={() => router.push(`/event/${event.id}`)}
+                  onLongPress={() => handleEventContextMenu(event)}
                 >
                   {/* Card image */}
                   <View style={styles.cardImageWrap}>

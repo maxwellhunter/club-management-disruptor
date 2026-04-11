@@ -11,6 +11,7 @@ import {
   Image,
   Platform,
   Dimensions,
+  ActionSheetIOS,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
@@ -523,6 +524,45 @@ export default function BookingsScreen() {
       month: "short",
       day: "numeric",
     });
+  }
+
+  /** iOS-native long-press context menu for booking cards */
+  function handleBookingContextMenu(booking: BookingWithDetails) {
+    if (Platform.OS !== "ios") return;
+    haptics.medium();
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options: ["Share Tee Time", "Add to Calendar", "Cancel Booking", "Dismiss"],
+        destructiveButtonIndex: 2,
+        cancelButtonIndex: 3,
+        title: `${booking.facility_name}`,
+        message: `${formatDate(booking.date)} at ${formatTime(booking.start_time)}`,
+      },
+      (buttonIndex) => {
+        if (buttonIndex === 0) {
+          shareTeeTime({
+            facilityName: booking.facility_name,
+            date: booking.date,
+            time: booking.start_time,
+            partySize: booking.party_size,
+          });
+        } else if (buttonIndex === 1) {
+          addTeeTimeToCalendar({
+            facilityName: booking.facility_name,
+            date: booking.date,
+            startTime: booking.start_time,
+            partySize: booking.party_size,
+          }).then((added) => {
+            if (added) {
+              haptics.success();
+              Alert.alert("Added", "Tee time added to your calendar.");
+            }
+          });
+        } else if (buttonIndex === 2) {
+          handleCancel(booking.id);
+        }
+      }
+    );
   }
 
   // ═══════════════════════════════════════════
@@ -1345,7 +1385,12 @@ export default function BookingsScreen() {
 
             <View style={s.bookingsList}>
               {upcomingBookings.map((b) => (
-                <View key={b.id} style={s.bookingCard}>
+                <TouchableOpacity
+                  key={b.id}
+                  style={s.bookingCard}
+                  activeOpacity={0.9}
+                  onLongPress={() => handleBookingContextMenu(b)}
+                >
                   {/* Course Image */}
                   <Image
                     source={{
@@ -1414,7 +1459,7 @@ export default function BookingsScreen() {
                       </TouchableOpacity>
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
 

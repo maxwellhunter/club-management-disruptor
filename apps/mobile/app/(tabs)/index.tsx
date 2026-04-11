@@ -8,6 +8,8 @@ import {
   Image,
   Platform,
   RefreshControl,
+  ActionSheetIOS,
+  Linking,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,9 +20,27 @@ import { getCurrentLocation, formatDistance, getDistanceMiles, type UserLocation
 import { useOnForeground } from "@/lib/app-state";
 import { indexForSpotlight, SpotlightHelpers } from "@/lib/spotlight";
 import { getBadgeCount } from "@/lib/notifications";
+import { haptics } from "@/lib/haptics";
+import { shareEvent } from "@/lib/sharing";
+import { addEventToCalendar } from "@/lib/calendar";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
+
+// Club coordinates (Greenfield CC placeholder)
+const CLUB_LOCATION = { latitude: 40.7128, longitude: -74.006 };
+const CLUB_NAME = "The Lakes at Greenfield";
+
+/** Open Apple Maps (iOS) or Google Maps (Android) with directions to the club */
+function openDirections() {
+  haptics.light();
+  const { latitude, longitude } = CLUB_LOCATION;
+  const url = Platform.select({
+    ios: `maps:0,0?daddr=${latitude},${longitude}&dirflg=d`,
+    default: `https://maps.google.com/maps?daddr=${latitude},${longitude}`,
+  });
+  Linking.openURL(url);
+}
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -168,9 +188,7 @@ export default function HomeScreen() {
     // Fetch location for distance indicator (non-blocking)
     getCurrentLocation().then((loc) => {
       if (loc) {
-        // Demo club coordinates (Greenfield CC placeholder)
-        const clubLocation: UserLocation = { latitude: 40.7128, longitude: -74.006 };
-        const miles = getDistanceMiles(loc, clubLocation);
+        const miles = getDistanceMiles(loc, CLUB_LOCATION as UserLocation);
         setDistanceText(formatDistance(miles));
       }
     }).catch(() => {
@@ -203,9 +221,38 @@ export default function HomeScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    haptics.light();
     await fetchDashboardData();
     setRefreshing(false);
   }, [fetchDashboardData]);
+
+  /** Long-press on event card shows iOS native context menu */
+  function handleEventLongPress(event: ClubEvent) {
+    if (Platform.OS !== "ios") return;
+    haptics.medium();
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options: ["Share Event", "Add to Calendar", "Cancel"],
+        cancelButtonIndex: 2,
+        title: event.title,
+      },
+      (buttonIndex) => {
+        if (buttonIndex === 0) {
+          shareEvent({
+            title: event.title,
+            date: new Date().toISOString(),
+            description: event.description,
+          });
+        } else if (buttonIndex === 1) {
+          addEventToCalendar({
+            title: event.title,
+            startDate: new Date().toISOString(),
+            description: event.description,
+          });
+        }
+      }
+    );
+  }
 
   return (
     <ScrollView
@@ -256,10 +303,19 @@ export default function HomeScreen() {
           {firstName}
         </Text>
         {distanceText && (
-          <View style={styles.distanceBadge}>
-            <Ionicons name="location-outline" size={12} color={Colors.light.primary} />
+          <TouchableOpacity
+            style={styles.distanceBadge}
+            onPress={openDirections}
+            activeOpacity={0.7}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel={`${distanceText} from The Lakes. Tap for directions.`}
+            accessibilityHint="Opens Apple Maps with directions to the club"
+          >
+            <Ionicons name="navigate-outline" size={12} color={Colors.light.primary} />
             <Text style={styles.distanceText}>{distanceText} from The Lakes</Text>
-          </View>
+            <Ionicons name="chevron-forward" size={10} color={Colors.light.primary} />
+          </TouchableOpacity>
         )}
       </View>
 
@@ -439,6 +495,7 @@ export default function HomeScreen() {
               ]}
               activeOpacity={0.7}
               onPress={() => router.push(`/event/${event.id}`)}
+              onLongPress={() => handleEventLongPress(event)}
             >
               {index === 0 && event.image_url ? (
                 <Image

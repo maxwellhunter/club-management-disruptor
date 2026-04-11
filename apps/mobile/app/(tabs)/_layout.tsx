@@ -1,7 +1,8 @@
-import { Platform } from "react-native";
+import { Platform, StyleSheet } from "react-native";
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { BlurView } from "expo-blur";
 import { Colors } from "@/constants/theme";
 
 export default function TabLayout() {
@@ -10,12 +11,30 @@ export default function TabLayout() {
       screenOptions={{
         tabBarActiveTintColor: Colors.light.primary,
         tabBarInactiveTintColor: Colors.light.mutedForeground,
-        tabBarStyle: {
-          borderTopColor: Colors.light.border,
-          height: Platform.OS === "ios" ? 84 : 60,
-          paddingBottom: Platform.OS === "ios" ? 28 : 8,
-          paddingTop: 8,
-        },
+        tabBarStyle: Platform.OS === "ios"
+          ? {
+              position: "absolute",
+              borderTopColor: "transparent",
+              backgroundColor: "transparent",
+              height: 84,
+              paddingBottom: 28,
+              paddingTop: 8,
+              elevation: 0,
+            }
+          : {
+              borderTopColor: Colors.light.border,
+              height: 60,
+              paddingBottom: 8,
+              paddingTop: 8,
+            },
+        tabBarBackground: () =>
+          Platform.OS === "ios" ? (
+            <BlurView
+              intensity={80}
+              tint="systemChromeMaterial"
+              style={StyleSheet.absoluteFill}
+            />
+          ) : null,
         headerStyle: { backgroundColor: Colors.light.background },
         headerTintColor: Colors.light.foreground,
         headerShadowVisible: false,
