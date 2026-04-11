@@ -69,14 +69,14 @@ export function Sidebar({ user }: { user: User }) {
   }
 
   return (
-    <aside className="flex h-full w-64 flex-col border-r border-[var(--border)] bg-[var(--muted)]">
+    <aside className="flex h-full w-64 flex-shrink-0 flex-col border-r border-[var(--border)] bg-[var(--muted)]">
       <div className="p-6">
         <h1 className="text-xl font-bold">
           Club<span className="text-[var(--primary)]">OS</span>
         </h1>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3">
+      <nav className="flex-1 overflow-y-auto space-y-1 px-3">
         {navigation.map((item) => {
           const isActive =
             item.href === "/dashboard"
