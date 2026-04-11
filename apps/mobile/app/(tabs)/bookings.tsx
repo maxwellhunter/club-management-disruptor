@@ -11,7 +11,6 @@ import {
   Image,
   Platform,
   Dimensions,
-  ActionSheetIOS,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/theme";
@@ -20,6 +19,7 @@ import { haptics } from "@/lib/haptics";
 import { addTeeTimeToCalendar } from "@/lib/calendar";
 import { trackPositiveAction } from "@/lib/store-review";
 import { shareTeeTime } from "@/lib/sharing";
+import { showBookingContextMenu } from "@/lib/context-menu";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -526,44 +526,7 @@ export default function BookingsScreen() {
     });
   }
 
-  /** iOS-native long-press context menu for booking cards */
-  function handleBookingContextMenu(booking: BookingWithDetails) {
-    if (Platform.OS !== "ios") return;
-    haptics.medium();
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        options: ["Share Tee Time", "Add to Calendar", "Cancel Booking", "Dismiss"],
-        destructiveButtonIndex: 2,
-        cancelButtonIndex: 3,
-        title: `${booking.facility_name}`,
-        message: `${formatDate(booking.date)} at ${formatTime(booking.start_time)}`,
-      },
-      (buttonIndex) => {
-        if (buttonIndex === 0) {
-          shareTeeTime({
-            facilityName: booking.facility_name,
-            date: booking.date,
-            time: booking.start_time,
-            partySize: booking.party_size,
-          });
-        } else if (buttonIndex === 1) {
-          addTeeTimeToCalendar({
-            facilityName: booking.facility_name,
-            date: booking.date,
-            startTime: booking.start_time,
-            partySize: booking.party_size,
-          }).then((added) => {
-            if (added) {
-              haptics.success();
-              Alert.alert("Added", "Tee time added to your calendar.");
-            }
-          });
-        } else if (buttonIndex === 2) {
-          handleCancel(booking.id);
-        }
-      }
-    );
-  }
+
 
   // ═══════════════════════════════════════════
   // Non-eligible view
@@ -1320,6 +1283,7 @@ export default function BookingsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => {
+              haptics.light();
               setRefreshing(true);
               fetchBookings();
             }}
@@ -1389,7 +1353,30 @@ export default function BookingsScreen() {
                   key={b.id}
                   style={s.bookingCard}
                   activeOpacity={0.9}
-                  onLongPress={() => handleBookingContextMenu(b)}
+                  onLongPress={() =>
+                    showBookingContextMenu({
+                      bookingId: b.id,
+                      facilityName: b.facility_name,
+                      date: formatDate(b.date),
+                      time: formatTime(b.start_time),
+                      onAddToCalendar: () =>
+                        addTeeTimeToCalendar({
+                          facilityName: b.facility_name,
+                          date: b.date,
+                          startTime: b.start_time,
+                          partySize: b.party_size,
+                          holes: b.holes,
+                        }),
+                      onShare: () =>
+                        shareTeeTime({
+                          facilityName: b.facility_name,
+                          date: b.date,
+                          time: b.start_time,
+                          partySize: b.party_size,
+                        }),
+                      onCancel: () => handleCancel(b.id),
+                    })
+                  }
                 >
                   {/* Course Image */}
                   <Image

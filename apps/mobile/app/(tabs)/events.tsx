@@ -11,7 +11,6 @@ import {
   Platform,
   Image,
   Dimensions,
-  ActionSheetIOS,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
@@ -23,6 +22,9 @@ import { AttendeesModal } from "@/components/attendees-modal";
 import { haptics } from "@/lib/haptics";
 import { addEventToCalendar } from "@/lib/calendar";
 import { shareEvent } from "@/lib/sharing";
+import { showEventContextMenu } from "@/lib/context-menu";
+import { trackPositiveAction } from "@/lib/store-review";
+import { announce } from "@/lib/accessibility";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -160,6 +162,8 @@ export default function EventsScreen() {
       if (res.ok) {
         if (newStatus === "attending") {
           haptics.success();
+          trackPositiveAction();
+          announce("RSVP confirmed");
           const event = events.find((e) => e.id === eventId);
           if (event) {
             Alert.alert("RSVP Confirmed!", `You're attending ${event.title}.`, [
@@ -329,50 +333,6 @@ export default function EventsScreen() {
     return new Date(event.start_date) < new Date();
   }
 
-  /** iOS-native long-press context menu for event cards */
-  function handleEventContextMenu(event: EventWithRsvp) {
-    if (Platform.OS !== "ios") return;
-    haptics.medium();
-    const options = ["Share Event", "Add to Calendar", "View Details"];
-    if (isAdmin) options.push("Edit Event");
-    options.push("Cancel");
-
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        options,
-        cancelButtonIndex: options.length - 1,
-        title: event.title,
-        message: `${formatDate(event.start_date)} at ${formatTime(event.start_date)}`,
-      },
-      (buttonIndex) => {
-        if (buttonIndex === 0) {
-          shareEvent({
-            title: event.title,
-            date: event.start_date,
-            location: event.location || undefined,
-            description: event.description || undefined,
-          });
-        } else if (buttonIndex === 1) {
-          addEventToCalendar({
-            title: event.title,
-            startDate: event.start_date,
-            endDate: event.end_date || undefined,
-            location: event.location || undefined,
-            description: event.description || undefined,
-          }).then((added) => {
-            if (added) {
-              haptics.success();
-              Alert.alert("Added", "Event added to your calendar.");
-            }
-          });
-        } else if (buttonIndex === 2) {
-          router.push(`/event/${event.id}`);
-        } else if (buttonIndex === 3 && isAdmin) {
-          showAdminMenu(event);
-        }
-      }
-    );
-  }
 
   if (loading) {
     return (
@@ -395,6 +355,7 @@ export default function EventsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => {
+              haptics.light();
               setRefreshing(true);
               fetchEvents();
             }}
@@ -434,6 +395,10 @@ export default function EventsScreen() {
                   setActiveCategory(cat);
                 }}
                 activeOpacity={0.7}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isActive }}
+                accessibilityLabel={`${cat} filter${isActive ? ", selected" : ""}`}
               >
                 <Text
                   style={[
@@ -473,7 +438,33 @@ export default function EventsScreen() {
                 style={styles.featuredCard}
                 activeOpacity={0.85}
                 onPress={() => router.push(`/event/${featuredEvent.id}`)}
-                onLongPress={() => handleEventContextMenu(featuredEvent)}
+                onLongPress={() =>
+                  isAdmin
+                    ? showAdminMenu(featuredEvent)
+                    : showEventContextMenu({
+                        title: featuredEvent.title,
+                        onAddToCalendar: () =>
+                          addEventToCalendar({
+                            title: featuredEvent.title,
+                            startDate: featuredEvent.start_date,
+                            endDate: featuredEvent.end_date || undefined,
+                            location: featuredEvent.location || undefined,
+                            description: featuredEvent.description || undefined,
+                          }),
+                        onShare: () =>
+                          shareEvent({
+                            title: featuredEvent.title,
+                            date: featuredEvent.start_date,
+                            location: featuredEvent.location || undefined,
+                            description: featuredEvent.description || undefined,
+                          }),
+                        onViewDetails: () => router.push(`/event/${featuredEvent.id}`),
+                      })
+                }
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={`Featured event: ${featuredEvent.title}, ${formatDate(featuredEvent.start_date)} at ${formatTime(featuredEvent.start_date)}${featuredEvent.user_rsvp_status === "attending" ? ", you are attending" : ""}`}
+                accessibilityHint="Tap to view details, long press for more options"
               >
                 <Image
                   source={{ uri: getEventImage(featuredEvent) }}
@@ -551,6 +542,13 @@ export default function EventsScreen() {
                       }
                       disabled={rsvpLoading === featuredEvent.id}
                       activeOpacity={0.7}
+                      accessible={true}
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        featuredEvent.user_rsvp_status === "attending"
+                          ? "Cancel RSVP"
+                          : getActionLabel(featuredEvent)
+                      }
                     >
                       {rsvpLoading === featuredEvent.id ? (
                         <ActivityIndicator size="small" color={Colors.light.primary} />
@@ -586,7 +584,33 @@ export default function EventsScreen() {
                   style={styles.eventCard}
                   activeOpacity={0.85}
                   onPress={() => router.push(`/event/${event.id}`)}
-                  onLongPress={() => handleEventContextMenu(event)}
+                  onLongPress={() =>
+                    isAdmin
+                      ? showAdminMenu(event)
+                      : showEventContextMenu({
+                          title: event.title,
+                          onAddToCalendar: () =>
+                            addEventToCalendar({
+                              title: event.title,
+                              startDate: event.start_date,
+                              endDate: event.end_date || undefined,
+                              location: event.location || undefined,
+                              description: event.description || undefined,
+                            }),
+                          onShare: () =>
+                            shareEvent({
+                              title: event.title,
+                              date: event.start_date,
+                              location: event.location || undefined,
+                              description: event.description || undefined,
+                            }),
+                          onViewDetails: () => router.push(`/event/${event.id}`),
+                        })
+                  }
+                  accessible={true}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${event.title}, ${formatDate(event.start_date)} at ${formatTime(event.start_date)}${spotsLeft !== null ? `, ${spotsLeft} seats remaining` : ""}${isAttending ? ", you are attending" : ""}`}
+                  accessibilityHint="Tap to view details, long press for more options"
                 >
                   {/* Card image */}
                   <View style={styles.cardImageWrap}>
@@ -688,6 +712,11 @@ export default function EventsScreen() {
                         }
                         disabled={isLoadingThis}
                         activeOpacity={0.7}
+                        accessible={true}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          isAttending ? "Cancel RSVP" : getActionLabel(event)
+                        }
                       >
                         {isLoadingThis ? (
                           <ActivityIndicator

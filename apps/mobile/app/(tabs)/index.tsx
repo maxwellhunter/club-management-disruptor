@@ -8,7 +8,6 @@ import {
   Image,
   Platform,
   RefreshControl,
-  ActionSheetIOS,
   Linking,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -20,9 +19,11 @@ import { getCurrentLocation, formatDistance, getDistanceMiles, type UserLocation
 import { useOnForeground } from "@/lib/app-state";
 import { indexForSpotlight, SpotlightHelpers } from "@/lib/spotlight";
 import { getBadgeCount } from "@/lib/notifications";
-import { haptics } from "@/lib/haptics";
+import { showEventContextMenu, showAnnouncementContextMenu } from "@/lib/context-menu";
 import { shareEvent } from "@/lib/sharing";
-import { addEventToCalendar } from "@/lib/calendar";
+import { addEventToCalendar, addTeeTimeToCalendar, addDiningToCalendar } from "@/lib/calendar";
+import { haptics } from "@/lib/haptics";
+import { announce } from "@/lib/accessibility";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -54,8 +55,11 @@ type ItineraryItem = {
   type: "tee_time" | "dining" | "event";
   title: string;
   time: string;
+  startTime: string;
+  date: string;
   subtitle: string;
   detail?: string;
+  partySize: number;
   icon: keyof typeof Ionicons.glyphMap;
 };
 
@@ -74,6 +78,8 @@ type ClubEvent = {
   category: string;
   description: string;
   image_url?: string;
+  start_datetime?: string;
+  location?: string;
 };
 
 function formatAnnouncementTime(dateString: string): string {
@@ -127,9 +133,12 @@ export default function HomeScreen() {
             ? "Dining Reservation"
             : "Tee Time",
         time: formatTime(b.start_time),
+        startTime: b.start_time,
+        date: b.date || today,
         subtitle: b.facilities?.name || "Club Facility",
         detail:
           b.party_size > 1 ? `Party of ${b.party_size}` : undefined,
+        partySize: b.party_size || 1,
         icon:
           b.facilities?.type === "dining"
             ? "restaurant-outline"
@@ -140,7 +149,7 @@ export default function HomeScreen() {
       // Fetch upcoming events
       const { data: eventData } = await supabase
         .from("events")
-        .select("id, title, description, image_url, event_type")
+        .select("id, title, description, image_url, event_type, start_datetime, location")
         .gte("start_datetime", new Date().toISOString())
         .eq("status", "published")
         .order("start_datetime", { ascending: true })
@@ -153,6 +162,8 @@ export default function HomeScreen() {
           category: formatCategory(e.event_type),
           description: e.description?.slice(0, 120) || "",
           image_url: e.image_url,
+          start_datetime: e.start_datetime,
+          location: e.location,
         }))
       );
 
@@ -220,39 +231,12 @@ export default function HomeScreen() {
   }, [announcements]);
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
     haptics.light();
+    setRefreshing(true);
     await fetchDashboardData();
     setRefreshing(false);
   }, [fetchDashboardData]);
 
-  /** Long-press on event card shows iOS native context menu */
-  function handleEventLongPress(event: ClubEvent) {
-    if (Platform.OS !== "ios") return;
-    haptics.medium();
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        options: ["Share Event", "Add to Calendar", "Cancel"],
-        cancelButtonIndex: 2,
-        title: event.title,
-      },
-      (buttonIndex) => {
-        if (buttonIndex === 0) {
-          shareEvent({
-            title: event.title,
-            date: new Date().toISOString(),
-            description: event.description,
-          });
-        } else if (buttonIndex === 1) {
-          addEventToCalendar({
-            title: event.title,
-            startDate: new Date().toISOString(),
-            description: event.description,
-          });
-        }
-      }
-    );
-  }
 
   return (
     <ScrollView
@@ -325,7 +309,12 @@ export default function HomeScreen() {
         {itinerary.length > 0 ? (
           <View style={styles.itineraryCard}>
             {itinerary.map((item, index) => (
-              <View key={item.id}>
+              <View
+                key={item.id}
+                accessible={true}
+                accessibilityRole="summary"
+                accessibilityLabel={`${item.title} at ${item.time}, ${item.subtitle}${item.detail ? `, ${item.detail}` : ""}`}
+              >
                 {index > 0 && <View style={styles.itineraryDivider} />}
                 <View style={styles.itineraryRow}>
                   <View style={styles.itineraryIconWrap}>
@@ -353,6 +342,38 @@ export default function HomeScreen() {
                       </View>
                     )}
                   </View>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      haptics.light();
+                      if (item.type === "tee_time") {
+                        await addTeeTimeToCalendar({
+                          facilityName: item.subtitle,
+                          date: item.date,
+                          startTime: item.startTime,
+                          partySize: item.partySize,
+                        });
+                      } else {
+                        await addDiningToCalendar({
+                          venueName: item.subtitle,
+                          date: item.date,
+                          time: item.startTime,
+                          partySize: item.partySize,
+                        });
+                      }
+                      haptics.success();
+                    }}
+                    style={styles.itineraryCalendarBtn}
+                    activeOpacity={0.7}
+                    accessible={true}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Add ${item.title} to calendar`}
+                  >
+                    <Ionicons
+                      name="calendar-outline"
+                      size={18}
+                      color={Colors.light.primary}
+                    />
+                  </TouchableOpacity>
                 </View>
               </View>
             ))}
@@ -412,7 +433,22 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   style={styles.announcementRow}
                   onPress={() => router.push("/announcements")}
+                  onLongPress={() =>
+                    showAnnouncementContextMenu(item.title, {
+                      onViewAll: () => router.push("/announcements"),
+                      onShare: () =>
+                        shareEvent({
+                          title: item.title,
+                          date: item.published_at || item.created_at,
+                          description: item.content,
+                        }),
+                    })
+                  }
                   activeOpacity={0.7}
+                  accessible={true}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.priority === "urgent" ? "Urgent: " : item.priority === "important" ? "Important: " : ""}${item.title}, ${formatAnnouncementTime(item.published_at || item.created_at)}`}
+                  accessibilityHint="View announcement details"
                 >
                   <View
                     style={[
@@ -495,7 +531,30 @@ export default function HomeScreen() {
               ]}
               activeOpacity={0.7}
               onPress={() => router.push(`/event/${event.id}`)}
-              onLongPress={() => handleEventLongPress(event)}
+              onLongPress={() =>
+                showEventContextMenu({
+                  title: event.title,
+                  onAddToCalendar: () =>
+                    addEventToCalendar({
+                      title: event.title,
+                      startDate: event.start_datetime || new Date().toISOString(),
+                      location: event.location,
+                      description: event.description,
+                    }),
+                  onShare: () =>
+                    shareEvent({
+                      title: event.title,
+                      date: event.start_datetime || new Date().toISOString(),
+                      location: event.location,
+                      description: event.description,
+                    }),
+                  onViewDetails: () => router.push(`/event/${event.id}`),
+                })
+              }
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={`${event.title}, ${event.category}`}
+              accessibilityHint="Tap to view details, long press for more options"
             >
               {index === 0 && event.image_url ? (
                 <Image
@@ -712,7 +771,16 @@ const styles = StyleSheet.create({
   },
   itineraryRow: {
     flexDirection: "row",
+    alignItems: "center",
     gap: 14,
+  },
+  itineraryCalendarBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: Colors.light.accent,
+    alignItems: "center",
+    justifyContent: "center",
   },
   itineraryIconWrap: {
     width: 40,

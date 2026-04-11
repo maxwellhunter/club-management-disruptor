@@ -20,6 +20,7 @@ import { showImagePickerOptions, type PickedImage } from "@/lib/image-picker";
 import { haptics } from "@/lib/haptics";
 import { supabase } from "@/lib/supabase";
 import { useOnForeground } from "@/lib/app-state";
+import { showContactOptions } from "@/lib/mail-composer";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -267,6 +268,7 @@ export default function ProfileScreen() {
         <RefreshControl
           refreshing={refreshing}
           onRefresh={() => {
+            haptics.light();
             setRefreshing(true);
             fetchBilling();
             fetchInvoices();
@@ -515,6 +517,29 @@ export default function ProfileScreen() {
             title="Security & Privacy"
             subtitle="Password, 2FA, data preferences"
             onPress={() => router.push("/settings/security" as never)}
+          />
+          <View style={styles.settingsDivider} />
+          <SettingsRow
+            icon="color-palette-outline"
+            title="Appearance"
+            subtitle="Dark mode, theme preferences"
+            onPress={() => router.push("/settings/appearance" as never)}
+          />
+        </View>
+      </View>
+
+      {/* Contact Club */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Club Services</Text>
+        <View style={styles.settingsCard}>
+          <SettingsRow
+            icon="call-outline"
+            title="Contact The Club"
+            subtitle="Call, email front desk, pro shop, or dining"
+            onPress={() => {
+              haptics.light();
+              showContactOptions();
+            }}
           />
         </View>
       </View>
