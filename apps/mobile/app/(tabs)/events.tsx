@@ -333,6 +333,7 @@ export default function EventsScreen() {
     return new Date(event.start_date) < new Date();
   }
 
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -389,7 +390,10 @@ export default function EventsScreen() {
                   styles.filterPill,
                   isActive && styles.filterPillActive,
                 ]}
-                onPress={() => setActiveCategory(cat)}
+                onPress={() => {
+                  haptics.selection();
+                  setActiveCategory(cat);
+                }}
                 activeOpacity={0.7}
                 accessible={true}
                 accessibilityRole="button"

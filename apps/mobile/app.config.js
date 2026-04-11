@@ -198,6 +198,7 @@ module.exports = {
         "expo-location",
         { locationWhenInUsePermission: "See nearby club facilities and get directions." },
       ],
+      "expo-brightness",
     ],
     experiments: {
       typedRoutes: true,

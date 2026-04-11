@@ -57,6 +57,9 @@ importers:
       expo-blur:
         specifier: ^55.0.10
         version: 55.0.10(expo@54.0.33)(react-native@0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
+      expo-brightness:
+        specifier: ^55.0.13
+        version: 55.0.13(expo@54.0.33)(react-native@0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
       expo-calendar:
         specifier: ^55.0.14
         version: 55.0.14(expo@54.0.33)(react-native@0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
@@ -2907,6 +2910,12 @@ packages:
     peerDependencies:
       expo: '*'
       react: 19.1.0
+      react-native: '*'
+
+  expo-brightness@55.0.13:
+    resolution: {integrity: sha512-vFMrB+ZLn9CBO4cTngh7oaogzYEhUlXvA0/V+iWBYwXrSQNb1lYZIfV2KYsehnwWvox8mDlVEGXtd9rU5Hi11A==}
+    peerDependencies:
+      expo: '*'
       react-native: '*'
 
   expo-calendar@55.0.14:
@@ -9230,6 +9239,11 @@ snapshots:
     dependencies:
       expo: 54.0.33(@babel/core@7.29.0)(@expo/metro-runtime@5.0.4(react-native@0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(expo-router@5.0.7)(react-native@0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
       react: 19.1.0
+      react-native: 0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)
+
+  expo-brightness@55.0.13(expo@54.0.33)(react-native@0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)):
+    dependencies:
+      expo: 54.0.33(@babel/core@7.29.0)(@expo/metro-runtime@5.0.4(react-native@0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)))(expo-router@5.0.7)(react-native@0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
       react-native: 0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)
 
   expo-calendar@55.0.14(expo@54.0.33)(react-native@0.81.3(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)):
