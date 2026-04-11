@@ -18,10 +18,11 @@ import { getCurrentLocation, formatDistance, getDistanceMiles, type UserLocation
 import { useOnForeground } from "@/lib/app-state";
 import { indexForSpotlight, SpotlightHelpers } from "@/lib/spotlight";
 import { getBadgeCount } from "@/lib/notifications";
-import { showEventContextMenu } from "@/lib/context-menu";
+import { showEventContextMenu, showAnnouncementContextMenu } from "@/lib/context-menu";
 import { shareEvent } from "@/lib/sharing";
 import { addEventToCalendar, addTeeTimeToCalendar, addDiningToCalendar } from "@/lib/calendar";
 import { haptics } from "@/lib/haptics";
+import { announce } from "@/lib/accessibility";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -284,7 +285,12 @@ export default function HomeScreen() {
         {itinerary.length > 0 ? (
           <View style={styles.itineraryCard}>
             {itinerary.map((item, index) => (
-              <View key={item.id}>
+              <View
+                key={item.id}
+                accessible={true}
+                accessibilityRole="summary"
+                accessibilityLabel={`${item.title} at ${item.time}, ${item.subtitle}${item.detail ? `, ${item.detail}` : ""}`}
+              >
                 {index > 0 && <View style={styles.itineraryDivider} />}
                 <View style={styles.itineraryRow}>
                   <View style={styles.itineraryIconWrap}>
@@ -403,10 +409,21 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   style={styles.announcementRow}
                   onPress={() => router.push("/announcements")}
+                  onLongPress={() =>
+                    showAnnouncementContextMenu(item.title, {
+                      onViewAll: () => router.push("/announcements"),
+                      onShare: () =>
+                        shareEvent({
+                          title: item.title,
+                          date: item.published_at || item.created_at,
+                          description: item.content,
+                        }),
+                    })
+                  }
                   activeOpacity={0.7}
                   accessible={true}
                   accessibilityRole="button"
-                  accessibilityLabel={`${item.priority === "urgent" ? "Urgent: " : item.priority === "important" ? "Important: " : ""}${item.title}`}
+                  accessibilityLabel={`${item.priority === "urgent" ? "Urgent: " : item.priority === "important" ? "Important: " : ""}${item.title}, ${formatAnnouncementTime(item.published_at || item.created_at)}`}
                   accessibilityHint="View announcement details"
                 >
                   <View
@@ -510,6 +527,11 @@ export default function HomeScreen() {
                   onViewDetails: () => router.push(`/event/${event.id}`),
                 })
               }
+              }
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={`${event.title}, ${event.category}`}
+              accessibilityHint="Tap to view details, long press for more options"
             >
               {index === 0 && event.image_url ? (
                 <Image

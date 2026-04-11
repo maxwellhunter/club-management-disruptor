@@ -1,4 +1,10 @@
-import { ActionSheetIOS, Alert, Platform, Share } from "react-native";
+/**
+ * iOS Context Menu Utilities
+ *
+ * Provides ActionSheetIOS-based context menus for long-press actions on cards.
+ * Falls back to Alert.alert on Android.
+ */
+import { ActionSheetIOS, Alert, Platform } from "react-native";
 import { haptics } from "./haptics";
 
 interface MenuAction {
@@ -8,6 +14,11 @@ interface MenuAction {
   onPress: () => void;
 }
 
+/**
+ * Show a context menu with haptic feedback.
+ * On iOS, uses the native ActionSheetIOS for a polished feel.
+ * On Android, falls back to Alert.alert with buttons.
+ */
 export function showContextMenu(
   title: string,
   actions: MenuAction[],
@@ -47,6 +58,8 @@ export function showContextMenu(
   }
 }
 
+// ─── Pre-built context menus for common entities ────────────────────
+
 export function showBookingContextMenu(options: {
   bookingId: string;
   facilityName: string;
@@ -73,5 +86,16 @@ export function showEventContextMenu(options: {
     { label: "Add to Calendar", onPress: options.onAddToCalendar },
     { label: "Share Event", onPress: options.onShare },
     { label: "View Details", onPress: options.onViewDetails },
+  ]);
+}
+
+export function showAnnouncementContextMenu(options: {
+  title: string;
+  onShare: () => void;
+  onViewAll: () => void;
+}): void {
+  showContextMenu(options.title, [
+    { label: "View All Announcements", onPress: options.onViewAll },
+    { label: "Share", onPress: options.onShare },
   ]);
 }
