@@ -157,18 +157,42 @@ struct EventsView: View {
             screen = .detail
         } label: {
             VStack(alignment: .leading, spacing: 0) {
-                // Hero gradient
+                // Hero image or gradient
                 ZStack(alignment: .bottomLeading) {
-                    LinearGradient(
-                        colors: gradientColors,
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .frame(height: 160)
-                    .overlay {
-                        Image(systemName: icon)
-                            .font(.system(size: 56))
-                            .foregroundStyle(.white.opacity(0.1))
+                    if let imageUrl = event.imageUrl, let url = URL(string: imageUrl) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            default:
+                                LinearGradient(
+                                    colors: gradientColors,
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                                .overlay {
+                                    Image(systemName: icon)
+                                        .font(.system(size: 56))
+                                        .foregroundStyle(.white.opacity(0.1))
+                                }
+                            }
+                        }
+                        .frame(height: 160)
+                        .clipped()
+                    } else {
+                        LinearGradient(
+                            colors: gradientColors,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .frame(height: 160)
+                        .overlay {
+                            Image(systemName: icon)
+                                .font(.system(size: 56))
+                                .foregroundStyle(.white.opacity(0.1))
+                        }
                     }
 
                     // Date badge
@@ -265,19 +289,39 @@ struct EventsView: View {
             screen = .detail
         } label: {
             HStack(spacing: 14) {
-                // Icon with gradient
-                ZStack {
-                    LinearGradient(
-                        colors: gradientColors,
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    Image(systemName: icon)
-                        .font(.system(size: 18))
-                        .foregroundStyle(.white.opacity(0.7))
+                // Event image or icon gradient
+                if let imageUrl = event.imageUrl, let url = URL(string: imageUrl) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        default:
+                            ZStack {
+                                LinearGradient(colors: gradientColors, startPoint: .topLeading, endPoint: .bottomTrailing)
+                                Image(systemName: icon)
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(.white.opacity(0.7))
+                            }
+                        }
+                    }
+                    .frame(width: 56, height: 56)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                } else {
+                    ZStack {
+                        LinearGradient(
+                            colors: gradientColors,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        Image(systemName: icon)
+                            .font(.system(size: 18))
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                    .frame(width: 56, height: 56)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
-                .frame(width: 56, height: 56)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
@@ -350,16 +394,41 @@ struct EventsView: View {
                     VStack(spacing: 0) {
                         // Hero image
                         ZStack(alignment: .topLeading) {
-                            LinearGradient(
-                                colors: gradientColors,
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                            .frame(height: 220)
-                            .overlay {
-                                Image(systemName: icon)
-                                    .font(.system(size: 64))
-                                    .foregroundStyle(.white.opacity(0.1))
+                            if let imageUrl = event.imageUrl, let url = URL(string: imageUrl) {
+                                AsyncImage(url: url) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(height: 220)
+                                            .clipped()
+                                    default:
+                                        LinearGradient(
+                                            colors: gradientColors,
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                        .frame(height: 220)
+                                        .overlay {
+                                            Image(systemName: icon)
+                                                .font(.system(size: 64))
+                                                .foregroundStyle(.white.opacity(0.1))
+                                        }
+                                    }
+                                }
+                            } else {
+                                LinearGradient(
+                                    colors: gradientColors,
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                                .frame(height: 220)
+                                .overlay {
+                                    Image(systemName: icon)
+                                        .font(.system(size: 64))
+                                        .foregroundStyle(.white.opacity(0.1))
+                                }
                             }
 
                             Button {
