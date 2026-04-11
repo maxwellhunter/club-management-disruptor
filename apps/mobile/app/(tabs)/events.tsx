@@ -24,6 +24,7 @@ import { addEventToCalendar } from "@/lib/calendar";
 import { shareEvent } from "@/lib/sharing";
 import { showEventContextMenu } from "@/lib/context-menu";
 import { trackPositiveAction } from "@/lib/store-review";
+import { announce } from "@/lib/accessibility";
 
 const API_URL =
   process.env.EXPO_PUBLIC_APP_URL || "http://localhost:3000";
@@ -162,6 +163,7 @@ export default function EventsScreen() {
         if (newStatus === "attending") {
           haptics.success();
           trackPositiveAction();
+          announce("RSVP confirmed");
           const event = events.find((e) => e.id === eventId);
           if (event) {
             Alert.alert("RSVP Confirmed!", `You're attending ${event.title}.`, [
@@ -389,6 +391,10 @@ export default function EventsScreen() {
                 ]}
                 onPress={() => setActiveCategory(cat)}
                 activeOpacity={0.7}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isActive }}
+                accessibilityLabel={`${cat} filter${isActive ? ", selected" : ""}`}
               >
                 <Text
                   style={[
@@ -429,26 +435,32 @@ export default function EventsScreen() {
                 activeOpacity={0.85}
                 onPress={() => router.push(`/event/${featuredEvent.id}`)}
                 onLongPress={() =>
-                  showEventContextMenu({
-                    title: featuredEvent.title,
-                    onAddToCalendar: () =>
-                      addEventToCalendar({
+                  isAdmin
+                    ? showAdminMenu(featuredEvent)
+                    : showEventContextMenu({
                         title: featuredEvent.title,
-                        startDate: featuredEvent.start_date,
-                        endDate: featuredEvent.end_date || undefined,
-                        location: featuredEvent.location || undefined,
-                        description: featuredEvent.description || undefined,
-                      }),
-                    onShare: () =>
-                      shareEvent({
-                        title: featuredEvent.title,
-                        date: featuredEvent.start_date,
-                        location: featuredEvent.location || undefined,
-                        description: featuredEvent.description || undefined,
-                      }),
-                    onViewDetails: () => router.push(`/event/${featuredEvent.id}`),
-                  })
+                        onAddToCalendar: () =>
+                          addEventToCalendar({
+                            title: featuredEvent.title,
+                            startDate: featuredEvent.start_date,
+                            endDate: featuredEvent.end_date || undefined,
+                            location: featuredEvent.location || undefined,
+                            description: featuredEvent.description || undefined,
+                          }),
+                        onShare: () =>
+                          shareEvent({
+                            title: featuredEvent.title,
+                            date: featuredEvent.start_date,
+                            location: featuredEvent.location || undefined,
+                            description: featuredEvent.description || undefined,
+                          }),
+                        onViewDetails: () => router.push(`/event/${featuredEvent.id}`),
+                      })
                 }
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={`Featured event: ${featuredEvent.title}, ${formatDate(featuredEvent.start_date)} at ${formatTime(featuredEvent.start_date)}${featuredEvent.user_rsvp_status === "attending" ? ", you are attending" : ""}`}
+                accessibilityHint="Tap to view details, long press for more options"
               >
                 <Image
                   source={{ uri: getEventImage(featuredEvent) }}
@@ -526,6 +538,13 @@ export default function EventsScreen() {
                       }
                       disabled={rsvpLoading === featuredEvent.id}
                       activeOpacity={0.7}
+                      accessible={true}
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        featuredEvent.user_rsvp_status === "attending"
+                          ? "Cancel RSVP"
+                          : getActionLabel(featuredEvent)
+                      }
                     >
                       {rsvpLoading === featuredEvent.id ? (
                         <ActivityIndicator size="small" color={Colors.light.primary} />
@@ -562,26 +581,32 @@ export default function EventsScreen() {
                   activeOpacity={0.85}
                   onPress={() => router.push(`/event/${event.id}`)}
                   onLongPress={() =>
-                    showEventContextMenu({
-                      title: event.title,
-                      onAddToCalendar: () =>
-                        addEventToCalendar({
+                    isAdmin
+                      ? showAdminMenu(event)
+                      : showEventContextMenu({
                           title: event.title,
-                          startDate: event.start_date,
-                          endDate: event.end_date || undefined,
-                          location: event.location || undefined,
-                          description: event.description || undefined,
-                        }),
-                      onShare: () =>
-                        shareEvent({
-                          title: event.title,
-                          date: event.start_date,
-                          location: event.location || undefined,
-                          description: event.description || undefined,
-                        }),
-                      onViewDetails: () => router.push(`/event/${event.id}`),
-                    })
+                          onAddToCalendar: () =>
+                            addEventToCalendar({
+                              title: event.title,
+                              startDate: event.start_date,
+                              endDate: event.end_date || undefined,
+                              location: event.location || undefined,
+                              description: event.description || undefined,
+                            }),
+                          onShare: () =>
+                            shareEvent({
+                              title: event.title,
+                              date: event.start_date,
+                              location: event.location || undefined,
+                              description: event.description || undefined,
+                            }),
+                          onViewDetails: () => router.push(`/event/${event.id}`),
+                        })
                   }
+                  accessible={true}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${event.title}, ${formatDate(event.start_date)} at ${formatTime(event.start_date)}${spotsLeft !== null ? `, ${spotsLeft} seats remaining` : ""}${isAttending ? ", you are attending" : ""}`}
+                  accessibilityHint="Tap to view details, long press for more options"
                 >
                   {/* Card image */}
                   <View style={styles.cardImageWrap}>
@@ -683,6 +708,11 @@ export default function EventsScreen() {
                         }
                         disabled={isLoadingThis}
                         activeOpacity={0.7}
+                        accessible={true}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          isAttending ? "Cancel RSVP" : getActionLabel(event)
+                        }
                       >
                         {isLoadingThis ? (
                           <ActivityIndicator

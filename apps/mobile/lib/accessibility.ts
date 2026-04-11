@@ -1,5 +1,48 @@
-import { AccessibilityInfo, Platform } from "react-native";
+/**
+ * iOS Accessibility Utilities
+ *
+ * Provides hooks and helpers for Dynamic Type (font scaling),
+ * reduced motion, VoiceOver detection, bold text, grayscale,
+ * and accessibility announcements.
+ */
+import { AccessibilityInfo, PixelRatio, Platform } from "react-native";
 import { useEffect, useState } from "react";
+
+// ─── Dynamic Type (font scaling) ────────────────────────────────────
+
+/**
+ * Returns the current font scale factor from system accessibility settings.
+ * On iOS, this reflects the user's Dynamic Type preference.
+ */
+export function useAccessibleFontScale(): number {
+  const [fontScale, setFontScale] = useState(PixelRatio.getFontScale());
+
+  useEffect(() => {
+    const sub = AccessibilityInfo.addEventListener(
+      "screenReaderChanged" as any,
+      () => {
+        setFontScale(PixelRatio.getFontScale());
+      }
+    );
+    return () => sub.remove();
+  }, []);
+
+  return fontScale;
+}
+
+/**
+ * Clamps a font size so it scales with Dynamic Type but never
+ * exceeds a reasonable maximum (prevents layout breakage).
+ */
+export function scaledFontSize(
+  baseSizePt: number,
+  maxScale: number = 1.5
+): number {
+  const scale = Math.min(PixelRatio.getFontScale(), maxScale);
+  return Math.round(baseSizePt * scale);
+}
+
+// ─── Reduced Motion ─────────────────────────────────────────────────
 
 /**
  * Hook to detect if the user has enabled Reduce Motion in iOS Settings.
@@ -20,6 +63,8 @@ export function useReducedMotion(): boolean {
 
   return reduceMotion;
 }
+
+// ─── Bold Text ──────────────────────────────────────────────────────
 
 /**
  * Hook to detect if Bold Text is enabled (iOS accessibility setting).
@@ -42,6 +87,8 @@ export function useBoldText(): boolean {
   return boldText;
 }
 
+// ─── VoiceOver / Screen Reader ──────────────────────────────────────
+
 /**
  * Hook to detect if a screen reader (VoiceOver/TalkBack) is active.
  */
@@ -60,6 +107,8 @@ export function useScreenReader(): boolean {
 
   return screenReader;
 }
+
+// ─── Grayscale ──────────────────────────────────────────────────────
 
 /**
  * Hook to detect if Grayscale mode is enabled.
@@ -82,10 +131,15 @@ export function useGrayscale(): boolean {
   return grayscale;
 }
 
+// ─── Accessibility Announcement ─────────────────────────────────────
+
 /**
  * Post an announcement to VoiceOver / TalkBack.
  * Use for dynamic content changes that aren't focus-driven.
  */
-export function announceForAccessibility(message: string): void {
+export function announce(message: string): void {
   AccessibilityInfo.announceForAccessibility(message);
 }
+
+/** Alias for backwards compatibility */
+export const announceForAccessibility = announce;
