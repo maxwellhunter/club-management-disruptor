@@ -27,6 +27,8 @@ import {
   Settings,
   Flag,
   Heart,
+  FileText,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -45,6 +47,8 @@ const navigation = [
   { name: "Guests", href: "/dashboard/guests", icon: UserPlus },
   { name: "POS", href: "/dashboard/pos", icon: ShoppingCart },
   { name: "Charge Posting", href: "/dashboard/charges", icon: Receipt },
+  { name: "Statements", href: "/dashboard/statements", icon: FileText },
+  { name: "Auto-Draft", href: "/dashboard/autodraft", icon: Zap },
   { name: "Accounting", href: "/dashboard/accounting", icon: BookOpen },
   { name: "Notifications", href: "/dashboard/notifications", icon: Bell },
   { name: "AI Insights", href: "/dashboard/insights", icon: Brain },

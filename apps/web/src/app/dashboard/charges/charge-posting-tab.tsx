@@ -9,6 +9,7 @@ interface SearchMember {
   last_name: string;
   email: string;
   avatar_url: string | null;
+  member_number: string | null;
   tier_name: string | null;
   tier_level: string | null;
 }
@@ -162,7 +163,8 @@ export default function ChargePostingTab() {
 
   // Debounced member search
   const searchMembers = useCallback(async (query: string) => {
-    if (query.length < 2) {
+    const isNumeric = /^\d+$/.test(query);
+    if (query.length < 2 && !isNumeric) {
       setSearchResults([]);
       return;
     }
@@ -361,13 +363,20 @@ export default function ChargePostingTab() {
                   {selectedMember.last_name[0]}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold">
-                    {selectedMember.first_name} {selectedMember.last_name}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold">
+                      {selectedMember.first_name} {selectedMember.last_name}
+                    </p>
+                    {selectedMember.member_number && (
+                      <span className="text-xs font-mono bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-1.5 py-0.5 rounded">
+                        #{selectedMember.member_number}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-[var(--muted-foreground)]">
                     {selectedMember.tier_name ?? "Member"}
                     {memberTab
-                      ? ` -- This month: $${memberTab.total.toFixed(2)} (${memberTab.charge_count} charges)`
+                      ? ` · This month: $${memberTab.total.toFixed(2)} (${memberTab.charge_count} charges)`
                       : ""}
                   </p>
                 </div>
@@ -388,9 +397,10 @@ export default function ChargePostingTab() {
                   value={memberSearch}
                   onChange={(e) => handleSearchInput(e.target.value)}
                   onFocus={() => {
-                    if (memberSearch.length >= 2) setShowDropdown(true);
+                    const isNum = /^\d+$/.test(memberSearch);
+                    if (memberSearch.length >= 2 || (isNum && memberSearch.length >= 1)) setShowDropdown(true);
                   }}
-                  placeholder="Search by name or email..."
+                  placeholder="Search by name, email, or member #..."
                   className="flex-1 bg-transparent text-sm outline-none placeholder:text-[var(--muted-foreground)]"
                 />
                 {searching && (
@@ -411,9 +421,16 @@ export default function ChargePostingTab() {
                         {member.last_name[0]}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {member.first_name} {member.last_name}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium truncate">
+                            {member.first_name} {member.last_name}
+                          </p>
+                          {member.member_number && (
+                            <span className="shrink-0 text-xs font-mono bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-1.5 py-0.5 rounded">
+                              #{member.member_number}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-[var(--muted-foreground)] truncate">
                           {member.tier_name ?? "Member"} &middot; {member.email}
                         </p>
@@ -423,7 +440,7 @@ export default function ChargePostingTab() {
                 </div>
               )}
               {showDropdown &&
-                memberSearch.length >= 2 &&
+                (memberSearch.length >= 2 || /^\d+$/.test(memberSearch)) &&
                 !searching &&
                 searchResults.length === 0 && (
                   <div className="absolute z-10 mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--background)] shadow-lg px-3 py-3 text-sm text-[var(--muted-foreground)] text-center">

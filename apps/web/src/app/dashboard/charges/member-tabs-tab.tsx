@@ -13,11 +13,14 @@ import {
 
 interface OpenTab {
   member_id: string;
-  member_name: string;
+  member_name?: string;
   first_name: string;
   last_name: string;
-  charge_count: number;
-  total: number;
+  member_number: string | null;
+  charge_count?: number;
+  tx_count?: number;
+  total?: number;
+  tab_total?: number;
 }
 
 interface ChargeItem {
@@ -192,7 +195,7 @@ export default function MemberTabsTab() {
     });
   }
 
-  const totalOutstanding = openTabs.reduce((sum, tab) => sum + tab.total, 0);
+  const totalOutstanding = openTabs.reduce((sum, tab) => sum + (tab.total ?? tab.tab_total ?? 0), 0);
 
   return (
     <div className="space-y-5">
@@ -274,6 +277,8 @@ export default function MemberTabsTab() {
               tab.member_name ??
               `${tab.first_name ?? ""} ${tab.last_name ?? ""}`.trim() ??
               "Unknown Member";
+            const chargeCount = tab.charge_count ?? tab.tx_count ?? 0;
+            const tabTotal = tab.total ?? tab.tab_total ?? 0;
 
             return (
               <div
@@ -295,16 +300,23 @@ export default function MemberTabsTab() {
                         .toUpperCase()}
                     </div>
                     <div className="text-left">
-                      <p className="text-sm font-semibold">{displayName}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold">{displayName}</p>
+                        {tab.member_number && (
+                          <span className="text-xs font-mono bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-1.5 py-0.5 rounded">
+                            #{tab.member_number}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-[var(--muted-foreground)]">
-                        {tab.charge_count} charge
-                        {tab.charge_count !== 1 ? "s" : ""}
+                        {chargeCount} charge
+                        {chargeCount !== 1 ? "s" : ""}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-bold tabular-nums">
-                      ${tab.total.toFixed(2)}
+                      ${tabTotal.toFixed(2)}
                     </span>
                     {isExpanded ? (
                       <ChevronUp className="h-4 w-4 text-[var(--muted-foreground)]" />

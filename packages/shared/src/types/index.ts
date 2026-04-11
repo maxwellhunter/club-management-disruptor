@@ -1198,6 +1198,130 @@ export interface OpenTab {
   tab_total: number;
 }
 
+// Monthly Statement types
+export type StatementRunStatus = "pending" | "running" | "completed" | "failed";
+
+export interface MonthlyStatementRun {
+  id: string;
+  club_id: string;
+  period: string;
+  status: StatementRunStatus;
+  members_processed: number;
+  statements_sent: number;
+  total_amount: number;
+  error_message: string | null;
+  run_by: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface MemberStatement {
+  id: string;
+  statement_run_id: string;
+  club_id: string;
+  member_id: string;
+  period: string;
+  dues_amount: number;
+  charges_amount: number;
+  assessments_amount: number;
+  credits_amount: number;
+  previous_balance: number;
+  total_due: number;
+  invoice_ids: string[];
+  email_sent: boolean;
+  email_sent_at: string | null;
+  pdf_generated: boolean;
+  created_at: string;
+}
+
+export interface StatementLineItem {
+  category: "dues" | "charges" | "assessment" | "credit" | "payment" | "previous_balance";
+  description: string;
+  amount: number;
+  date: string;
+  invoice_id?: string;
+}
+
+export interface MemberStatementDetail extends MemberStatement {
+  member_name: string;
+  member_email: string;
+  member_number: string | null;
+  tier_name: string | null;
+  line_items: StatementLineItem[];
+}
+
+// Payment Method & Auto-Draft types
+export type PaymentMethodType = "us_bank_account" | "card";
+export type PaymentMethodStatus = "active" | "requires_confirmation" | "failed" | "detached";
+export type MandateStatus = "active" | "inactive" | "pending";
+
+export interface PaymentMethodRecord {
+  id: string;
+  club_id: string;
+  member_id: string;
+  stripe_payment_method_id: string;
+  type: PaymentMethodType;
+  label: string;
+  last_four: string | null;
+  bank_name: string | null;
+  card_brand: string | null;
+  is_default: boolean;
+  status: PaymentMethodStatus;
+  stripe_mandate_id: string | null;
+  mandate_status: MandateStatus | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type AutodraftRunStatus = "pending" | "processing" | "completed" | "failed" | "partial";
+export type AutodraftItemStatus = "pending" | "processing" | "succeeded" | "failed" | "skipped" | "requires_action";
+
+export interface AutodraftRun {
+  id: string;
+  club_id: string;
+  period: string;
+  status: AutodraftRunStatus;
+  members_attempted: number;
+  members_succeeded: number;
+  members_failed: number;
+  members_skipped: number;
+  total_collected: number;
+  total_failed: number;
+  error_message: string | null;
+  run_by: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface AutodraftItem {
+  id: string;
+  run_id: string;
+  club_id: string;
+  member_id: string;
+  statement_id: string | null;
+  payment_method_id: string | null;
+  stripe_payment_intent_id: string | null;
+  amount: number;
+  status: AutodraftItemStatus;
+  failure_reason: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface AutodraftSettings {
+  id: string;
+  club_id: string;
+  enabled: boolean;
+  draft_day_of_month: number;
+  grace_period_days: number;
+  retry_failed: boolean;
+  max_retries: number;
+  notify_members: boolean;
+  advance_notice_days: number;
+  created_at: string;
+  updated_at: string;
+}
+
 // Chat types
 export interface ChatConversation {
   id: string;

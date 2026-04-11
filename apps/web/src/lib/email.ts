@@ -295,6 +295,123 @@ export async function sendBookingConfirmationEmail({
 }
 
 /**
+ * Send a monthly statement email.
+ */
+export async function sendStatementEmail({
+  to,
+  memberName,
+  clubName,
+  period,
+  previousBalance,
+  duesAmount,
+  chargesAmount,
+  assessmentsAmount,
+  creditsAmount,
+  totalDue,
+  lineItems,
+  dashboardUrl,
+}: {
+  to: string;
+  memberName: string;
+  clubName: string;
+  period: string;
+  previousBalance: number;
+  duesAmount: number;
+  chargesAmount: number;
+  assessmentsAmount: number;
+  creditsAmount: number;
+  totalDue: number;
+  lineItems: { category: string; description: string; amount: number }[];
+  dashboardUrl: string;
+}): Promise<SendResult> {
+  const fmt = (n: number) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+
+  // Build line items HTML (max 20 for email readability)
+  const displayItems = lineItems.slice(0, 20);
+  const lineItemsHtml = displayItems
+    .map(
+      (item) =>
+        `<tr>
+          <td style="padding:6px 0;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;">${item.description}</td>
+          <td style="padding:6px 0;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;text-align:right;white-space:nowrap;">${fmt(item.amount)}</td>
+        </tr>`
+    )
+    .join("\n");
+
+  const moreItemsNote =
+    lineItems.length > 20
+      ? `<p style="margin:8px 0 0;font-size:12px;color:#9ca3af;">+ ${lineItems.length - 20} more items — view full statement in your dashboard</p>`
+      : "";
+
+  // Summary section
+  const summaryRows: string[] = [];
+  if (previousBalance > 0)
+    summaryRows.push(
+      `<tr><td style="padding:4px 0;font-size:13px;color:#6b7280;">Previous Balance</td><td style="padding:4px 0;font-size:13px;color:#374151;text-align:right;">${fmt(previousBalance)}</td></tr>`
+    );
+  if (duesAmount > 0)
+    summaryRows.push(
+      `<tr><td style="padding:4px 0;font-size:13px;color:#6b7280;">Dues</td><td style="padding:4px 0;font-size:13px;color:#374151;text-align:right;">${fmt(duesAmount)}</td></tr>`
+    );
+  if (chargesAmount > 0)
+    summaryRows.push(
+      `<tr><td style="padding:4px 0;font-size:13px;color:#6b7280;">Member Charges</td><td style="padding:4px 0;font-size:13px;color:#374151;text-align:right;">${fmt(chargesAmount)}</td></tr>`
+    );
+  if (assessmentsAmount > 0)
+    summaryRows.push(
+      `<tr><td style="padding:4px 0;font-size:13px;color:#6b7280;">Assessments</td><td style="padding:4px 0;font-size:13px;color:#374151;text-align:right;">${fmt(assessmentsAmount)}</td></tr>`
+    );
+  if (creditsAmount > 0)
+    summaryRows.push(
+      `<tr><td style="padding:4px 0;font-size:13px;color:#6b7280;">Credits / Payments</td><td style="padding:4px 0;font-size:13px;color:#16a34a;text-align:right;">-${fmt(creditsAmount)}</td></tr>`
+    );
+
+  const totalColor = totalDue > 0 ? "#dc2626" : "#16a34a";
+
+  const html = baseLayout(
+    `<h2 style="margin:0 0 4px;font-size:18px;color:#111827;">Monthly Statement</h2>
+     <p style="margin:0 0 20px;font-size:14px;color:#6b7280;">
+       Hi ${memberName}, here is your account statement for <strong>${period}</strong>.
+     </p>
+
+     <!-- Summary Box -->
+     <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:20px;">
+       <table style="width:100%;border-collapse:collapse;">
+         ${summaryRows.join("\n")}
+         <tr style="border-top:2px solid #e5e7eb;">
+           <td style="padding:10px 0 0;font-size:15px;font-weight:700;color:#111827;">Total Due</td>
+           <td style="padding:10px 0 0;font-size:15px;font-weight:700;color:${totalColor};text-align:right;">${fmt(totalDue)}</td>
+         </tr>
+       </table>
+     </div>
+
+     <!-- Line Items -->
+     ${
+       displayItems.length > 0
+         ? `<h3 style="margin:0 0 12px;font-size:14px;color:#111827;">Activity Detail</h3>
+            <table style="width:100%;border-collapse:collapse;">
+              ${lineItemsHtml}
+            </table>
+            ${moreItemsNote}`
+         : ""
+     }
+
+     ${buttonHtml("View Full Statement", dashboardUrl + "/dashboard/billing")}
+     <p style="margin:0;font-size:12px;color:#9ca3af;">
+       Questions about your statement? Contact the front desk or reply to this email.
+     </p>`,
+    clubName
+  );
+
+  return send({
+    to,
+    subject: `${clubName} — ${period} Monthly Statement (${fmt(totalDue)} due)`,
+    html,
+  });
+}
+
+/**
  * Check if Resend email is configured.
  */
 export function isEmailConfigured(): boolean {

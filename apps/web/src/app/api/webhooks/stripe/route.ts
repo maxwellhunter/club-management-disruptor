@@ -69,6 +69,26 @@ export async function POST(request: Request) {
         );
         break;
 
+      // ACH auto-draft events
+      case "payment_intent.succeeded":
+        await handlePaymentIntentSucceeded(
+          event.data.object as Stripe.PaymentIntent
+        );
+        break;
+
+      case "payment_intent.payment_failed":
+        await handlePaymentIntentFailed(
+          event.data.object as Stripe.PaymentIntent
+        );
+        break;
+
+      case "payment_intent.processing":
+        // ACH is processing — update status but don't mark paid yet
+        await handlePaymentIntentProcessing(
+          event.data.object as Stripe.PaymentIntent
+        );
+        break;
+
       default:
         // Unhandled event type — acknowledge it
         break;
@@ -251,4 +271,144 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
     .from("invoices")
     .update({ status: "overdue" })
     .eq("stripe_invoice_id", invoice.id);
+}
+
+// ─── ACH Auto-Draft Event Handlers ───────────────────────────────
+
+/**
+ * PaymentIntent succeeded — ACH cleared or card charged.
+ * If it's from auto-draft (has metadata.autodraft_run_id), update records.
+ */
+async function handlePaymentIntentSucceeded(pi: Stripe.PaymentIntent) {
+  const meta = pi.metadata;
+  if (!meta?.autodraft_run_id) return; // Not from auto-draft
+
+  const admin = getSupabaseAdmin();
+
+  // Update the autodraft_item
+  await admin
+    .from("autodraft_items")
+    .update({
+      status: "succeeded",
+      completed_at: new Date().toISOString(),
+    })
+    .eq("stripe_payment_intent_id", pi.id);
+
+  // Create payment record
+  const member = await getMemberByStripeCustomer(
+    typeof pi.customer === "string" ? pi.customer : pi.customer?.id ?? ""
+  );
+  if (!member) return;
+
+  const amount = pi.amount / 100;
+  const method = pi.payment_method_types?.includes("us_bank_account") ? "ach" : "card";
+
+  await admin.from("payments").insert({
+    club_id: member.club_id,
+    member_id: member.id,
+    stripe_payment_id: pi.id,
+    amount,
+    method,
+    description: pi.description || `Auto-draft payment — ${meta.period ?? ""}`,
+  });
+
+  // Mark statement invoices as paid
+  if (meta.statement_id) {
+    const { data: stmt } = await admin
+      .from("member_statements")
+      .select("invoice_ids")
+      .eq("id", meta.statement_id)
+      .single();
+
+    if (stmt?.invoice_ids?.length) {
+      await admin
+        .from("invoices")
+        .update({ status: "paid", paid_at: new Date().toISOString() })
+        .in("id", stmt.invoice_ids)
+        .in("status", ["sent", "overdue"]);
+    }
+  }
+
+  // Recount successful drafts on the run
+  await updateAutodraftRunCounts(admin, meta.autodraft_run_id);
+}
+
+/**
+ * PaymentIntent failed — ACH bounced or card declined.
+ */
+async function handlePaymentIntentFailed(pi: Stripe.PaymentIntent) {
+  const meta = pi.metadata;
+  if (!meta?.autodraft_run_id) return;
+
+  const admin = getSupabaseAdmin();
+  const failureMessage =
+    pi.last_payment_error?.message ?? "Payment failed";
+
+  await admin
+    .from("autodraft_items")
+    .update({
+      status: "failed",
+      failure_reason: failureMessage,
+      completed_at: new Date().toISOString(),
+    })
+    .eq("stripe_payment_intent_id", pi.id);
+
+  await updateAutodraftRunCounts(admin, meta.autodraft_run_id);
+}
+
+/**
+ * PaymentIntent processing — ACH debit initiated, waiting for bank.
+ */
+async function handlePaymentIntentProcessing(pi: Stripe.PaymentIntent) {
+  const meta = pi.metadata;
+  if (!meta?.autodraft_run_id) return;
+
+  await getSupabaseAdmin()
+    .from("autodraft_items")
+    .update({ status: "processing" })
+    .eq("stripe_payment_intent_id", pi.id);
+}
+
+/**
+ * Recount autodraft run totals from items after async updates.
+ */
+async function updateAutodraftRunCounts(
+  admin: ReturnType<typeof getSupabaseAdmin>,
+  runId: string
+) {
+  const { data: items } = await admin
+    .from("autodraft_items")
+    .select("status, amount")
+    .eq("run_id", runId);
+
+  if (!items) return;
+
+  let succeeded = 0,
+    failed = 0,
+    skipped = 0,
+    totalCollected = 0,
+    totalFailed = 0;
+
+  for (const item of items) {
+    if (item.status === "succeeded") { succeeded++; totalCollected += Number(item.amount); }
+    else if (item.status === "failed") { failed++; totalFailed += Number(item.amount); }
+    else if (item.status === "skipped") { skipped++; }
+  }
+
+  let status: string;
+  if (failed > 0 && succeeded > 0) status = "partial";
+  else if (failed > 0) status = "failed";
+  else status = "completed";
+
+  await admin
+    .from("autodraft_runs")
+    .update({
+      status,
+      members_succeeded: succeeded,
+      members_failed: failed,
+      members_skipped: skipped,
+      total_collected: Math.round(totalCollected * 100) / 100,
+      total_failed: Math.round(totalFailed * 100) / 100,
+    })
+    .eq("id", runId);
 }

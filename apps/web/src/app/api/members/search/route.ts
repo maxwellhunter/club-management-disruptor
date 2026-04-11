@@ -30,20 +30,22 @@ export async function GET(request: Request) {
     const q = searchParams.get("q") ?? "";
     const limit = Math.min(parseInt(searchParams.get("limit") ?? "10"), 20);
 
-    if (q.length < 2) {
+    // Allow single-char search for numeric member numbers, otherwise require 2+
+    const isNumericSearch = /^\d+$/.test(q);
+    if (q.length < 2 && !isNumericSearch) {
       return NextResponse.json({ members: [] });
     }
 
     const { data: members, error } = await supabase
       .from("members")
       .select(
-        `id, first_name, last_name, email, avatar_url,
+        `id, first_name, last_name, email, avatar_url, member_number,
          membership_tiers (name, level)`
       )
       .eq("club_id", result.member.club_id)
       .eq("status", "active")
       .or(
-        `first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%`
+        `first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%,member_number.ilike.%${q}%`
       )
       .neq("id", result.member.id) // Exclude the booking member (they're added automatically)
       .order("last_name", { ascending: true })
@@ -68,6 +70,7 @@ export async function GET(request: Request) {
         last_name: m.last_name,
         email: m.email,
         avatar_url: m.avatar_url,
+        member_number: m.member_number ?? null,
         tier_name: tier?.name ?? null,
         tier_level: tier?.level ?? null,
       };
