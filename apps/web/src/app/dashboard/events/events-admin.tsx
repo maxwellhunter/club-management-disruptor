@@ -190,6 +190,17 @@ export function EventsAdmin({ events, onRefresh }: EventsAdminProps) {
                 key={event.id}
                 className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-5 flex items-start gap-4 transition-all hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)]"
               >
+                {/* Thumbnail */}
+                {event.image_url && (
+                  <div className="shrink-0 w-20 h-20 rounded-xl overflow-hidden">
+                    <img
+                      src={event.image_url}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+
                 {/* Event info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-2">

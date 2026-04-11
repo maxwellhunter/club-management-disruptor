@@ -13,6 +13,7 @@ export interface EventCardProps {
   end_date: string | null;
   capacity: number | null;
   price: number | null;
+  image_url?: string | null;
   rsvp_count: number;
   user_rsvp_status: RsvpStatus | null;
   onRsvp: (eventId: string, currentStatus: RsvpStatus | null) => void;
@@ -69,6 +70,7 @@ function FeaturedEventCard({
   end_date,
   capacity,
   price,
+  image_url,
   rsvp_count,
   user_rsvp_status,
   onRsvp,
@@ -79,14 +81,24 @@ function FeaturedEventCard({
   const relative = getRelativeDate(start_date);
   const spotsLeft = capacity ? capacity - rsvp_count : null;
 
+  const hasImage = !!image_url;
+
   return (
     <div className="relative rounded-2xl overflow-hidden bg-[var(--primary-container)] text-white shadow-lg">
-      {/* Gradient overlay for depth */}
+      {/* Background image or gradient */}
+      {hasImage && (
+        <img
+          src={image_url!}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      )}
       <div
         className="absolute inset-0"
         style={{
-          background:
-            "linear-gradient(135deg, rgba(1,45,29,0.95) 0%, rgba(27,67,50,0.85) 100%)",
+          background: hasImage
+            ? "linear-gradient(135deg, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.55) 100%)"
+            : "linear-gradient(135deg, rgba(1,45,29,0.95) 0%, rgba(27,67,50,0.85) 100%)",
         }}
       />
       <div className="relative z-10 p-8 md:p-10">
@@ -197,6 +209,7 @@ export function EventCard(props: EventCardProps) {
     end_date,
     capacity,
     price,
+    image_url,
     rsvp_count,
     user_rsvp_status,
     onRsvp,
@@ -219,6 +232,17 @@ export function EventCard(props: EventCardProps) {
       href={`/dashboard/events/${id}`}
       className="block rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)] border border-[var(--outline-variant)]/30 transition-all duration-200 overflow-hidden group"
     >
+      {/* Card image */}
+      {image_url && (
+        <div className="w-full h-36 overflow-hidden">
+          <img
+            src={image_url}
+            alt=""
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        </div>
+      )}
+
       <div className={compact ? "p-5" : "p-6"}>
         {/* Top row: badges */}
         <div className="flex items-center gap-2 mb-3">

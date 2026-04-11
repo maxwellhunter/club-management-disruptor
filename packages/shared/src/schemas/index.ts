@@ -81,6 +81,7 @@ export const createEventSchema = z.object({
   end_date: z.string().datetime().optional(),
   capacity: z.number().int().min(1).optional(),
   price: z.number().min(0).optional(),
+  image_url: z.string().url().optional().or(z.literal("")),
 });
 
 export const updateEventSchema = createEventSchema.partial().extend({

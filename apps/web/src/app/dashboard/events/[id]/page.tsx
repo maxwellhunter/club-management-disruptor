@@ -172,6 +172,17 @@ export default function EventDetailPage() {
 
       {/* Main card */}
       <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+        {/* Hero image */}
+        {event.image_url && (
+          <div className="w-full h-56 overflow-hidden">
+            <img
+              src={event.image_url}
+              alt={event.title}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
+
         <div className="p-6">
           {/* Title + badges */}
           <div className="flex items-start justify-between gap-4">
