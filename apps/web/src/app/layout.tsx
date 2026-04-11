@@ -6,6 +6,11 @@ export const metadata: Metadata = {
   title: "ClubOS - Modern Club Management",
   description:
     "AI-powered country club management platform. Member management, billing, bookings, and more.",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+  },
 };
 
 export default function RootLayout({
