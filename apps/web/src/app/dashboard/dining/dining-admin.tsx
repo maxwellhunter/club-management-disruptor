@@ -106,9 +106,55 @@ const INPUT_CLS =
 
 export default function DiningAdmin() {
   const [tab, setTab] = useState<AdminTab>("orders");
+  const [diningHeroUrl, setDiningHeroUrl] = useState("");
+  const [heroLoaded, setHeroLoaded] = useState(false);
+
+  useEffect(() => {
+    async function fetchHero() {
+      try {
+        const res = await fetch("/api/club/dining-image");
+        if (res.ok) {
+          const data = await res.json();
+          setDiningHeroUrl(data.dining_image_url ?? "");
+        }
+      } catch {
+        // ignore
+      } finally {
+        setHeroLoaded(true);
+      }
+    }
+    fetchHero();
+  }, []);
+
+  async function handleHeroChange(url: string) {
+    setDiningHeroUrl(url);
+    try {
+      await fetch("/api/club/dining-image", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dining_image_url: url || null }),
+      });
+    } catch {
+      // ignore
+    }
+  }
 
   return (
     <div className="space-y-6">
+      {/* Dining Hero Image */}
+      {heroLoaded && (
+        <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-5">
+          <ImageUpload
+            value={diningHeroUrl}
+            onChange={handleHeroChange}
+            bucket="dining-images"
+            label="Dining Hero Image"
+            aspect="video"
+            placeholder="Upload a hero image for the dining experience (shown in the iOS app)"
+          />
+        </div>
+      )}
+
       {/* Segmented tab control */}
       <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--muted)] w-fit">
         {TABS.map((t) => {

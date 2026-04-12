@@ -47,18 +47,20 @@ echo "✅ Archive succeeded"
 # Export and upload to App Store Connect
 echo ""
 echo "3/4  Exporting & uploading to App Store Connect..."
-xcodebuild -exportArchive \
+EXPORT_OUTPUT=$(xcodebuild -exportArchive \
   -archivePath "$ARCHIVE_DIR/$SCHEME.xcarchive" \
   -exportPath "$EXPORT_DIR" \
   -exportOptionsPlist "$EXPORT_OPTIONS" \
-  -allowProvisioningUpdates \
-  | grep -E "^(Export Succeeded|error:|Upload|ITC)" || true
+  -allowProvisioningUpdates 2>&1)
 
-# Check export result
-if [ -f "$EXPORT_DIR/$SCHEME.ipa" ] || [ -f "$EXPORT_DIR/DistributionSummary.plist" ]; then
+# Check for success in output
+if echo "$EXPORT_OUTPUT" | grep -q "Upload succeeded"; then
+  echo "✅ Upload succeeded"
+elif [ -f "$EXPORT_DIR/$SCHEME.ipa" ] || [ -f "$EXPORT_DIR/DistributionSummary.plist" ]; then
   echo "✅ Export & upload succeeded"
 else
-  echo "❌ Export failed. Run without grep to see full output."
+  echo "$EXPORT_OUTPUT" | grep -E "(error:|Upload|Export)" || true
+  echo "❌ Export/upload failed. Check output above."
   exit 1
 fi
 

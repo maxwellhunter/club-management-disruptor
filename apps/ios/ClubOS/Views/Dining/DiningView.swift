@@ -14,6 +14,10 @@ struct DiningFacilitiesResponse: Decodable {
     let facilities: [DiningFacility]
 }
 
+struct DiningHeroResponse: Decodable {
+    let diningImageUrl: String?
+}
+
 struct MenuCategory: Decodable, Identifiable {
     let id: String
     let name: String
@@ -107,6 +111,9 @@ struct DiningView: View {
     @State private var screen: Screen = .venues
     @State private var flowMode: FlowMode = .reserve
 
+    // Hero image
+    @State private var diningHeroUrl: String?
+
     // Venues
     @State private var facilities: [DiningFacility] = []
     @State private var loadingFacilities = true
@@ -165,7 +172,10 @@ struct DiningView: View {
         }
         .navigationTitle(navTitle)
         .navigationBarTitleDisplayMode(.inline)
-        .task { await fetchFacilities() }
+        .task {
+            await fetchFacilities()
+            await fetchDiningHero()
+        }
         .alert("Order Placed!", isPresented: $showOrderSuccess) {
             Button("OK") {
                 resetFlow()
@@ -211,31 +221,59 @@ struct DiningView: View {
 
     private var venueSelectionView: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 24) {
-                // Hero
-                VStack(spacing: 8) {
-                    Image(systemName: "fork.knife")
-                        .font(.system(size: 36))
-                        .foregroundStyle(Color.club.primary)
-                        .frame(width: 64, height: 64)
-                        .background(Color.club.accent, in: RoundedRectangle(cornerRadius: 18))
+            VStack(spacing: 0) {
+                // Hero — image with gradient fade or fallback
+                if let heroUrl = diningHeroUrl, let url = URL(string: heroUrl) {
+                    ZStack(alignment: .bottom) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(height: 220)
+                                    .clipped()
+                            default:
+                                diningHeroFallback
+                            }
+                        }
 
-                    Text("Dining at The Lakes")
-                        .font(.custom("Georgia", size: 22).weight(.bold))
-                        .foregroundStyle(Color.club.foreground)
+                        // Gradient fade from image into background
+                        LinearGradient(
+                            colors: [
+                                Color.club.background.opacity(0),
+                                Color.club.background.opacity(0.6),
+                                Color.club.background,
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 100)
 
-                    Text("Reserve a table or order from our world-class restaurants.")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.club.onSurfaceVariant)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
+                        // Text overlay
+                        VStack(spacing: 4) {
+                            Text("Dining")
+                                .font(.custom("Georgia", size: 28).weight(.bold))
+                                .foregroundStyle(.white)
+                                .shadow(color: .black.opacity(0.5), radius: 8, y: 2)
+
+                            Text("Reserve a table or order from our restaurants")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.white.opacity(0.85))
+                                .shadow(color: .black.opacity(0.4), radius: 4, y: 1)
+                        }
+                        .padding(.bottom, 16)
+                    }
+                    .frame(height: 220)
+                    .clipped()
+                } else {
+                    diningHeroFallback
                 }
-                .padding(.top, 16)
-                .padding(.bottom, 8)
 
                 // Flow mode toggle
                 flowModeToggle
                     .padding(.horizontal, 20)
+                    .padding(.top, 20)
 
                 if loadingFacilities {
                     ProgressView()
@@ -258,6 +296,7 @@ struct DiningView: View {
                         }
                     }
                     .padding(.horizontal, 20)
+                    .padding(.top, 20)
                 }
 
                 Spacer(minLength: 32)
@@ -293,6 +332,28 @@ struct DiningView: View {
         .padding(4)
         .background(Color.club.surfaceContainerHigh, in: RoundedRectangle(cornerRadius: 14))
         .contentShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var diningHeroFallback: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "fork.knife")
+                .font(.system(size: 36))
+                .foregroundStyle(Color.club.primary)
+                .frame(width: 64, height: 64)
+                .background(Color.club.accent, in: RoundedRectangle(cornerRadius: 18))
+
+            Text("Dining")
+                .font(.custom("Georgia", size: 22).weight(.bold))
+                .foregroundStyle(Color.club.foreground)
+
+            Text("Reserve a table or order from our restaurants.")
+                .font(.system(size: 13))
+                .foregroundStyle(Color.club.onSurfaceVariant)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+        }
+        .padding(.top, 16)
+        .padding(.bottom, 8)
     }
 
     private func venueCard(_ facility: DiningFacility) -> some View {
@@ -1486,6 +1547,15 @@ struct DiningView: View {
             facilities = response.facilities
         } catch {
             print("Failed to fetch dining facilities:", error)
+        }
+    }
+
+    private func fetchDiningHero() async {
+        do {
+            let response: DiningHeroResponse = try await APIClient.shared.get("/club/dining-image")
+            diningHeroUrl = response.diningImageUrl
+        } catch {
+            print("Failed to fetch dining hero:", error)
         }
     }
 
