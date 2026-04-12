@@ -17,6 +17,7 @@ struct MenuCategory: Decodable, Identifiable {
     let id: String
     let name: String
     let description: String?
+    let imageUrl: String?
     let items: [MenuItem]
 }
 
@@ -1011,18 +1012,43 @@ struct DiningView: View {
         let inCart = cart.first(where: { $0.menuItemId == item.id })
 
         return HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(LinearGradient(
-                        colors: [Color(hex: "2e3131"), Color(hex: "191c1c")],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                Image(systemName: "fork.knife")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.2))
+            if let imageUrl = item.imageUrl, let url = URL(string: imageUrl) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    default:
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(LinearGradient(
+                                    colors: [Color(hex: "2e3131"), Color(hex: "191c1c")],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ))
+                            Image(systemName: "fork.knife")
+                                .font(.system(size: 16))
+                                .foregroundStyle(.white.opacity(0.2))
+                        }
+                    }
+                }
+                .frame(width: 64, height: 64)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            } else {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(LinearGradient(
+                            colors: [Color(hex: "2e3131"), Color(hex: "191c1c")],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                    Image(systemName: "fork.knife")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.white.opacity(0.2))
+                }
+                .frame(width: 64, height: 64)
             }
-            .frame(width: 64, height: 64)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
