@@ -6,7 +6,7 @@ AI-powered country club management SaaS ("ClubOS") — built to disrupt legacy c
 ## Tech Stack
 - **Monorepo**: Turborepo + pnpm workspaces
 - **Web**: Next.js 15 (App Router) in `apps/web`
-- **Mobile**: React Native + Expo (Expo Router) in `apps/mobile`
+- **iOS**: Native Swift/SwiftUI app in `apps/ios` (distributed via TestFlight)
 - **Backend/DB**: Supabase (Postgres, Auth, Realtime, Storage, Edge Functions)
 - **Payments**: Stripe (Connect for multi-tenant, Subscriptions for recurring dues)
 - **AI Chat**: Claude API via `@anthropic-ai/sdk`
@@ -14,7 +14,7 @@ AI-powered country club management SaaS ("ClubOS") — built to disrupt legacy c
 - **Validation**: Zod (shared between web and API)
 - **Email**: Resend (invite, invoice, announcement, booking confirmation templates)
 - **Testing**: Jest 30 + ts-jest
-- **Deployment** (planned): Vercel (web) + EAS (mobile)
+- **Deployment**: Vercel (web) + TestFlight/App Store (iOS)
 
 ## Project Structure
 ```
@@ -53,13 +53,11 @@ apps/
         golf-eligibility.ts # Member tier lookup + golf access check
         email.ts            # Resend email service (invite, invoice, announcement, booking)
       middleware.ts          # Auth middleware — redirects unauthenticated users
-  mobile/                     # Expo React Native app
-    app/                    # Expo Router screens (file-based routing)
-      (auth)/               # Login, signup screens (Stack navigator)
-      (tabs)/               # Authenticated tab screens (Home, Bookings, Events, Chat, Profile)
-      membership-card.tsx   # Digital wallet card with NFC tap-to-check-in
-    lib/                    # Supabase client + AuthContext provider
-    constants/              # Theme colors (matches web CSS custom properties)
+  ios/                        # Native Swift/SwiftUI app
+    ClubOS/                 # Xcode project
+      Views/                # SwiftUI views (Events, Dining, Bookings, Chat, Profile)
+      Models/               # Data models
+      Services/             # API client, auth service
 packages/
   shared/                   # @club/shared — shared types + Zod schemas
     src/types/index.ts      # All entity types (Member, Booking, Event, Invoice, DigitalPass, etc.)
@@ -74,11 +72,10 @@ packages/
 ## Key Architecture Decisions
 - **Multi-tenant**: Each club is an org. All tables have `club_id` FK. Row-Level Security scopes all queries to the user's club.
 - **Auth flow**: Supabase Auth → middleware checks session → redirects to `/login` if unauthenticated. Public routes: `/`, `/login`, `/signup`, `/auth/callback`.
-- **Shared package**: Types and Zod schemas in `@club/shared` are imported by both web and mobile apps. Import as `import { Member, createMemberSchema } from "@club/shared"`.
-- **AI Chat**: POST `/api/chat` → authenticates user via Supabase → sends messages to Claude API. Gracefully handles missing `ANTHROPIC_API_KEY`. Mobile calls the same endpoint.
-- **Mobile auth**: Expo SecureStore for token persistence. `AuthProvider` context wraps the app, Expo Router file-based routing mirrors web structure. Auth state redirects between `(auth)` and `(tabs)` groups.
-- **Mobile navigation**: Tab bar with 5 tabs (Home, Bookings, Events, AI Chat, Profile). Auth screens use Stack navigator.
-- **API auth pattern**: `createApiClient()` helper handles both cookie auth (web) and Bearer token auth (mobile). Returns `{ supabase, adminClient, caller }` where `caller` has `member: MemberWithTier` with `tier_name` and `tier_level` (but NOT `member_number` — query separately if needed).
+- **Shared package**: Types and Zod schemas in `@club/shared` are imported by the web app. Import as `import { Member, createMemberSchema } from "@club/shared"`.
+- **AI Chat**: POST `/api/chat` → authenticates user via Supabase → sends messages to Claude API. Gracefully handles missing `ANTHROPIC_API_KEY`. iOS app calls the same endpoint.
+- **iOS app**: Native Swift/SwiftUI app with Supabase Auth (Keychain token persistence). Tab bar navigation (Home, Bookings, Events, AI Chat, Profile). Distributed via TestFlight.
+- **API auth pattern**: `createApiClient()` helper handles both cookie auth (web) and Bearer token auth (iOS). Returns `{ supabase, adminClient, caller }` where `caller` has `member: MemberWithTier` with `tier_name` and `tier_level` (but NOT `member_number` — query separately if needed).
 - **Family billing**: ALL family members (including primary) go to a single consolidated invoice. Primary is NOT billed separately.
 - **Invite flow**: Admin creates member with `status: 'invited'` → generates 7-day token → member visits `/invite/[token]` → sets password → Supabase Auth user created → member activated.
 
@@ -117,9 +114,6 @@ pnpm install
 # Development (web)
 pnpm dev              # Starts Next.js dev server (port 3000)
 
-# Development (mobile)
-cd apps/mobile && npx expo start
-
 # Build
 pnpm build            # Turbo builds all packages
 
@@ -139,10 +133,6 @@ pnpm test -- --watch  # Watch mode
 - `ANTHROPIC_API_KEY` — for AI chat
 - `RESEND_API_KEY` — for email
 
-**Mobile** — Create `apps/mobile/.env` with:
-- `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` — same Supabase project
-- `EXPO_PUBLIC_APP_URL` — URL of the web app (for AI chat API calls)
-
 ## Feature Modules (Status)
 
 ### Core MVP (fully wired)
@@ -150,7 +140,7 @@ pnpm test -- --watch  # Watch mode
 2. **Bookings** — Multi-step tee time wizard, slot selection with availability, my bookings (edit/cancel), waitlist with auto-promotion on cancellation, admin schedule config (generate slots), admin golf rates CRUD, email confirmations
 3. **Events** — Event list (role-based), detail with capacity bar, RSVP flow (attending/declined/maybe) with capacity enforcement, admin CRUD with draft→publish workflow, attendee management
 4. **Communications** — Announcement list (admin: all/published/drafts tabs; member: published only), create/edit/delete, priority levels (low/normal/high/urgent), tier-targeted audience, email blast on publish
-5. **AI Chat** — Claude API endpoint, chat UI with suggested prompts, mobile support via shared endpoint
+5. **AI Chat** — Claude API endpoint, chat UI with suggested prompts, iOS support via shared endpoint
 6. **Billing & Payments** — Billing engine with dues calculation, family consolidated billing, spending minimum tracking + shortfall invoicing, assessments (capital/seasonal with installments), billing cycle tracking. **Not yet wired to Stripe** — engine is tested but payments are manual/seeded.
 
 ### Competitive Analysis Features (built)
@@ -160,7 +150,7 @@ pnpm test -- --watch  # Watch mode
 10. **Data Migration** — Import tools for Jonas/Northstar/ClubEssential/CSV with field mapping, validation, and progress tracking
 11. **Advanced Billing** — Spending minimums per tier, shortfall enforcement, capital assessments with installment plans, family billing consolidation, member credits/adjustments
 12. **Accounting & GL Export** — Chart of accounts, GL mappings, journal entries, export batches (QuickBooks/Sage/Xero/CSV)
-13. **Push Notifications** — Server infrastructure with per-member category preferences, notification templates with {{variable}} placeholders, delivery tracking with Expo receipts
+13. **Push Notifications** — Server infrastructure with per-member category preferences, notification templates with {{variable}} placeholders, delivery tracking
 14. **AI Insights Dashboard** — AI-powered analytics dashboard
 15. **Digital Member Cards (NFC)** — Apple/Google Wallet pass generation, NFC tap-to-check-in with 30s dedup, barcode-to-member resolution, card design templates, mobile wallet buttons (platform-aware)
 
@@ -169,15 +159,13 @@ pnpm test -- --watch  # Watch mode
 - Test files in `__tests__/` directories alongside source files
 
 ## Conventions
-- Package names use `@club/` scope (e.g., `@club/web`, `@club/mobile`, `@club/shared`)
+- Package names use `@club/` scope (e.g., `@club/web`, `@club/shared`)
 - **Web**: CSS uses custom properties (`--primary`, `--background`, etc.) defined in `globals.css` with dark mode support via `prefers-color-scheme`
-- **Mobile**: Theme colors in `constants/theme.ts` mirror the web CSS custom properties (Colors.light / Colors.dark)
 - Supabase server client (web): `import { createClient } from "@/lib/supabase/server"` (async, uses cookies)
 - Supabase browser client (web): `import { createClient } from "@/lib/supabase/client"`
-- Supabase mobile client: `import { supabase } from "@/lib/supabase"` (uses Expo SecureStore for tokens)
 - Web dashboard pages are server components by default; add `"use client"` only when needed
-- Mobile uses Expo Router file-based routing with `(auth)` and `(tabs)` route groups
-- Green theme: primary color is `#16a34a` (light) / `#22c55e` (dark) — consistent across web and mobile
+- **iOS**: Native SwiftUI views, Supabase Swift SDK for auth and data. When building new web features, always port them to the iOS app in the same session.
+- Green theme: primary color is `#16a34a` (light) / `#22c55e` (dark) — consistent across web and iOS
 
 ## Demo Accounts (Supabase Auth)
 | Role | Email | Name | Tier |
