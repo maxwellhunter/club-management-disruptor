@@ -814,7 +814,7 @@ function MenuTab() {
             onChange={handleFacilityImageChange}
             bucket="dining-images"
             label="Restaurant Photo"
-            height="h-36"
+            aspect="square"
             placeholder="Upload a photo of this restaurant"
           />
         </div>
@@ -940,7 +940,7 @@ function MenuTab() {
             onChange={setItemImageUrl}
             bucket="dining-images"
             label="Food Photo"
-            height="h-28"
+            aspect="square"
             placeholder="Upload a photo of this dish"
           />
           {/* Dietary tags */}
@@ -1130,7 +1130,7 @@ function MenuTab() {
                             onChange={setEditItemImageUrl}
                             bucket="dining-images"
                             label="Food Photo"
-                            height="h-24"
+                            aspect="square"
                             placeholder="Upload a photo"
                           />
                           <div>

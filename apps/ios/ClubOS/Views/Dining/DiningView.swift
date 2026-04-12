@@ -7,6 +7,7 @@ struct DiningFacility: Decodable, Identifiable {
     let name: String
     let type: String
     let description: String?
+    let imageUrl: String?
 }
 
 struct DiningFacilitiesResponse: Decodable {
@@ -306,18 +307,43 @@ struct DiningView: View {
             }
         } label: {
             VStack(alignment: .leading, spacing: 0) {
-                // Venue image gradient
+                // Venue image or gradient fallback
                 ZStack(alignment: .topLeading) {
-                    LinearGradient(
-                        colors: [Color.club.primaryContainer, Color(hex: "012d1d")],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .frame(height: 120)
-                    .overlay {
-                        Image(systemName: info.icon)
-                            .font(.system(size: 40))
-                            .foregroundStyle(.white.opacity(0.15))
+                    if let imageUrl = facility.imageUrl, let url = URL(string: imageUrl) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(height: 120)
+                                    .clipped()
+                            default:
+                                LinearGradient(
+                                    colors: [Color.club.primaryContainer, Color(hex: "012d1d")],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                                .frame(height: 120)
+                                .overlay {
+                                    Image(systemName: info.icon)
+                                        .font(.system(size: 40))
+                                        .foregroundStyle(.white.opacity(0.15))
+                                }
+                            }
+                        }
+                    } else {
+                        LinearGradient(
+                            colors: [Color.club.primaryContainer, Color(hex: "012d1d")],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .frame(height: 120)
+                        .overlay {
+                            Image(systemName: info.icon)
+                                .font(.system(size: 40))
+                                .foregroundStyle(.white.opacity(0.15))
+                        }
                     }
 
                     // Cuisine badge

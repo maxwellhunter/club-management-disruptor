@@ -9,6 +9,7 @@ interface ImageUploadProps {
   bucket?: string;
   label?: string;
   height?: string; // tailwind height class e.g. "h-40"
+  aspect?: "auto" | "square" | "video"; // preview aspect ratio
   placeholder?: string;
 }
 
@@ -18,6 +19,7 @@ export function ImageUpload({
   bucket = "event-images",
   label = "Cover Image",
   height = "h-40",
+  aspect = "auto",
   placeholder = "Click to upload an image",
 }: ImageUploadProps) {
   const [preview, setPreview] = useState(value);
@@ -77,7 +79,7 @@ export function ImageUpload({
       )}
 
       {preview ? (
-        <div className={`relative rounded-lg overflow-hidden border border-[var(--border)] ${height}`}>
+        <div className={`relative rounded-lg overflow-hidden border border-[var(--border)] ${aspect === "square" ? "aspect-square max-w-[240px]" : aspect === "video" ? "aspect-video" : height}`}>
           <img
             src={preview}
             alt=""
@@ -103,7 +105,7 @@ export function ImageUpload({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className={`w-full ${height} rounded-lg border-2 border-dashed border-[var(--border)] hover:border-[var(--primary)] flex flex-col items-center justify-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--primary)] transition-colors`}
+          className={`${aspect === "square" ? "aspect-square max-w-[240px]" : aspect === "video" ? "aspect-video w-full" : `w-full ${height}`} rounded-lg border-2 border-dashed border-[var(--border)] hover:border-[var(--primary)] flex flex-col items-center justify-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--primary)] transition-colors`}
         >
           <Upload className="h-6 w-6" />
           <span className="text-sm">{placeholder}</span>
