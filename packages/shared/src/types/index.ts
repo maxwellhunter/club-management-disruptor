@@ -118,6 +118,7 @@ export interface Facility {
   name: string;
   type: FacilityType;
   description: string | null;
+  image_url: string | null;
   capacity: number | null;
   is_active: boolean;
   created_at: string;

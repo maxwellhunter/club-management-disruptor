@@ -441,7 +441,7 @@ interface CategoryWithItems extends MenuCategory {
 
 function MenuTab() {
   const [facilities, setFacilities] = useState<
-    { id: string; name: string }[]
+    { id: string; name: string; image_url?: string | null }[]
   >([]);
   const [selectedFacility, setSelectedFacility] = useState<string | null>(null);
   const [categories, setCategories] = useState<CategoryWithItems[]>([]);
@@ -740,6 +740,28 @@ function MenuTab() {
     setEditItemDietaryTags(item.dietary_tags ?? []);
   }
 
+  async function handleFacilityImageChange(url: string) {
+    if (!selectedFacility) return;
+    try {
+      const res = await fetch(`/api/facilities/${selectedFacility}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_url: url || null }),
+      });
+      if (res.ok) {
+        setFacilities((prev) =>
+          prev.map((f) =>
+            f.id === selectedFacility ? { ...f, image_url: url || null } : f
+          )
+        );
+      }
+    } catch {
+      setError("Failed to update restaurant image");
+    }
+  }
+
+  const currentFacility = facilities.find((f) => f.id === selectedFacility);
+
   if (loading) {
     return (
       <div className="space-y-3">
@@ -776,6 +798,25 @@ function MenuTab() {
               {f.name}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Restaurant Image */}
+      {currentFacility && (
+        <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <p className="font-[family-name:var(--font-headline)] font-bold text-base">
+              {currentFacility.name}
+            </p>
+          </div>
+          <ImageUpload
+            value={currentFacility.image_url || ""}
+            onChange={handleFacilityImageChange}
+            bucket="dining-images"
+            label="Restaurant Photo"
+            height="h-36"
+            placeholder="Upload a photo of this restaurant"
+          />
         </div>
       )}
 
@@ -834,14 +875,6 @@ function MenuTab() {
             onChange={(e) => setCatDescription(e.target.value)}
             placeholder="Description (optional)"
             className={`w-full ${INPUT_CLS}`}
-          />
-          <ImageUpload
-            value={catImageUrl}
-            onChange={setCatImageUrl}
-            bucket="dining-images"
-            label="Restaurant Image"
-            height="h-32"
-            placeholder="Upload a restaurant or venue photo"
           />
           <div className="flex gap-2">
             <button
@@ -998,14 +1031,6 @@ function MenuTab() {
                       placeholder="Description (optional)"
                       className={`w-full text-xs ${INPUT_CLS}`}
                     />
-                    <ImageUpload
-                      value={editCatImageUrl}
-                      onChange={setEditCatImageUrl}
-                      bucket="dining-images"
-                      label="Restaurant Image"
-                      height="h-24"
-                      placeholder="Upload a venue photo"
-                    />
                     <div className="flex gap-1.5">
                       <button
                         onClick={() => handleUpdateCategory(cat.id)}
@@ -1026,24 +1051,15 @@ function MenuTab() {
                   </div>
                 ) : (
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {cat.image_url && (
-                        <img
-                          src={cat.image_url}
-                          alt=""
-                          className="w-10 h-10 rounded-lg object-cover shrink-0"
-                        />
-                      )}
-                      <div>
-                        <p className="font-[family-name:var(--font-headline)] font-bold text-sm">
-                          {cat.name}
+                    <div>
+                      <p className="font-[family-name:var(--font-headline)] font-bold text-sm">
+                        {cat.name}
+                      </p>
+                      {cat.description && (
+                        <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+                          {cat.description}
                         </p>
-                        {cat.description && (
-                          <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
-                            {cat.description}
-                          </p>
-                        )}
-                      </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5">
                       <button
