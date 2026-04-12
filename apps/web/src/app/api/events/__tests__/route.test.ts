@@ -45,7 +45,7 @@ function createChainMock(result: {
   };
 
   const chain: Record<string, jest.Mock> = {};
-  for (const m of ["select", "eq", "neq", "gte", "order", "limit", "in"]) {
+  for (const m of ["select", "eq", "neq", "gte", "lt", "order", "limit", "in"]) {
     chain[m] = jest.fn().mockReturnValue(chain);
   }
   chain["single"] = jest.fn().mockResolvedValue(resolved);
@@ -137,7 +137,7 @@ describe("GET /api/events", () => {
     expect(data.role).toBe("admin");
   });
 
-  it("admin sees all events (no status/date filter)", async () => {
+  it("admin defaults to upcoming events (no status filter, gte applied)", async () => {
     mockGetMemberWithTier.mockResolvedValue({
       member: mockAdminMember,
       isGolfEligible: true,
@@ -158,7 +158,47 @@ describe("GET /api/events", () => {
     );
     expect(hasStatusFilter).toBe(false);
 
-    // Verify gte (future date) filter was NOT applied for admin
+    // Admin defaults to upcoming — gte IS applied
+    expect(eventsChain["gte"]).toHaveBeenCalledWith(
+      "start_date",
+      expect.any(String),
+    );
+  });
+
+  it("admin with time=all sees all events (no date filter)", async () => {
+    mockGetMemberWithTier.mockResolvedValue({
+      member: mockAdminMember,
+      isGolfEligible: true,
+    });
+
+    const eventsChain = createChainMock({ data: [] });
+    mockFrom.mockReturnValue(eventsChain);
+
+    const req = new Request("http://localhost:3000/api/events?time=all", { method: "GET" });
+    await GET(req);
+
+    // Verify no gte or lt filter
+    expect(eventsChain["gte"]).not.toHaveBeenCalled();
+    expect(eventsChain["lt"]).not.toHaveBeenCalled();
+  });
+
+  it("admin with time=past sees past events", async () => {
+    mockGetMemberWithTier.mockResolvedValue({
+      member: mockAdminMember,
+      isGolfEligible: true,
+    });
+
+    const eventsChain = createChainMock({ data: [] });
+    mockFrom.mockReturnValue(eventsChain);
+
+    const req = new Request("http://localhost:3000/api/events?time=past", { method: "GET" });
+    await GET(req);
+
+    // Verify lt filter applied for past
+    expect(eventsChain["lt"]).toHaveBeenCalledWith(
+      "start_date",
+      expect.any(String),
+    );
     expect(eventsChain["gte"]).not.toHaveBeenCalled();
   });
 

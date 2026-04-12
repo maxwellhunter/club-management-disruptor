@@ -24,18 +24,31 @@ export async function GET(request: Request) {
     }
 
     const isAdmin = result.member.role === "admin";
+    const { searchParams } = new URL(request.url);
+    const timeFilter = searchParams.get("time"); // "upcoming" | "past" | "all"
 
     // Admins see all events; members see only published upcoming events
     let query = supabase
       .from("events")
       .select("*")
-      .eq("club_id", result.member.club_id)
-      .order("start_date", { ascending: true });
+      .eq("club_id", result.member.club_id);
 
     if (!isAdmin) {
       query = query
         .eq("status", "published")
-        .gte("start_date", new Date().toISOString());
+        .gte("start_date", new Date().toISOString())
+        .order("start_date", { ascending: true });
+    } else {
+      // Admin time filter
+      const now = new Date().toISOString();
+      if (timeFilter === "past") {
+        query = query.lt("start_date", now).order("start_date", { ascending: false });
+      } else if (timeFilter === "all") {
+        query = query.order("start_date", { ascending: false });
+      } else {
+        // Default: upcoming
+        query = query.gte("start_date", now).order("start_date", { ascending: true });
+      }
     }
 
     const { data: events, error } = await query;

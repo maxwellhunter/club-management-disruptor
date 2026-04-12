@@ -285,12 +285,14 @@ struct DiningView: View {
                         isSelected ? Color.club.primary : Color.clear,
                         in: RoundedRectangle(cornerRadius: 12)
                     )
+                    .contentShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
             }
         }
         .padding(4)
         .background(Color.club.surfaceContainerHigh, in: RoundedRectangle(cornerRadius: 14))
+        .contentShape(RoundedRectangle(cornerRadius: 14))
     }
 
     private func venueCard(_ facility: DiningFacility) -> some View {
@@ -394,6 +396,7 @@ struct DiningView: View {
             }
             .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 16))
             .shadow(color: Color.club.foreground.opacity(0.04), radius: 12, y: 4)
+            .contentShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
     }

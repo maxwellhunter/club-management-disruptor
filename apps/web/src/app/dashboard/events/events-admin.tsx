@@ -13,6 +13,7 @@ import {
   Clock,
 } from "lucide-react";
 import type { EventWithRsvp, ClubEvent, EventStatus } from "@club/shared";
+import type { TimeFilter } from "./page";
 import { EventFormModal } from "./event-form-modal";
 import { AttendeesModal } from "./attendees-modal";
 
@@ -21,7 +22,15 @@ type FilterStatus = "all" | EventStatus;
 interface EventsAdminProps {
   events: EventWithRsvp[];
   onRefresh: () => void;
+  timeFilter: TimeFilter;
+  onTimeFilterChange: (t: TimeFilter) => void;
 }
+
+const TIME_TABS: { value: TimeFilter; label: string }[] = [
+  { value: "upcoming", label: "Upcoming" },
+  { value: "past", label: "Past" },
+  { value: "all", label: "All" },
+];
 
 const STATUS_BADGE: Record<
   EventStatus,
@@ -77,7 +86,7 @@ function formatTime(dateStr: string) {
   });
 }
 
-export function EventsAdmin({ events, onRefresh }: EventsAdminProps) {
+export function EventsAdmin({ events, onRefresh, timeFilter, onTimeFilterChange }: EventsAdminProps) {
   const [filter, setFilter] = useState<FilterStatus>("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<ClubEvent | null>(null);
@@ -137,21 +146,40 @@ export function EventsAdmin({ events, onRefresh }: EventsAdminProps) {
   return (
     <>
       {/* Action bar */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--muted)]">
-          {FILTER_TABS.map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => setFilter(tab.value)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold tracking-wide transition-all ${
-                filter === tab.value
-                  ? "bg-[var(--surface-lowest)] text-[var(--foreground)] shadow-sm"
-                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          {/* Time filter */}
+          <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--muted)]">
+            {TIME_TABS.map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => onTimeFilterChange(tab.value)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold tracking-wide transition-all ${
+                  timeFilter === tab.value
+                    ? "bg-[var(--surface-lowest)] text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          {/* Status filter */}
+          <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--muted)]">
+            {FILTER_TABS.map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => setFilter(tab.value)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold tracking-wide transition-all ${
+                  filter === tab.value
+                    ? "bg-[var(--surface-lowest)] text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}

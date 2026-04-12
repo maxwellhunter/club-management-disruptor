@@ -5,15 +5,20 @@ import type { EventWithRsvp, MemberRole } from "@club/shared";
 import { EventsMember } from "./events-member";
 import { EventsAdmin } from "./events-admin";
 
+export type TimeFilter = "upcoming" | "past" | "all";
+
 export default function EventsPage() {
   const [events, setEvents] = useState<EventWithRsvp[]>([]);
   const [role, setRole] = useState<MemberRole>("member");
   const [loading, setLoading] = useState(true);
   const [rsvpLoading, setRsvpLoading] = useState<string | null>(null);
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("upcoming");
 
-  const fetchEvents = useCallback(async () => {
+  const fetchEvents = useCallback(async (time?: TimeFilter) => {
     try {
-      const res = await fetch("/api/events");
+      const params = new URLSearchParams();
+      if (time) params.set("time", time);
+      const res = await fetch(`/api/events?${params}`);
       if (res.ok) {
         const data = await res.json();
         setEvents(data.events);
@@ -27,8 +32,8 @@ export default function EventsPage() {
   }, []);
 
   useEffect(() => {
-    fetchEvents();
-  }, [fetchEvents]);
+    fetchEvents(timeFilter);
+  }, [fetchEvents, timeFilter]);
 
   async function handleRsvp(eventId: string, currentStatus: string | null) {
     setRsvpLoading(eventId);
@@ -98,7 +103,12 @@ export default function EventsPage() {
       </div>
 
       {isAdmin ? (
-        <EventsAdmin events={events} onRefresh={fetchEvents} />
+        <EventsAdmin
+          events={events}
+          onRefresh={() => fetchEvents(timeFilter)}
+          timeFilter={timeFilter}
+          onTimeFilterChange={setTimeFilter}
+        />
       ) : (
         <EventsMember
           events={events}
