@@ -53,19 +53,7 @@ export default function DiningPage() {
   }
 
   return (
-    <div className="space-y-8">
-      {/* Page header */}
-      <div>
-        <h1 className="font-[family-name:var(--font-headline)] text-3xl font-bold text-[var(--foreground)]">
-          Dining
-        </h1>
-        <p className="text-sm text-[var(--muted-foreground)] mt-1">
-          {isAdmin
-            ? "Manage reservations, orders, and menus."
-            : "Reserve a table or browse the menu."}
-        </p>
-      </div>
-
+    <div className="space-y-6">
       {isAdmin ? <DiningAdmin /> : <DiningMember />}
     </div>
   );

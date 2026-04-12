@@ -19,6 +19,10 @@ struct RsvpResult: Decodable {
     let status: String
 }
 
+struct EventsHeroResponse: Decodable {
+    let eventsImageUrl: String?
+}
+
 // MARK: - Event Icon Mapping
 
 private func eventIcon(for title: String) -> (icon: String, colors: [Color]) {
@@ -52,6 +56,15 @@ struct EventsView: View {
     @State private var loading = true
     @State private var selectedEvent: ClubEvent?
 
+    // Hero image — nil = still loading, "" = no image, URL string = has image
+    @State private var eventsHeroUrl: String?
+    @State private var heroLoaded = false
+
+    /// True when we should show hero space (loading shimmer or actual image)
+    private var hasHeroContent: Bool {
+        !heroLoaded || (eventsHeroUrl != nil && !eventsHeroUrl!.isEmpty)
+    }
+
     // RSVP
     @State private var rsvpInProgress: String? = nil  // tracks which status is loading
     @State private var showRsvpSuccess = false
@@ -69,9 +82,13 @@ struct EventsView: View {
                 eventDetailView
             }
         }
-        .navigationTitle(screen == .list ? "Events" : "")
+        .navigationTitle(screen == .list && hasHeroContent ? "" : (screen == .list ? "Events" : ""))
         .navigationBarTitleDisplayMode(.inline)
-        .task { await fetchEvents() }
+        .toolbarBackground(screen == .list && hasHeroContent ? .hidden : .visible, for: .navigationBar)
+        .task {
+            await fetchEventsHero()
+            await fetchEvents()
+        }
         .alert("RSVP Updated!", isPresented: $showRsvpSuccess) {
             Button("OK") {}
         } message: {
@@ -91,26 +108,53 @@ struct EventsView: View {
     private var eventListView: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 24) {
-                // Hero
-                VStack(spacing: 8) {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.system(size: 36))
-                        .foregroundStyle(Color.club.primary)
-                        .frame(width: 64, height: 64)
-                        .background(Color.club.accent, in: RoundedRectangle(cornerRadius: 18))
+                // Hero — shimmer while loading, image when ready, nothing if no URL
+                if !heroLoaded {
+                    ShimmerView()
+                        .frame(height: 300)
+                } else if let heroUrl = eventsHeroUrl, !heroUrl.isEmpty,
+                          let url = URL(string: heroUrl) {
+                    GeometryReader { geo in
+                        let minY = geo.frame(in: .global).minY
+                        let heroHeight: CGFloat = 300
+                        let offset = minY > 0 ? -minY : 0
+                        let height = minY > 0 ? heroHeight + minY : heroHeight
 
-                    Text("Upcoming Events")
-                        .font(.custom("Georgia", size: 22).weight(.bold))
-                        .foregroundStyle(Color.club.foreground)
+                        ZStack(alignment: .bottom) {
+                            CachedAsyncImage(url: url) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: geo.size.width, height: height)
+                                        .clipped()
+                                case .failure:
+                                    Color.club.surfaceContainer
+                                        .frame(width: geo.size.width, height: height)
+                                default:
+                                    ShimmerView()
+                                        .frame(width: geo.size.width, height: height)
+                                }
+                            }
 
-                    Text("Discover what's happening at the club.")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.club.onSurfaceVariant)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
+                            // Gradient fade from image into background
+                            LinearGradient(
+                                colors: [
+                                    Color.club.background.opacity(0),
+                                    Color.club.background.opacity(0.6),
+                                    Color.club.background,
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .frame(height: 120)
+                        }
+                        .frame(width: geo.size.width, height: height)
+                        .offset(y: offset)
+                    }
+                    .frame(height: 300)
                 }
-                .padding(.top, 16)
-                .padding(.bottom, 8)
 
                 if loading {
                     ProgressView()
@@ -147,6 +191,7 @@ struct EventsView: View {
                 Spacer(minLength: 32)
             }
         }
+        .ignoresSafeArea(edges: hasHeroContent ? .top : [])
     }
 
     private func featuredEventCard(_ event: ClubEvent) -> some View {
@@ -160,7 +205,7 @@ struct EventsView: View {
                 // Hero image or gradient
                 ZStack(alignment: .bottomLeading) {
                     if let imageUrl = event.imageUrl, let url = URL(string: imageUrl) {
-                        AsyncImage(url: url) { phase in
+                        CachedAsyncImage(url: url) { phase in
                             switch phase {
                             case .success(let image):
                                 image
@@ -291,7 +336,7 @@ struct EventsView: View {
             HStack(spacing: 14) {
                 // Event image or icon gradient
                 if let imageUrl = event.imageUrl, let url = URL(string: imageUrl) {
-                    AsyncImage(url: url) { phase in
+                    CachedAsyncImage(url: url) { phase in
                         switch phase {
                         case .success(let image):
                             image
@@ -395,7 +440,7 @@ struct EventsView: View {
                         // Hero image
                         ZStack(alignment: .topLeading) {
                             if let imageUrl = event.imageUrl, let url = URL(string: imageUrl) {
-                                AsyncImage(url: url) { phase in
+                                CachedAsyncImage(url: url) { phase in
                                     switch phase {
                                     case .success(let image):
                                         image
@@ -725,6 +770,28 @@ struct EventsView: View {
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // MARK: - API Calls
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private func fetchEventsHero() async {
+        // Check cache first for instant display
+        if let cached = await AppCacheService.shared.getString("events_hero_url") {
+            eventsHeroUrl = cached
+            heroLoaded = true
+        }
+
+        // Always fetch fresh from API (updates cache for next time)
+        do {
+            let response: EventsHeroResponse = try await APIClient.shared.get("/club/events-image")
+            let url = response.eventsImageUrl ?? ""
+            eventsHeroUrl = url
+            heroLoaded = true
+            await AppCacheService.shared.setString(url, forKey: "events_hero_url")
+        } catch {
+            if !heroLoaded {
+                heroLoaded = true
+            }
+            print("Failed to fetch events hero:", error)
+        }
+    }
 
     private func fetchEvents() async {
         loading = true

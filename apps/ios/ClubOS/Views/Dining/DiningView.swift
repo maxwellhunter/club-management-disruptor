@@ -102,17 +102,40 @@ private func venueInfo(for name: String) -> VenueInfo {
 private let TAX_RATE = 0.08
 private let SERVICE_CHARGE_RATE = 0.18
 
+// MARK: - Glass Effect Modifier
+
+private struct GlassToggleModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 14))
+                .contentShape(RoundedRectangle(cornerRadius: 14))
+        } else {
+            content
+                .background(Color.club.surfaceContainerHigh, in: RoundedRectangle(cornerRadius: 14))
+                .contentShape(RoundedRectangle(cornerRadius: 14))
+        }
+    }
+}
+
 // MARK: - Dining View
 
 struct DiningView: View {
     enum Screen { case venues, menu, cart, reserveDate, reserveTime, reserveConfirm }
     enum FlowMode: String { case reserve = "Reserve", order = "Order" }
 
+    @Namespace private var toggleAnimation
     @State private var screen: Screen = .venues
     @State private var flowMode: FlowMode = .reserve
 
-    // Hero image
+    // Hero image — nil = still loading, "" = no image, URL string = has image
     @State private var diningHeroUrl: String?
+    @State private var heroLoaded = false
+
+    /// True when we should show hero space (loading shimmer or actual image)
+    private var hasHeroContent: Bool {
+        !heroLoaded || (diningHeroUrl != nil && !diningHeroUrl!.isEmpty)
+    }
 
     // Venues
     @State private var facilities: [DiningFacility] = []
@@ -170,8 +193,9 @@ struct DiningView: View {
                 reserveConfirmView
             }
         }
-        .navigationTitle(navTitle)
+        .navigationTitle(screen == .venues && hasHeroContent ? "" : navTitle)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(screen == .venues && hasHeroContent ? .hidden : .visible, for: .navigationBar)
         .task {
             await fetchFacilities()
             await fetchDiningHero()
@@ -222,52 +246,54 @@ struct DiningView: View {
     private var venueSelectionView: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
-                // Hero — image with gradient fade or fallback
-                if let heroUrl = diningHeroUrl, let url = URL(string: heroUrl) {
-                    ZStack(alignment: .bottom) {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(height: 220)
-                                    .clipped()
-                            default:
-                                diningHeroFallback
+                // Hero — shimmer while loading, image when ready, nothing if no URL
+                if !heroLoaded {
+                    // API hasn't returned yet — show shimmer
+                    ShimmerView()
+                        .frame(height: 300)
+                } else if let heroUrl = diningHeroUrl, !heroUrl.isEmpty,
+                          let url = URL(string: heroUrl) {
+                    // Have a hero image URL — show cached image
+                    GeometryReader { geo in
+                        let minY = geo.frame(in: .global).minY
+                        let heroHeight: CGFloat = 300
+                        let offset = minY > 0 ? -minY : 0
+                        let height = minY > 0 ? heroHeight + minY : heroHeight
+
+                        ZStack(alignment: .bottom) {
+                            CachedAsyncImage(url: url) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: geo.size.width, height: height)
+                                        .clipped()
+                                case .failure:
+                                    Color.club.surfaceContainer
+                                        .frame(width: geo.size.width, height: height)
+                                default:
+                                    ShimmerView()
+                                        .frame(width: geo.size.width, height: height)
+                                }
                             }
+
+                            // Gradient fade from image into background
+                            LinearGradient(
+                                colors: [
+                                    Color.club.background.opacity(0),
+                                    Color.club.background.opacity(0.6),
+                                    Color.club.background,
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .frame(height: 120)
                         }
-
-                        // Gradient fade from image into background
-                        LinearGradient(
-                            colors: [
-                                Color.club.background.opacity(0),
-                                Color.club.background.opacity(0.6),
-                                Color.club.background,
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .frame(height: 100)
-
-                        // Text overlay
-                        VStack(spacing: 4) {
-                            Text("Dining")
-                                .font(.custom("Georgia", size: 28).weight(.bold))
-                                .foregroundStyle(.white)
-                                .shadow(color: .black.opacity(0.5), radius: 8, y: 2)
-
-                            Text("Reserve a table or order from our restaurants")
-                                .font(.system(size: 13))
-                                .foregroundStyle(.white.opacity(0.85))
-                                .shadow(color: .black.opacity(0.4), radius: 4, y: 1)
-                        }
-                        .padding(.bottom, 16)
+                        .frame(width: geo.size.width, height: height)
+                        .offset(y: offset)
                     }
-                    .frame(height: 220)
-                    .clipped()
-                } else {
-                    diningHeroFallback
+                    .frame(height: 300)
                 }
 
                 // Flow mode toggle
@@ -302,6 +328,7 @@ struct DiningView: View {
                 Spacer(minLength: 32)
             }
         }
+        .ignoresSafeArea(edges: hasHeroContent ? .top : [])
     }
 
     private var flowModeToggle: some View {
@@ -309,7 +336,9 @@ struct DiningView: View {
             ForEach([FlowMode.reserve, FlowMode.order], id: \.rawValue) { mode in
                 let isSelected = flowMode == mode
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { flowMode = mode }
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        flowMode = mode
+                    }
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: mode == .reserve ? "calendar.badge.clock" : "bag.fill")
@@ -320,18 +349,20 @@ struct DiningView: View {
                     .foregroundStyle(isSelected ? .white : Color.club.onSurfaceVariant)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(
-                        isSelected ? Color.club.primary : Color.clear,
-                        in: RoundedRectangle(cornerRadius: 12)
-                    )
+                    .background {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.club.primary)
+                                .matchedGeometryEffect(id: "toggle", in: toggleAnimation)
+                        }
+                    }
                     .contentShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
             }
         }
         .padding(4)
-        .background(Color.club.surfaceContainerHigh, in: RoundedRectangle(cornerRadius: 14))
-        .contentShape(RoundedRectangle(cornerRadius: 14))
+        .modifier(GlassToggleModifier())
     }
 
     private var diningHeroFallback: some View {
@@ -341,16 +372,6 @@ struct DiningView: View {
                 .foregroundStyle(Color.club.primary)
                 .frame(width: 64, height: 64)
                 .background(Color.club.accent, in: RoundedRectangle(cornerRadius: 18))
-
-            Text("Dining")
-                .font(.custom("Georgia", size: 22).weight(.bold))
-                .foregroundStyle(Color.club.foreground)
-
-            Text("Reserve a table or order from our restaurants.")
-                .font(.system(size: 13))
-                .foregroundStyle(Color.club.onSurfaceVariant)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
         }
         .padding(.top, 16)
         .padding(.bottom, 8)
@@ -373,7 +394,7 @@ struct DiningView: View {
                 // Venue image or gradient fallback
                 ZStack(alignment: .topLeading) {
                     if let imageUrl = facility.imageUrl, let url = URL(string: imageUrl) {
-                        AsyncImage(url: url) { phase in
+                        CachedAsyncImage(url: url) { phase in
                             switch phase {
                             case .success(let image):
                                 image
@@ -381,7 +402,7 @@ struct DiningView: View {
                                     .aspectRatio(contentMode: .fill)
                                     .frame(height: 120)
                                     .clipped()
-                            default:
+                            case .failure:
                                 LinearGradient(
                                     colors: [Color.club.primaryContainer, Color(hex: "012d1d")],
                                     startPoint: .topLeading,
@@ -393,6 +414,9 @@ struct DiningView: View {
                                         .font(.system(size: 40))
                                         .foregroundStyle(.white.opacity(0.15))
                                 }
+                            default:
+                                ShimmerView()
+                                    .frame(height: 120)
                             }
                         }
                     } else {
@@ -1103,7 +1127,7 @@ struct DiningView: View {
 
         return HStack(spacing: 12) {
             if let imageUrl = item.imageUrl, let url = URL(string: imageUrl) {
-                AsyncImage(url: url) { phase in
+                CachedAsyncImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
                         image
@@ -1551,10 +1575,24 @@ struct DiningView: View {
     }
 
     private func fetchDiningHero() async {
+        // Check cache first for instant display
+        if let cached = await AppCacheService.shared.getString("dining_hero_url") {
+            diningHeroUrl = cached
+            heroLoaded = true
+        }
+
+        // Always fetch fresh from API (updates cache for next time)
         do {
             let response: DiningHeroResponse = try await APIClient.shared.get("/club/dining-image")
-            diningHeroUrl = response.diningImageUrl
+            let url = response.diningImageUrl ?? ""
+            diningHeroUrl = url
+            heroLoaded = true
+            await AppCacheService.shared.setString(url, forKey: "dining_hero_url")
         } catch {
+            // If we had a cached value, keep showing it
+            if !heroLoaded {
+                heroLoaded = true  // Stop shimmer, show nothing
+            }
             print("Failed to fetch dining hero:", error)
         }
     }

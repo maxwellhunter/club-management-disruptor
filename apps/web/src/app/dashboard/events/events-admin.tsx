@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { ImageUpload } from "@/components/image-upload";
 import {
   Plus,
   Pencil,
@@ -97,6 +98,41 @@ export function EventsAdmin({ events, onRefresh, timeFilter, onTimeFilterChange 
     title: string;
   } | null>(null);
 
+  // Events hero image
+  const [eventsHeroUrl, setEventsHeroUrl] = useState("");
+  const [heroLoaded, setHeroLoaded] = useState(false);
+  const [heroExpanded, setHeroExpanded] = useState(false);
+
+  useEffect(() => {
+    async function fetchHero() {
+      try {
+        const res = await fetch("/api/club/events-image");
+        if (res.ok) {
+          const data = await res.json();
+          setEventsHeroUrl(data.events_image_url ?? "");
+        }
+      } catch {
+        // ignore
+      } finally {
+        setHeroLoaded(true);
+      }
+    }
+    fetchHero();
+  }, []);
+
+  async function handleHeroChange(url: string) {
+    setEventsHeroUrl(url);
+    try {
+      await fetch("/api/club/events-image", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ events_image_url: url || null }),
+      });
+    } catch {
+      // ignore
+    }
+  }
+
   const filteredEvents =
     filter === "all"
       ? events
@@ -145,6 +181,46 @@ export function EventsAdmin({ events, onRefresh, timeFilter, onTimeFilterChange 
 
   return (
     <>
+      {/* Events Hero Image — collapsible */}
+      {heroLoaded && (
+        <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setHeroExpanded(!heroExpanded)}
+            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--muted)]/50 transition-colors"
+          >
+            {eventsHeroUrl ? (
+              <img src={eventsHeroUrl} alt="" className="h-8 w-14 rounded object-cover" />
+            ) : (
+              <div className="h-8 w-14 rounded bg-[var(--muted)] flex items-center justify-center">
+                <Calendar className="h-3.5 w-3.5 text-[var(--muted-foreground)]" />
+              </div>
+            )}
+            <span className="text-xs font-semibold text-[var(--foreground)]">
+              Events Hero Image
+            </span>
+            <span className="text-xs text-[var(--muted-foreground)]">
+              {eventsHeroUrl ? "Uploaded" : "Not set"} · shown in iOS app
+            </span>
+            <svg className={`ml-auto h-4 w-4 text-[var(--muted-foreground)] transition-transform ${heroExpanded ? "rotate-180" : ""}`} viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+            </svg>
+          </button>
+          {heroExpanded && (
+            <div className="px-4 pb-4">
+              <ImageUpload
+                value={eventsHeroUrl}
+                onChange={handleHeroChange}
+                bucket="event-images"
+                label=""
+                aspect="video"
+                placeholder="Upload a hero image for the events experience"
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Action bar */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">

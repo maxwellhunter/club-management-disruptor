@@ -97,6 +97,7 @@ final class AuthViewModel {
             session = nil
             user = nil
             await APIClient.shared.setToken(nil)
+            await AppCacheService.shared.clearAll()
         } catch {
             errorMessage = error.localizedDescription
         }

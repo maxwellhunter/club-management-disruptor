@@ -1,0 +1,602 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0527E82B1919261F3C15B740 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D3B0A8D5DC712DAFC66EA1E /* HomeView.swift */; };
+		07B050D1CD8AD30BA96C155A /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F403413B0C5F628D9A8DDCDA /* AuthViewModel.swift */; };
+		0E31C6F60975F5940724856C /* EventsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CA1494AF2CFE5F291AA9D8E /* EventsView.swift */; };
+		18C64989900827C42E2719FC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 40F0C278CA7DF2C1779DDD70 /* Assets.xcassets */; };
+		1F9ED783AD8BB4FCF41B3DE4 /* Member.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDEA2A58F8BA32E02FF9B727 /* Member.swift */; };
+		2C1281ABDB7F1B4B2795EE51 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C18688663021B86ABEE890A /* APIClient.swift */; };
+		2EF709626901F10F3631DD67 /* ClubOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8FB6DE3F3392CFF82E78937 /* ClubOSApp.swift */; };
+		3100AE9C45F8901669624481 /* GolfBookingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37CC54DC0C954B403A536A71 /* GolfBookingView.swift */; };
+		33AFDE7356E81A406E19CC84 /* DiningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2113B0FF55C8F05A75A73CA /* DiningView.swift */; };
+		4871406A87E7BA17C0B7D228 /* SecurityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FAA015B4CC78EE3E134CF8F /* SecurityView.swift */; };
+		5F9A0E227F83510681FDD69F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A438C1A077D5830884ED34D /* ContentView.swift */; };
+		7274545DBB1A3241E10049F6 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F47C2FE6DA0B81CFB18BE8 /* Theme.swift */; };
+		7668D83C7BB2BDCEFF53949F /* BillingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F1D809EF88A59F5CB73373A /* BillingView.swift */; };
+		83DE5CDCBD6988A9E5EB821D /* PersonalInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDD8290984EA056EA660983C /* PersonalInfoView.swift */; };
+		97064286620037EF3C38B5EA /* MembershipCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 735D860DA8DB5F1FA2543EB1 /* MembershipCardView.swift */; };
+		A49BDC6E3CF3088E3E48A8AA /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90EF7AFD6B9F29B0A0F065E /* SupabaseClient.swift */; };
+		BA30E3F3F7551C0DAA3643DE /* SignupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4E6462871241AAF28C9C9F2 /* SignupView.swift */; };
+		C550771E6BBA3C6F4CD17968 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D63CC08A1B6CBF0C9197A7AC /* LoginView.swift */; };
+		C93B044D0F2C6600521ACF1C /* MembersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A679D70EA159103C5700DB9B /* MembersView.swift */; };
+		CF9FCF058A15113FD7669DED /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 7EC08D8E8F8330AF1FFFBF48 /* Supabase */; };
+		CFA18EE4CCB453EAC4492B27 /* AnnouncementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3D5DF16D605BF502426C68E /* AnnouncementsView.swift */; };
+		D37F7028BD5D59C1685D5FC9 /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A6CF647777BDA87A8FF6F4D /* NotificationsView.swift */; };
+		D70AF87B0086AF9F92B10D7E /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 420D42E45CFFDAC741C7E36E /* Config.swift */; };
+		DF21BC665099D208F43F321F /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B78B5A08E883ADB3802BFA0 /* ChatView.swift */; };
+		DF44E39E4BAE058C6542F23E /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC2090F6E9C8C602603CC6CE /* ProfileView.swift */; };
+		E1A2B3C4D5E6F7089012ABCD /* ScorecardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F607180920ABCD /* ScorecardView.swift */; };
+		F2B3C4D5E6F70819A023BCDE /* PlayerRatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6070819A023BCDE /* PlayerRatesView.swift */; };
+		A1C2D3E4F5061728B934CDEF /* ImageCacheService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D4E5F6A7B80920D145EFAB /* ImageCacheService.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0A6CF647777BDA87A8FF6F4D /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
+		1CA1494AF2CFE5F291AA9D8E /* EventsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventsView.swift; sourceTree = "<group>"; };
+		1CCEA1070E01D6A7CD81126A /* ClubOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ClubOS.entitlements; sourceTree = "<group>"; };
+		2F1D809EF88A59F5CB73373A /* BillingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillingView.swift; sourceTree = "<group>"; };
+		2FAA015B4CC78EE3E134CF8F /* SecurityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityView.swift; sourceTree = "<group>"; };
+		37CC54DC0C954B403A536A71 /* GolfBookingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GolfBookingView.swift; sourceTree = "<group>"; };
+		3F3489D53E7F3B20DD723924 /* ClubOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ClubOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		40F0C278CA7DF2C1779DDD70 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		420D42E45CFFDAC741C7E36E /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
+		4C18688663021B86ABEE890A /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		5D3B0A8D5DC712DAFC66EA1E /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		6B78B5A08E883ADB3802BFA0 /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
+		735D860DA8DB5F1FA2543EB1 /* MembershipCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MembershipCardView.swift; sourceTree = "<group>"; };
+		97F47C2FE6DA0B81CFB18BE8 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		987DF30AFFFD9B1D9158CF36 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		9A438C1A077D5830884ED34D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A679D70EA159103C5700DB9B /* MembersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MembersView.swift; sourceTree = "<group>"; };
+		B90EF7AFD6B9F29B0A0F065E /* SupabaseClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseClient.swift; sourceTree = "<group>"; };
+		BBE811927B1AF2D7D3839556 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		BC2090F6E9C8C602603CC6CE /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		D2113B0FF55C8F05A75A73CA /* DiningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiningView.swift; sourceTree = "<group>"; };
+		D63CC08A1B6CBF0C9197A7AC /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		E3D5DF16D605BF502426C68E /* AnnouncementsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnouncementsView.swift; sourceTree = "<group>"; };
+		EDEA2A58F8BA32E02FF9B727 /* Member.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Member.swift; sourceTree = "<group>"; };
+		F1F2F49E1F662773D68358D6 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		F403413B0C5F628D9A8DDCDA /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
+		F4E6462871241AAF28C9C9F2 /* SignupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignupView.swift; sourceTree = "<group>"; };
+		F8FB6DE3F3392CFF82E78937 /* ClubOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClubOSApp.swift; sourceTree = "<group>"; };
+		FDD8290984EA056EA660983C /* PersonalInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalInfoView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F607180920ABCD /* ScorecardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScorecardView.swift; sourceTree = "<group>"; };
+		B2C3D4E5F6070819A023BCDE /* PlayerRatesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerRatesView.swift; sourceTree = "<group>"; };
+		C3D4E5F6A7B80920D145EFAB /* ImageCacheService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheService.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C3EC88220B2B13E881E5AE5E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CF9FCF058A15113FD7669DED /* Supabase in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0899B6683EDDF19167686F5D = {
+			isa = PBXGroup;
+			children = (
+				A003BBC1D1A31A23CDEE749C /* ClubOS */,
+				462942D1EC675715DC2B25E8 /* Config */,
+				C27660F0DA29B917FD5FCE14 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		0D6C693C999C892DC3776FD1 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				852C89C970F0EF8647589AC4 /* Auth */,
+				F6204E087BFA035D652183B6 /* Card */,
+				33B81CE582E5EC63657765E1 /* Chat */,
+				215A7A80876F4C04662AA3D6 /* Dining */,
+				CA3DFC28BCDB6564C0FA2F9F /* Events */,
+				E88C45A2928BC18313DFC10F /* Golf */,
+				FFEA3606036A88B940232175 /* Home */,
+				D9285FDA55E43100DA1FB79C /* Members */,
+				C7FF51A7744C4918C4F75E44 /* Profile */,
+				655779A44AF3C109278E6CE7 /* Settings */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		215A7A80876F4C04662AA3D6 /* Dining */ = {
+			isa = PBXGroup;
+			children = (
+				D2113B0FF55C8F05A75A73CA /* DiningView.swift */,
+			);
+			path = Dining;
+			sourceTree = "<group>";
+		};
+		291BAFCF6E7822DDA418FE72 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		33B81CE582E5EC63657765E1 /* Chat */ = {
+			isa = PBXGroup;
+			children = (
+				6B78B5A08E883ADB3802BFA0 /* ChatView.swift */,
+			);
+			path = Chat;
+			sourceTree = "<group>";
+		};
+		360D34A23DAFAAED26A4EFA7 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				4C18688663021B86ABEE890A /* APIClient.swift */,
+				F403413B0C5F628D9A8DDCDA /* AuthViewModel.swift */,
+				C3D4E5F6A7B80920D145EFAB /* ImageCacheService.swift */,
+				B90EF7AFD6B9F29B0A0F065E /* SupabaseClient.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		462942D1EC675715DC2B25E8 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				BBE811927B1AF2D7D3839556 /* Debug.xcconfig */,
+				F1F2F49E1F662773D68358D6 /* Release.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		655779A44AF3C109278E6CE7 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		81B1FD3F35AA7A5EFC2B3037 /* Preview Content */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		852C89C970F0EF8647589AC4 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				D63CC08A1B6CBF0C9197A7AC /* LoginView.swift */,
+				F4E6462871241AAF28C9C9F2 /* SignupView.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		876E560CE6718313793F6B96 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				EDEA2A58F8BA32E02FF9B727 /* Member.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		A003BBC1D1A31A23CDEE749C /* ClubOS */ = {
+			isa = PBXGroup;
+			children = (
+				40F0C278CA7DF2C1779DDD70 /* Assets.xcassets */,
+				1CCEA1070E01D6A7CD81126A /* ClubOS.entitlements */,
+				987DF30AFFFD9B1D9158CF36 /* Info.plist */,
+				BE231A246FFB7FD81C5FFFB4 /* App */,
+				291BAFCF6E7822DDA418FE72 /* Components */,
+				B46AE8AEF6972ACCD5744D72 /* Config */,
+				876E560CE6718313793F6B96 /* Models */,
+				81B1FD3F35AA7A5EFC2B3037 /* Preview Content */,
+				360D34A23DAFAAED26A4EFA7 /* Services */,
+				0D6C693C999C892DC3776FD1 /* Views */,
+			);
+			path = ClubOS;
+			sourceTree = "<group>";
+		};
+		B46AE8AEF6972ACCD5744D72 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				420D42E45CFFDAC741C7E36E /* Config.swift */,
+				97F47C2FE6DA0B81CFB18BE8 /* Theme.swift */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		BE231A246FFB7FD81C5FFFB4 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				F8FB6DE3F3392CFF82E78937 /* ClubOSApp.swift */,
+				9A438C1A077D5830884ED34D /* ContentView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		C27660F0DA29B917FD5FCE14 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				3F3489D53E7F3B20DD723924 /* ClubOS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		C7FF51A7744C4918C4F75E44 /* Profile */ = {
+			isa = PBXGroup;
+			children = (
+				2F1D809EF88A59F5CB73373A /* BillingView.swift */,
+				0A6CF647777BDA87A8FF6F4D /* NotificationsView.swift */,
+				FDD8290984EA056EA660983C /* PersonalInfoView.swift */,
+				BC2090F6E9C8C602603CC6CE /* ProfileView.swift */,
+				2FAA015B4CC78EE3E134CF8F /* SecurityView.swift */,
+			);
+			path = Profile;
+			sourceTree = "<group>";
+		};
+		CA3DFC28BCDB6564C0FA2F9F /* Events */ = {
+			isa = PBXGroup;
+			children = (
+				1CA1494AF2CFE5F291AA9D8E /* EventsView.swift */,
+			);
+			path = Events;
+			sourceTree = "<group>";
+		};
+		D9285FDA55E43100DA1FB79C /* Members */ = {
+			isa = PBXGroup;
+			children = (
+				A679D70EA159103C5700DB9B /* MembersView.swift */,
+			);
+			path = Members;
+			sourceTree = "<group>";
+		};
+		E88C45A2928BC18313DFC10F /* Golf */ = {
+			isa = PBXGroup;
+			children = (
+				37CC54DC0C954B403A536A71 /* GolfBookingView.swift */,
+				B2C3D4E5F6070819A023BCDE /* PlayerRatesView.swift */,
+				A1B2C3D4E5F607180920ABCD /* ScorecardView.swift */,
+			);
+			path = Golf;
+			sourceTree = "<group>";
+		};
+		F6204E087BFA035D652183B6 /* Card */ = {
+			isa = PBXGroup;
+			children = (
+				735D860DA8DB5F1FA2543EB1 /* MembershipCardView.swift */,
+			);
+			path = Card;
+			sourceTree = "<group>";
+		};
+		FFEA3606036A88B940232175 /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				E3D5DF16D605BF502426C68E /* AnnouncementsView.swift */,
+				5D3B0A8D5DC712DAFC66EA1E /* HomeView.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		ECCEDAA5FD309ECB60AD5F4C /* ClubOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DCA270DAD76241330311AD22 /* Build configuration list for PBXNativeTarget "ClubOS" */;
+			buildPhases = (
+				4C90EE872DE4A7B99658719B /* Sources */,
+				7AF96CB1E96571AF07024590 /* Resources */,
+				C3EC88220B2B13E881E5AE5E /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ClubOS;
+			packageProductDependencies = (
+				7EC08D8E8F8330AF1FFFBF48 /* Supabase */,
+			);
+			productName = ClubOS;
+			productReference = 3F3489D53E7F3B20DD723924 /* ClubOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		996E6CE435DCBEC757A10798 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					ECCEDAA5FD309ECB60AD5F4C = {
+						DevelopmentTeam = F2VKRSRXTV;
+					};
+				};
+			};
+			buildConfigurationList = ABA6910864A69C1B0F76BA5D /* Build configuration list for PBXProject "ClubOS" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 0899B6683EDDF19167686F5D;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				1DBEC8F42885F1B8F63FF8DA /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = C27660F0DA29B917FD5FCE14 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				ECCEDAA5FD309ECB60AD5F4C /* ClubOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		7AF96CB1E96571AF07024590 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				18C64989900827C42E2719FC /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		4C90EE872DE4A7B99658719B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2C1281ABDB7F1B4B2795EE51 /* APIClient.swift in Sources */,
+				CFA18EE4CCB453EAC4492B27 /* AnnouncementsView.swift in Sources */,
+				07B050D1CD8AD30BA96C155A /* AuthViewModel.swift in Sources */,
+				7668D83C7BB2BDCEFF53949F /* BillingView.swift in Sources */,
+				DF21BC665099D208F43F321F /* ChatView.swift in Sources */,
+				2EF709626901F10F3631DD67 /* ClubOSApp.swift in Sources */,
+				D70AF87B0086AF9F92B10D7E /* Config.swift in Sources */,
+				5F9A0E227F83510681FDD69F /* ContentView.swift in Sources */,
+				33AFDE7356E81A406E19CC84 /* DiningView.swift in Sources */,
+				0E31C6F60975F5940724856C /* EventsView.swift in Sources */,
+				3100AE9C45F8901669624481 /* GolfBookingView.swift in Sources */,
+				0527E82B1919261F3C15B740 /* HomeView.swift in Sources */,
+				A1C2D3E4F5061728B934CDEF /* ImageCacheService.swift in Sources */,
+				C550771E6BBA3C6F4CD17968 /* LoginView.swift in Sources */,
+				1F9ED783AD8BB4FCF41B3DE4 /* Member.swift in Sources */,
+				C93B044D0F2C6600521ACF1C /* MembersView.swift in Sources */,
+				97064286620037EF3C38B5EA /* MembershipCardView.swift in Sources */,
+				D37F7028BD5D59C1685D5FC9 /* NotificationsView.swift in Sources */,
+				83DE5CDCBD6988A9E5EB821D /* PersonalInfoView.swift in Sources */,
+				DF44E39E4BAE058C6542F23E /* ProfileView.swift in Sources */,
+				4871406A87E7BA17C0B7D228 /* SecurityView.swift in Sources */,
+				E1A2B3C4D5E6F7089012ABCD /* ScorecardView.swift in Sources */,
+				F2B3C4D5E6F70819A023BCDE /* PlayerRatesView.swift in Sources */,
+				BA30E3F3F7551C0DAA3643DE /* SignupView.swift in Sources */,
+				A49BDC6E3CF3088E3E48A8AA /* SupabaseClient.swift in Sources */,
+				7274545DBB1A3241E10049F6 /* Theme.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		0579A4BAC942654A533A7B31 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = BBE811927B1AF2D7D3839556 /* Debug.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = F2VKRSRXTV;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ClubOS/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.10;
+			};
+			name = Debug;
+		};
+		30C2A52F45EBA07C79D47D86 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = ClubOS/ClubOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = ClubOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.clubos.app;
+				SDKROOT = iphoneos;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		E1B847232C87246163B39C8B /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = F1F2F49E1F662773D68358D6 /* Release.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = F2VKRSRXTV;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ClubOS/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.10;
+			};
+			name = Release;
+		};
+		FEA1B977AC7BE3F3DCB47DFD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = ClubOS/ClubOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = ClubOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.clubos.app;
+				SDKROOT = iphoneos;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		ABA6910864A69C1B0F76BA5D /* Build configuration list for PBXProject "ClubOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0579A4BAC942654A533A7B31 /* Debug */,
+				E1B847232C87246163B39C8B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		DCA270DAD76241330311AD22 /* Build configuration list for PBXNativeTarget "ClubOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FEA1B977AC7BE3F3DCB47DFD /* Debug */,
+				30C2A52F45EBA07C79D47D86 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		1DBEC8F42885F1B8F63FF8DA /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		7EC08D8E8F8330AF1FFFBF48 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1DBEC8F42885F1B8F63FF8DA /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 996E6CE435DCBEC757A10798 /* Project object */;
+}
