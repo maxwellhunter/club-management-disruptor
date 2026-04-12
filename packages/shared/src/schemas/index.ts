@@ -164,6 +164,7 @@ export const createMenuCategorySchema = z.object({
   facility_id: z.string().uuid(),
   name: z.string().min(1, "Category name is required").max(100),
   description: z.string().optional(),
+  image_url: z.string().url().optional().or(z.literal("")),
   sort_order: z.number().int().min(0).default(0),
 });
 
@@ -195,6 +196,7 @@ export const updateMenuItemSchema = createMenuItemSchema.partial();
 export const updateMenuCategorySchema = z.object({
   name: z.string().min(1, "Category name is required").max(100).optional(),
   description: z.string().optional(),
+  image_url: z.string().url().optional().or(z.literal("")),
   sort_order: z.number().int().min(0).optional(),
   is_active: z.boolean().optional(),
 });

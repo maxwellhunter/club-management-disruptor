@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { X, Upload, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { X } from "lucide-react";
 import type { ClubEvent, EventStatus } from "@club/shared";
+import { ImageUpload } from "@/components/image-upload";
 
 interface EventFormModalProps {
   event?: ClubEvent;
@@ -42,52 +43,8 @@ export function EventFormModal({
     event?.status ?? "draft"
   );
   const [imageUrl, setImageUrl] = useState(event?.image_url ?? "");
-  const [imagePreview, setImagePreview] = useState(event?.image_url ?? "");
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
-  async function handleImageUpload(file: File) {
-    setUploading(true);
-    setError("");
-
-    try {
-      // Show local preview immediately
-      const localUrl = URL.createObjectURL(file);
-      setImagePreview(localUrl);
-
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("bucket", "event-images");
-
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Upload failed");
-      }
-
-      const data = await res.json();
-      setImageUrl(data.url);
-      setImagePreview(data.url);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to upload image");
-      setImagePreview("");
-      setImageUrl("");
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  function handleRemoveImage() {
-    setImageUrl("");
-    setImagePreview("");
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -188,53 +145,12 @@ export function EventFormModal({
           </div>
 
           {/* Event Image */}
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Cover Image
-            </label>
-            {imagePreview ? (
-              <div className="relative rounded-lg overflow-hidden border border-[var(--border)]">
-                <img
-                  src={imagePreview}
-                  alt="Event cover"
-                  className="w-full h-40 object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={handleRemoveImage}
-                  className="absolute top-2 right-2 rounded-full bg-black/60 text-white p-1.5 hover:bg-black/80 transition-colors"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-                {uploading && (
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                    <div className="text-white text-sm font-medium">Compressing & uploading...</div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="w-full h-32 rounded-lg border-2 border-dashed border-[var(--border)] hover:border-[var(--primary)] flex flex-col items-center justify-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--primary)] transition-colors"
-              >
-                <Upload className="h-6 w-6" />
-                <span className="text-sm">Click to upload an image</span>
-                <span className="text-xs">JPG, PNG, WebP (max 10MB)</span>
-              </button>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleImageUpload(file);
-              }}
-            />
-          </div>
+          <ImageUpload
+            value={imageUrl}
+            onChange={setImageUrl}
+            bucket="event-images"
+            label="Cover Image"
+          />
 
           {/* Location */}
           <div>

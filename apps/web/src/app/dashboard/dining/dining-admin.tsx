@@ -20,9 +20,9 @@ import {
   Settings,
   ShoppingCart,
   Search,
-  ImageIcon,
   Timer,
 } from "lucide-react";
+import { ImageUpload } from "@/components/image-upload";
 import {
   DIETARY_TAGS,
   type DiningOrderWithItems,
@@ -458,6 +458,7 @@ function MenuTab() {
   // Category form
   const [catName, setCatName] = useState("");
   const [catDescription, setCatDescription] = useState("");
+  const [catImageUrl, setCatImageUrl] = useState("");
   const [catSortOrder, setCatSortOrder] = useState(0);
 
   // Item form (create + edit)
@@ -474,6 +475,7 @@ function MenuTab() {
   );
   const [editCatName, setEditCatName] = useState("");
   const [editCatDescription, setEditCatDescription] = useState("");
+  const [editCatImageUrl, setEditCatImageUrl] = useState("");
 
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editItemName, setEditItemName] = useState("");
@@ -536,6 +538,7 @@ function MenuTab() {
           facility_id: selectedFacility,
           name: catName.trim(),
           description: catDescription.trim() || undefined,
+          image_url: catImageUrl.trim() || undefined,
           sort_order: catSortOrder,
         }),
       });
@@ -543,6 +546,7 @@ function MenuTab() {
         setShowCategoryForm(false);
         setCatName("");
         setCatDescription("");
+        setCatImageUrl("");
         setCatSortOrder(0);
         fetchMenu();
       } else {
@@ -566,6 +570,7 @@ function MenuTab() {
         body: JSON.stringify({
           name: editCatName.trim(),
           description: editCatDescription.trim() || undefined,
+          image_url: editCatImageUrl.trim() || undefined,
         }),
       });
       if (res.ok) {
@@ -723,6 +728,7 @@ function MenuTab() {
     setEditingCategoryId(cat.id);
     setEditCatName(cat.name);
     setEditCatDescription(cat.description || "");
+    setEditCatImageUrl(cat.image_url || "");
   }
 
   function startEditItem(item: MenuItem) {
@@ -829,6 +835,14 @@ function MenuTab() {
             placeholder="Description (optional)"
             className={`w-full ${INPUT_CLS}`}
           />
+          <ImageUpload
+            value={catImageUrl}
+            onChange={setCatImageUrl}
+            bucket="dining-images"
+            label="Restaurant Image"
+            height="h-32"
+            placeholder="Upload a restaurant or venue photo"
+          />
           <div className="flex gap-2">
             <button
               onClick={handleCreateCategory}
@@ -888,12 +902,13 @@ function MenuTab() {
             placeholder="Description (optional)"
             className={`w-full ${INPUT_CLS}`}
           />
-          <input
-            type="text"
+          <ImageUpload
             value={itemImageUrl}
-            onChange={(e) => setItemImageUrl(e.target.value)}
-            placeholder="Image URL (optional)"
-            className={`w-full ${INPUT_CLS}`}
+            onChange={setItemImageUrl}
+            bucket="dining-images"
+            label="Food Photo"
+            height="h-28"
+            placeholder="Upload a photo of this dish"
           />
           {/* Dietary tags */}
           <div>
@@ -983,6 +998,14 @@ function MenuTab() {
                       placeholder="Description (optional)"
                       className={`w-full text-xs ${INPUT_CLS}`}
                     />
+                    <ImageUpload
+                      value={editCatImageUrl}
+                      onChange={setEditCatImageUrl}
+                      bucket="dining-images"
+                      label="Restaurant Image"
+                      height="h-24"
+                      placeholder="Upload a venue photo"
+                    />
                     <div className="flex gap-1.5">
                       <button
                         onClick={() => handleUpdateCategory(cat.id)}
@@ -1003,15 +1026,24 @@ function MenuTab() {
                   </div>
                 ) : (
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-[family-name:var(--font-headline)] font-bold text-sm">
-                        {cat.name}
-                      </p>
-                      {cat.description && (
-                        <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
-                          {cat.description}
-                        </p>
+                    <div className="flex items-center gap-3">
+                      {cat.image_url && (
+                        <img
+                          src={cat.image_url}
+                          alt=""
+                          className="w-10 h-10 rounded-lg object-cover shrink-0"
+                        />
                       )}
+                      <div>
+                        <p className="font-[family-name:var(--font-headline)] font-bold text-sm">
+                          {cat.name}
+                        </p>
+                        {cat.description && (
+                          <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+                            {cat.description}
+                          </p>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <button
@@ -1077,16 +1109,14 @@ function MenuTab() {
                               className={`text-sm ${INPUT_CLS}`}
                             />
                           </div>
-                          <div className="flex items-center gap-2">
-                            <ImageIcon className="h-3.5 w-3.5 text-[var(--muted-foreground)] shrink-0" />
-                            <input
-                              type="text"
-                              value={editItemImageUrl}
-                              onChange={(e) => setEditItemImageUrl(e.target.value)}
-                              placeholder="Image URL (optional)"
-                              className={`flex-1 text-sm ${INPUT_CLS}`}
-                            />
-                          </div>
+                          <ImageUpload
+                            value={editItemImageUrl}
+                            onChange={setEditItemImageUrl}
+                            bucket="dining-images"
+                            label="Food Photo"
+                            height="h-24"
+                            placeholder="Upload a photo"
+                          />
                           <div>
                             <p className="text-[10px] font-bold tracking-widest uppercase text-[var(--muted-foreground)] mb-1">
                               Dietary Tags
