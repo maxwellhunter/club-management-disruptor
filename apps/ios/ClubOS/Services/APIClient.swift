@@ -68,6 +68,35 @@ actor APIClient {
         try validateResponse(response, data: data)
     }
 
+    // MARK: - Multipart Upload
+
+    func uploadMultipart<T: Decodable>(
+        _ path: String,
+        fileData: Data,
+        fileName: String,
+        mimeType: String,
+        fieldName: String = "file"
+    ) async throws -> T {
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var request = try buildRequest(path: path, method: "POST")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"\(fieldName)\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+        body.append(fileData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        request.httpBody = body
+
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data)
+
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode(T.self, from: data)
+    }
+
     // MARK: - Raw data (for non-JSON responses)
 
     func getData(_ path: String, query: [String: String]? = nil) async throws -> (Data, HTTPURLResponse) {

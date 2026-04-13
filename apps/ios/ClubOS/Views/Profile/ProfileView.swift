@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 // MARK: - Response Types
 
@@ -56,6 +57,11 @@ struct ProfileView: View {
     @State private var showSignOutAlert = false
     @State private var actionLoading = false
 
+    // Avatar
+    @State private var avatarUrl: String?
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var uploadingAvatar = false
+
     private var fullName: String {
         auth.user?.userMetadata["full_name"]?.stringValue ?? "Member"
     }
@@ -105,16 +111,45 @@ struct ProfileView: View {
 
     private var profileHeader: some View {
         VStack(spacing: 0) {
-            Circle()
-                .fill(Color.club.surfaceContainerHigh)
-                .frame(width: 80, height: 80)
-                .overlay {
-                    Text(initials)
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(Color.club.onSurfaceVariant)
+            // Avatar with photo picker
+            PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                ZStack(alignment: .bottomTrailing) {
+                    if uploadingAvatar {
+                        Circle()
+                            .fill(Color.club.surfaceContainerHigh)
+                            .frame(width: 80, height: 80)
+                            .overlay { ProgressView().tint(Color.club.primary) }
+                    } else if let url = avatarUrl, let imageUrl = URL(string: url) {
+                        CachedAsyncImage(url: imageUrl) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 80, height: 80)
+                                    .clipShape(Circle())
+                            default:
+                                avatarInitials
+                            }
+                        }
+                    } else {
+                        avatarInitials
+                    }
+
+                    // Camera badge
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 24, height: 24)
+                        .background(Color.club.primary, in: Circle())
+                        .overlay(Circle().stroke(Color.club.background, lineWidth: 2))
                 }
-                .overlay(Circle().stroke(Color.club.outlineVariant, lineWidth: 3))
-                .padding(.bottom, 14)
+            }
+            .onChange(of: selectedPhoto) { _, item in
+                guard let item else { return }
+                Task { await uploadAvatar(item) }
+            }
+            .padding(.bottom, 14)
 
             Text(fullName)
                 .font(.custom("Georgia", size: 22).weight(.bold))
@@ -483,6 +518,49 @@ struct ProfileView: View {
         .padding(.horizontal, 24)
     }
 
+    // MARK: - Avatar Initials
+
+    private var avatarInitials: some View {
+        Circle()
+            .fill(Color.club.primaryContainer)
+            .frame(width: 80, height: 80)
+            .overlay {
+                Text(initials)
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+    }
+
+    // MARK: - Avatar Upload
+
+    private func uploadAvatar(_ item: PhotosPickerItem) async {
+        uploadingAvatar = true
+        defer { uploadingAvatar = false }
+
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else { return }
+
+            struct AvatarResponse: Decodable {
+                let url: String
+                let size: Int
+                let originalSize: Int
+            }
+
+            let response: AvatarResponse = try await APIClient.shared.uploadMultipart(
+                "/upload/avatar",
+                fileData: data,
+                fileName: "avatar.jpg",
+                mimeType: "image/jpeg"
+            )
+
+            await MainActor.run {
+                avatarUrl = response.url
+            }
+        } catch {
+            print("Avatar upload failed: \(error)")
+        }
+    }
+
     // MARK: - Data Loading
 
     private func loadData() async {
@@ -491,8 +569,9 @@ struct ProfileView: View {
 
         async let billingTask: BillingStatusResponse? = try? await APIClient.shared.get("/billing/status")
         async let invoicesTask: InvoicesResponse? = try? await APIClient.shared.get("/billing/invoices")
+        async let avatarTask: Void = fetchAvatar()
 
-        let (billingResult, invoicesResult) = await (billingTask, invoicesTask)
+        let (billingResult, invoicesResult, _) = await (billingTask, invoicesTask, avatarTask)
         billing = billingResult
 
         if let invoices = invoicesResult?.invoices, !invoices.isEmpty {
@@ -507,6 +586,31 @@ struct ProfileView: View {
                     status: invoice.status
                 )
             }
+        }
+    }
+
+    private func fetchAvatar() async {
+        struct MemberItem: Decodable {
+            let id: String
+            let email: String?
+            let avatarUrl: String?
+        }
+        struct MembersResponse: Decodable {
+            let members: [MemberItem]
+        }
+
+        do {
+            let response: MembersResponse = try await APIClient.shared.get("/members")
+            let userEmail = auth.user?.email
+            if let me = response.members.first(where: { $0.email == userEmail }) {
+                await MainActor.run {
+                    if avatarUrl == nil { // Don't overwrite a freshly uploaded avatar
+                        avatarUrl = me.avatarUrl
+                    }
+                }
+            }
+        } catch {
+            // Non-critical — avatar just won't show
         }
     }
 

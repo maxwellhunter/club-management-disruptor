@@ -166,8 +166,8 @@ export async function PATCH(
 
     const input = parsed.data;
 
-    // Non-admins can only update phone and notes (self-service fields)
-    const allowedSelfFields = ["phone", "notes"];
+    // Non-admins can only update phone, notes, and avatar (self-service fields)
+    const allowedSelfFields = ["phone", "notes", "avatar_url"];
     const updateData: Record<string, unknown> = {};
 
     if (isAdmin) {
@@ -182,6 +182,7 @@ export async function PATCH(
       if (input.member_number !== undefined)
         updateData.member_number = input.member_number || null;
       if (input.notes !== undefined) updateData.notes = input.notes || null;
+      if (input.avatar_url !== undefined) updateData.avatar_url = input.avatar_url || null;
       // Handle family_id from body directly (not in updateMemberSchema)
       if (body.family_id !== undefined)
         updateData.family_id = body.family_id || null;

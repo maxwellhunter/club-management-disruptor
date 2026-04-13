@@ -14,6 +14,7 @@ export const createMemberSchema = z.object({
   membership_tier_id: z.string().uuid().optional(),
   member_number: z.string().optional(),
   notes: z.string().optional(),
+  avatar_url: z.string().url().optional().nullable(),
 });
 
 export const updateMemberSchema = createMemberSchema.partial();
