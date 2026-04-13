@@ -538,7 +538,20 @@ struct ProfileView: View {
         defer { uploadingAvatar = false }
 
         do {
-            guard let data = try await item.loadTransferable(type: Data.self) else { return }
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let original = UIImage(data: data) else { return }
+
+            // Resize to 800×800 max and compress to JPEG on-device
+            // (keeps upload under Vercel's 4.5MB limit; server further crops to 400×400)
+            let maxDim: CGFloat = 800
+            let scale = min(maxDim / original.size.width, maxDim / original.size.height, 1.0)
+            let newSize = CGSize(width: original.size.width * scale, height: original.size.height * scale)
+
+            let resized = UIGraphicsImageRenderer(size: newSize).image { _ in
+                original.draw(in: CGRect(origin: .zero, size: newSize))
+            }
+
+            guard let jpegData = resized.jpegData(compressionQuality: 0.8) else { return }
 
             struct AvatarResponse: Decodable {
                 let url: String
@@ -548,7 +561,7 @@ struct ProfileView: View {
 
             let response: AvatarResponse = try await APIClient.shared.uploadMultipart(
                 "/upload/avatar",
-                fileData: data,
+                fileData: jpegData,
                 fileName: "avatar.jpg",
                 mimeType: "image/jpeg"
             )
