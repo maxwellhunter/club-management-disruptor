@@ -49,9 +49,6 @@ private func eventIcon(for title: String) -> (icon: String, colors: [Color]) {
 // MARK: - Events View
 
 struct EventsView: View {
-    enum Screen { case list, detail }
-
-    @State private var screen: Screen = .list
     @State private var events: [ClubEvent] = []
     @State private var loading = true
     @State private var selectedEvent: ClubEvent?
@@ -74,20 +71,17 @@ struct EventsView: View {
     var body: some View {
         ZStack {
             Color.club.background.ignoresSafeArea()
-
-            switch screen {
-            case .list:
-                eventListView
-            case .detail:
-                eventDetailView
-            }
+            eventListView
         }
-        .navigationTitle(screen == .list && hasHeroContent ? "" : (screen == .list ? "Events" : ""))
+        .navigationTitle(hasHeroContent ? "" : "Events")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(screen == .list && hasHeroContent ? .hidden : .visible, for: .navigationBar)
+        .toolbarBackground(hasHeroContent ? .hidden : .visible, for: .navigationBar)
         .task {
             await fetchEventsHero()
             await fetchEvents()
+        }
+        .sheet(item: $selectedEvent) { event in
+            eventDetailSheet(event)
         }
         .alert("RSVP Updated!", isPresented: $showRsvpSuccess) {
             Button("OK") {}
@@ -199,7 +193,6 @@ struct EventsView: View {
 
         return Button {
             selectedEvent = event
-            screen = .detail
         } label: {
             VStack(alignment: .leading, spacing: 0) {
                 // Hero image or gradient
@@ -331,7 +324,6 @@ struct EventsView: View {
 
         return Button {
             selectedEvent = event
-            screen = .detail
         } label: {
             HStack(spacing: 14) {
                 // Event image or icon gradient
@@ -422,23 +414,21 @@ struct EventsView: View {
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // MARK: - Event Detail
+    // MARK: - Event Detail Sheet
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    private var eventDetailView: some View {
-        guard let event = selectedEvent else {
-            return AnyView(EmptyView())
-        }
-
+    private func eventDetailSheet(_ event: ClubEvent) -> some View {
         let (icon, gradientColors) = eventIcon(for: event.title)
         let currentStatus = event.userRsvpStatus
 
-        return AnyView(
+        return NavigationStack {
             ZStack(alignment: .bottom) {
+                Color.club.background.ignoresSafeArea()
+
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 0) {
-                        // Hero image
-                        ZStack(alignment: .topLeading) {
+                        // Hero image — fixed size, no stretch on drag
+                        ZStack(alignment: .bottom) {
                             if let imageUrl = event.imageUrl, let url = URL(string: imageUrl) {
                                 CachedAsyncImage(url: url) { phase in
                                     switch phase {
@@ -446,48 +436,34 @@ struct EventsView: View {
                                         image
                                             .resizable()
                                             .aspectRatio(contentMode: .fill)
-                                            .frame(height: 220)
+                                            .frame(height: 240)
                                             .clipped()
+                                    case .failure:
+                                        eventGradientHero(icon: icon, colors: gradientColors)
                                     default:
-                                        LinearGradient(
-                                            colors: gradientColors,
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                        .frame(height: 220)
-                                        .overlay {
-                                            Image(systemName: icon)
-                                                .font(.system(size: 64))
-                                                .foregroundStyle(.white.opacity(0.1))
-                                        }
+                                        ShimmerView()
+                                            .frame(height: 240)
                                     }
                                 }
                             } else {
-                                LinearGradient(
-                                    colors: gradientColors,
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                                .frame(height: 220)
-                                .overlay {
-                                    Image(systemName: icon)
-                                        .font(.system(size: 64))
-                                        .foregroundStyle(.white.opacity(0.1))
-                                }
+                                eventGradientHero(icon: icon, colors: gradientColors)
                             }
 
-                            Button {
-                                screen = .list
-                                selectedEvent = nil
-                            } label: {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 36, height: 36)
-                                    .background(.ultraThinMaterial, in: Circle())
-                            }
-                            .padding(.top, 12)
-                            .padding(.leading, 20)
+                            // Gradient fade at bottom
+                            LinearGradient(
+                                colors: [.clear, Color.club.background.opacity(0.8), Color.club.background],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .frame(height: 80)
+                        }
+                        .frame(height: 240)
+                        .clipped()
+                        // Fill overscroll area above hero with matching color
+                        .background(alignment: .top) {
+                            (gradientColors.first ?? Color.club.surfaceContainer)
+                                .frame(height: 600)
+                                .offset(y: -600)
                         }
 
                         VStack(alignment: .leading, spacing: 20) {
@@ -572,7 +548,34 @@ struct EventsView: View {
                 // RSVP buttons
                 rsvpBar(event: event)
             }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+        .presentationBackground {
+            if #available(iOS 26.0, *) {
+                Color.club.background
+                    .glassEffect(.regular, in: .rect(cornerRadius: 24))
+            } else {
+                Color.club.background
+            }
+        }
+    }
+
+    private func eventGradientHero(icon: String, colors: [Color], height: CGFloat = 240) -> some View {
+        LinearGradient(
+            colors: colors,
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
         )
+        .frame(height: height)
+        .overlay {
+            Image(systemName: icon)
+                .font(.system(size: 64))
+                .foregroundStyle(.white.opacity(0.1))
+        }
     }
 
     private func infoRow(icon: String, label: String, value: String) -> some View {
