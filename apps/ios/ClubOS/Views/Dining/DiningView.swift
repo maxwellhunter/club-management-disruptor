@@ -121,7 +121,8 @@ private struct GlassToggleModifier: ViewModifier {
 // MARK: - Dining View
 
 struct DiningView: View {
-    enum Screen { case venues, menu, cart, reserveDate, reserveTime, reserveConfirm }
+    enum Screen { case venues, menu, cart }
+    enum ReserveStep: Int, CaseIterable { case date = 0, time = 1, confirm = 2 }
     enum FlowMode: String { case reserve = "Reserve", order = "Order" }
 
     @Namespace private var toggleAnimation
@@ -153,7 +154,9 @@ struct DiningView: View {
     @State private var showOrderSuccess = false
     @State private var orderError: String?
 
-    // Reserve flow
+    // Reserve sheet flow
+    @State private var showReserveSheet = false
+    @State private var reserveStep: ReserveStep = .date
     @State private var reserveDates: [BookableDate] = []
     @State private var selectedDateStr = ""
     @State private var slots: [DiningSlot] = []
@@ -185,12 +188,6 @@ struct DiningView: View {
                 menuBrowsingView
             case .cart:
                 cartView
-            case .reserveDate:
-                reserveDateView
-            case .reserveTime:
-                reserveTimeView
-            case .reserveConfirm:
-                reserveConfirmView
             }
         }
         .navigationTitle(screen == .venues && hasHeroContent ? "" : navTitle)
@@ -211,10 +208,13 @@ struct DiningView: View {
         .alert("Reservation Confirmed!", isPresented: $showReservationSuccess) {
             Button("OK") {
                 resetFlow()
-                screen = .venues
+                showReserveSheet = false
             }
         } message: {
             Text("Your dining reservation has been confirmed. You'll receive an email confirmation shortly.")
+        }
+        .sheet(isPresented: $showReserveSheet) {
+            reserveSheetView
         }
         .alert("Order Error", isPresented: .constant(orderError != nil)) {
             Button("OK") { orderError = nil }
@@ -233,9 +233,6 @@ struct DiningView: View {
         case .venues: return "Dining"
         case .menu: return selectedFacility?.name ?? "Menu"
         case .cart: return "Your Order"
-        case .reserveDate: return "Select Date"
-        case .reserveTime: return "Select Time"
-        case .reserveConfirm: return "Confirm Reservation"
         }
     }
 
@@ -387,7 +384,12 @@ struct DiningView: View {
                 screen = .menu
             } else {
                 generateDates()
-                screen = .reserveDate
+                reserveStep = .date
+                selectedDateStr = ""
+                selectedSlot = nil
+                specialRequests = ""
+                seatingPreference = "any"
+                showReserveSheet = true
             }
         } label: {
             VStack(alignment: .leading, spacing: 0) {
@@ -487,153 +489,236 @@ struct DiningView: View {
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // MARK: - Reserve: Date Selection
+    // MARK: - Reserve Sheet (Bottom Sheet Flow)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    private var reserveDateView: some View {
-        VStack(spacing: 0) {
-            // Header
-            screenHeader(
-                title: selectedFacility?.name ?? "Reservation",
-                subtitle: "Select a date for your dining experience",
-                backAction: { screen = .venues; selectedDateStr = "" }
-            )
+    private var reserveSheetView: some View {
+        NavigationStack {
+            ZStack(alignment: .bottom) {
+                Color.club.background.ignoresSafeArea()
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 24) {
-                    // Party size selector
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("PARTY SIZE")
-                            .font(.system(size: 10, weight: .bold))
-                            .tracking(1)
-                            .foregroundStyle(Color.club.outline)
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        // Step progress bar
+                        reserveProgressBar
+                            .padding(.top, 8)
+                            .padding(.bottom, 20)
 
-                        HStack(spacing: 8) {
-                            ForEach(1...6, id: \.self) { size in
-                                let isSelected = partySize == size
-                                Button { partySize = size } label: {
-                                    VStack(spacing: 4) {
-                                        Image(systemName: size == 1 ? "person.fill" : "person.\(min(size, 3)).fill")
-                                            .font(.system(size: 14))
-                                        Text("\(size)")
-                                            .font(.system(size: 13, weight: .bold))
-                                    }
-                                    .foregroundStyle(isSelected ? .white : Color.club.onSurfaceVariant)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 12)
-                                    .background(
-                                        isSelected ? Color.club.primary : Color.club.surfaceContainerLowest,
-                                        in: RoundedRectangle(cornerRadius: 12)
-                                    )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(isSelected ? Color.clear : Color.club.outlineVariant.opacity(0.3), lineWidth: 1)
-                                    )
-                                }
-                                .buttonStyle(.plain)
+                        // Step content with transition
+                        Group {
+                            switch reserveStep {
+                            case .date:
+                                reserveDateStep
+                            case .time:
+                                reserveTimeStep
+                            case .confirm:
+                                reserveConfirmStep
                             }
                         }
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .trailing).combined(with: .opacity),
+                            removal: .move(edge: .leading).combined(with: .opacity)
+                        ))
+                        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: reserveStep)
+
+                        Spacer(minLength: 120)
                     }
-                    .padding(.horizontal, 20)
-
-                    // Date strip
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("SELECT DATE")
-                            .font(.system(size: 10, weight: .bold))
-                            .tracking(1)
-                            .foregroundStyle(Color.club.outline)
-                            .padding(.horizontal, 20)
-
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 10) {
-                                ForEach(reserveDates) { d in
-                                    let isSelected = selectedDateStr == d.dateString
-                                    Button {
-                                        selectedDateStr = d.dateString
-                                    } label: {
-                                        VStack(spacing: 6) {
-                                            Text(d.dayName)
-                                                .font(.system(size: 10, weight: .medium))
-                                                .foregroundStyle(isSelected ? .white.opacity(0.8) : Color.club.onSurfaceVariant)
-                                            Text(d.dayNum)
-                                                .font(.system(size: 20, weight: .bold))
-                                                .foregroundStyle(isSelected ? .white : Color.club.foreground)
-                                            Text(d.monthName)
-                                                .font(.system(size: 10))
-                                                .foregroundStyle(isSelected ? .white.opacity(0.8) : Color.club.onSurfaceVariant)
-                                        }
-                                        .frame(width: 56, height: 76)
-                                        .background(
-                                            isSelected ? Color.club.primary : Color.club.surfaceContainerLowest,
-                                            in: RoundedRectangle(cornerRadius: 14)
-                                        )
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 14)
-                                                .stroke(isSelected ? Color.clear : Color.club.outlineVariant.opacity(0.3), lineWidth: 1)
-                                        )
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                            .padding(.horizontal, 20)
-                        }
-                    }
-
-                    Spacer(minLength: 60)
                 }
-                .padding(.top, 16)
+
+                // Bottom action bar with glass effect
+                reserveActionBar
             }
-
-            // Continue button
-            if !selectedDateStr.isEmpty {
-                VStack(spacing: 8) {
-                    Divider()
-                    Button {
-                        Task {
-                            if let fac = selectedFacility {
-                                await fetchSlots(facilityId: fac.id, date: selectedDateStr)
+            .navigationTitle(reserveSheetTitle)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    if reserveStep == .date {
+                        Button("Cancel") { showReserveSheet = false }
+                            .foregroundStyle(Color.club.onSurfaceVariant)
+                    } else {
+                        Button {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                if reserveStep == .time {
+                                    reserveStep = .date
+                                    selectedSlot = nil
+                                } else {
+                                    reserveStep = .time
+                                }
                             }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text("Back")
+                            }
+                            .foregroundStyle(Color.club.onSurfaceVariant)
                         }
-                        screen = .reserveTime
-                    } label: {
-                        HStack(spacing: 8) {
-                            Text("Choose Time")
-                                .font(.system(size: 16, weight: .bold))
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 14, weight: .semibold))
-                        }
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color.club.primary, in: RoundedRectangle(cornerRadius: 14))
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 8)
                 }
-                .background(.ultraThinMaterial)
+            }
+            .interactiveDismissDisabled(reserveStep != .date)
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+        .presentationBackground {
+            if #available(iOS 26.0, *) {
+                Color.club.background
+                    .glassEffect(.regular, in: .rect(cornerRadius: 24))
+            } else {
+                Color.club.background
             }
         }
     }
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // MARK: - Reserve: Time Selection
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    private var reserveSheetTitle: String {
+        switch reserveStep {
+        case .date: return selectedFacility?.name ?? "Reserve"
+        case .time: return formattedSelectedDate
+        case .confirm: return "Confirm Reservation"
+        }
+    }
 
-    private var reserveTimeView: some View {
-        VStack(spacing: 0) {
-            screenHeader(
-                title: formattedSelectedDate,
-                subtitle: "\(selectedFacility?.name ?? "") · Party of \(partySize)",
-                backAction: { screen = .reserveDate; selectedSlot = nil }
-            )
+    // Step progress indicator
+    private var reserveProgressBar: some View {
+        HStack(spacing: 6) {
+            ForEach(ReserveStep.allCases, id: \.rawValue) { step in
+                let isCurrent = step == reserveStep
+                let isCompleted = step.rawValue < reserveStep.rawValue
+
+                HStack(spacing: 4) {
+                    if isCompleted {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 16, height: 16)
+                            .background(Color.club.primary, in: Circle())
+                    }
+
+                    if isCurrent || !isCompleted {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(isCurrent ? Color.club.primary : Color.club.outlineVariant.opacity(0.3))
+                            .frame(height: 4)
+                    }
+                }
+                .animation(.spring(response: 0.4), value: reserveStep)
+            }
+        }
+        .padding(.horizontal, 24)
+    }
+
+    // MARK: Step 1 — Date & Party Size
+
+    private var reserveDateStep: some View {
+        VStack(spacing: 24) {
+            // Party size
+            VStack(alignment: .leading, spacing: 10) {
+                Text("PARTY SIZE")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1)
+                    .foregroundStyle(Color.club.outline)
+
+                HStack(spacing: 8) {
+                    ForEach(1...6, id: \.self) { size in
+                        let isSelected = partySize == size
+                        Button { withAnimation(.spring(response: 0.25)) { partySize = size } } label: {
+                            VStack(spacing: 4) {
+                                Image(systemName: size == 1 ? "person.fill" : "person.\(min(size, 3)).fill")
+                                    .font(.system(size: 14))
+                                Text("\(size)")
+                                    .font(.system(size: 13, weight: .bold))
+                            }
+                            .foregroundStyle(isSelected ? .white : Color.club.onSurfaceVariant)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(
+                                isSelected ? Color.club.primary : Color.club.surfaceContainerLowest,
+                                in: RoundedRectangle(cornerRadius: 12)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(isSelected ? Color.clear : Color.club.outlineVariant.opacity(0.3), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+
+            // Date strip
+            VStack(alignment: .leading, spacing: 10) {
+                Text("SELECT DATE")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1)
+                    .foregroundStyle(Color.club.outline)
+                    .padding(.horizontal, 20)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(reserveDates) { d in
+                            let isSelected = selectedDateStr == d.dateString
+                            Button {
+                                withAnimation(.spring(response: 0.25)) {
+                                    selectedDateStr = d.dateString
+                                }
+                            } label: {
+                                VStack(spacing: 6) {
+                                    Text(d.dayName)
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundStyle(isSelected ? .white.opacity(0.8) : Color.club.onSurfaceVariant)
+                                    Text(d.dayNum)
+                                        .font(.system(size: 20, weight: .bold))
+                                        .foregroundStyle(isSelected ? .white : Color.club.foreground)
+                                    Text(d.monthName)
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(isSelected ? .white.opacity(0.8) : Color.club.onSurfaceVariant)
+                                }
+                                .frame(width: 56, height: 76)
+                                .background(
+                                    isSelected ? Color.club.primary : Color.club.surfaceContainerLowest,
+                                    in: RoundedRectangle(cornerRadius: 14)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(isSelected ? Color.clear : Color.club.outlineVariant.opacity(0.3), lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+            }
+        }
+    }
+
+    // MARK: Step 2 — Time Selection
+
+    private var reserveTimeStep: some View {
+        VStack(spacing: 16) {
+            // Context chip
+            HStack(spacing: 6) {
+                Image(systemName: "person.2.fill")
+                    .font(.system(size: 11))
+                Text("Party of \(partySize)")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("·")
+                    .foregroundStyle(Color.club.outline)
+                Text(selectedFacility?.name ?? "")
+                    .font(.system(size: 12))
+            }
+            .foregroundStyle(Color.club.onSurfaceVariant)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color.club.surfaceContainerHigh, in: Capsule())
+            .padding(.bottom, 4)
 
             if loadingSlots {
-                Spacer()
                 ProgressView()
                     .tint(Color.club.primary)
-                Spacer()
+                    .padding(.top, 40)
             } else if slots.isEmpty {
-                Spacer()
                 VStack(spacing: 12) {
                     Image(systemName: "clock.badge.xmark")
                         .font(.system(size: 32))
@@ -645,50 +730,19 @@ struct DiningView: View {
                         .font(.system(size: 13))
                         .foregroundStyle(Color.club.outline)
                 }
-                Spacer()
+                .padding(.top, 40)
             } else {
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 24) {
-                        // Group by Lunch / Dinner
-                        let lunchSlots = slots.filter { timeHour($0.startTime) < 15 }
-                        let dinnerSlots = slots.filter { timeHour($0.startTime) >= 15 }
+                let lunchSlots = slots.filter { timeHour($0.startTime) < 15 }
+                let dinnerSlots = slots.filter { timeHour($0.startTime) >= 15 }
 
-                        if !lunchSlots.isEmpty {
-                            slotGroup(title: "Lunch", icon: "sun.max.fill", slots: lunchSlots)
-                        }
-
-                        if !dinnerSlots.isEmpty {
-                            slotGroup(title: "Dinner", icon: "moon.stars.fill", slots: dinnerSlots)
-                        }
-
-                        Spacer(minLength: 80)
+                VStack(spacing: 24) {
+                    if !lunchSlots.isEmpty {
+                        slotGroup(title: "Lunch", icon: "sun.max.fill", slots: lunchSlots)
                     }
-                    .padding(.top, 16)
-                }
-            }
-
-            // Continue
-            if selectedSlot != nil {
-                VStack(spacing: 8) {
-                    Divider()
-                    Button {
-                        screen = .reserveConfirm
-                    } label: {
-                        HStack(spacing: 8) {
-                            Text("Review Reservation")
-                                .font(.system(size: 16, weight: .bold))
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 14, weight: .semibold))
-                        }
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color.club.primary, in: RoundedRectangle(cornerRadius: 14))
+                    if !dinnerSlots.isEmpty {
+                        slotGroup(title: "Dinner", icon: "moon.stars.fill", slots: dinnerSlots)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 8)
                 }
-                .background(.ultraThinMaterial)
             }
         }
     }
@@ -714,7 +768,9 @@ struct DiningView: View {
                     let isSelected = selectedSlot?.startTime == slot.startTime
                     let isAvailable = slot.isAvailable
                     Button {
-                        if isAvailable { selectedSlot = slot }
+                        if isAvailable {
+                            withAnimation(.spring(response: 0.25)) { selectedSlot = slot }
+                        }
                     } label: {
                         VStack(spacing: 4) {
                             Text(formatSlotTime(slot.startTime))
@@ -760,157 +816,194 @@ struct DiningView: View {
         }
     }
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // MARK: - Reserve: Confirm
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // MARK: Step 3 — Confirm
 
-    private var reserveConfirmView: some View {
-        ZStack(alignment: .bottom) {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    screenHeader(
-                        title: "Confirm Reservation",
-                        subtitle: selectedFacility?.name ?? "",
-                        backAction: { screen = .reserveTime }
-                    )
+    private var reserveConfirmStep: some View {
+        VStack(spacing: 20) {
+            // Summary card
+            VStack(spacing: 16) {
+                HStack(spacing: 14) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.system(size: 24))
+                        .foregroundStyle(Color.club.primary)
+                        .frame(width: 48, height: 48)
+                        .background(Color.club.accent, in: RoundedRectangle(cornerRadius: 14))
 
-                    // Reservation summary card
-                    VStack(spacing: 16) {
-                        HStack(spacing: 14) {
-                            Image(systemName: "calendar.badge.clock")
-                                .font(.system(size: 24))
-                                .foregroundStyle(Color.club.primary)
-                                .frame(width: 48, height: 48)
-                                .background(Color.club.accent, in: RoundedRectangle(cornerRadius: 14))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(selectedFacility?.name ?? "")
+                            .font(.custom("Georgia", size: 16).weight(.semibold))
+                            .foregroundStyle(Color.club.foreground)
+                        Text(formattedSelectedDate)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.club.onSurfaceVariant)
+                    }
+                    Spacer()
+                }
 
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(selectedFacility?.name ?? "")
-                                    .font(.custom("Georgia", size: 16).weight(.semibold))
-                                    .foregroundStyle(Color.club.foreground)
-                                Text(formattedSelectedDate)
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(Color.club.onSurfaceVariant)
+                Rectangle()
+                    .fill(Color.club.outlineVariant.opacity(0.2))
+                    .frame(height: 1)
+
+                HStack(spacing: 24) {
+                    reserveSummaryItem(icon: "clock", label: "Time", value: formatSlotTime(selectedSlot?.startTime ?? ""))
+                    reserveSummaryItem(icon: "person.2", label: "Guests", value: "\(partySize)")
+                    reserveSummaryItem(icon: "chair.lounge", label: "Seating", value: seatingLabel)
+                }
+            }
+            .padding(16)
+            .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 16))
+            .padding(.horizontal, 20)
+
+            // Seating preference
+            VStack(alignment: .leading, spacing: 10) {
+                Text("SEATING PREFERENCE")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1)
+                    .foregroundStyle(Color.club.outline)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(seatingOptions, id: \.0) { key, label, icon in
+                            let isSelected = seatingPreference == key
+                            Button {
+                                withAnimation(.spring(response: 0.25)) { seatingPreference = key }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: icon)
+                                        .font(.system(size: 12))
+                                    Text(label)
+                                        .font(.system(size: 13, weight: .medium))
+                                }
+                                .foregroundStyle(isSelected ? .white : Color.club.foreground)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .background(
+                                    isSelected ? Color.club.primary : Color.club.surfaceContainerLowest,
+                                    in: Capsule()
+                                )
+                                .overlay(
+                                    Capsule()
+                                        .stroke(isSelected ? Color.clear : Color.club.outlineVariant.opacity(0.3), lineWidth: 1)
+                                )
                             }
-
-                            Spacer()
-                        }
-
-                        Rectangle()
-                            .fill(Color.club.outlineVariant.opacity(0.2))
-                            .frame(height: 1)
-
-                        HStack(spacing: 24) {
-                            reserveSummaryItem(icon: "clock", label: "Time", value: formatSlotTime(selectedSlot?.startTime ?? ""))
-                            reserveSummaryItem(icon: "person.2", label: "Guests", value: "\(partySize)")
-                            reserveSummaryItem(icon: "chair.lounge", label: "Seating", value: seatingLabel)
+                            .buttonStyle(.plain)
                         }
                     }
-                    .padding(16)
-                    .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 16))
-                    .padding(.horizontal, 20)
+                }
+            }
+            .padding(.horizontal, 20)
 
-                    // Seating preference
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("SEATING PREFERENCE")
-                            .font(.system(size: 10, weight: .bold))
-                            .tracking(1)
-                            .foregroundStyle(Color.club.outline)
+            // Special requests
+            VStack(alignment: .leading, spacing: 6) {
+                Text("SPECIAL REQUESTS")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1)
+                    .foregroundStyle(Color.club.outline)
+                TextField("Allergies, celebrations, etc.", text: $specialRequests)
+                    .font(.system(size: 15))
+                    .foregroundStyle(Color.club.foreground)
+                    .padding(12)
+                    .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.club.outlineVariant.opacity(0.5), lineWidth: 1)
+                    )
+            }
+            .padding(.horizontal, 20)
+        }
+    }
 
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(seatingOptions, id: \.0) { key, label, icon in
-                                    let isSelected = seatingPreference == key
-                                    Button { seatingPreference = key } label: {
-                                        HStack(spacing: 6) {
-                                            Image(systemName: icon)
-                                                .font(.system(size: 12))
-                                            Text(label)
-                                                .font(.system(size: 13, weight: .medium))
-                                        }
-                                        .foregroundStyle(isSelected ? .white : Color.club.foreground)
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 10)
-                                        .background(
-                                            isSelected ? Color.club.primary : Color.club.surfaceContainerLowest,
-                                            in: Capsule()
-                                        )
-                                        .overlay(
-                                            Capsule()
-                                                .stroke(isSelected ? Color.clear : Color.club.outlineVariant.opacity(0.3), lineWidth: 1)
-                                        )
-                                    }
-                                    .buttonStyle(.plain)
+    // Bottom action bar
+    private var reserveActionBar: some View {
+        VStack(spacing: 0) {
+            // Glass action button
+            Group {
+                switch reserveStep {
+                case .date:
+                    if !selectedDateStr.isEmpty {
+                        reserveNextButton(title: "Choose Time", icon: "clock") {
+                            Task {
+                                if let fac = selectedFacility {
+                                    await fetchSlots(facilityId: fac.id, date: selectedDateStr)
+                                }
+                            }
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                reserveStep = .time
+                            }
+                        }
+                    }
+                case .time:
+                    if selectedSlot != nil {
+                        reserveNextButton(title: "Review Reservation", icon: "text.badge.checkmark") {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                reserveStep = .confirm
+                            }
+                        }
+                    }
+                case .confirm:
+                    Button {
+                        Task { await bookReservation() }
+                    } label: {
+                        Group {
+                            if bookingInProgress {
+                                ProgressView().tint(.white)
+                            } else {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 16))
+                                    Text("Confirm Reservation")
+                                        .font(.system(size: 16, weight: .bold))
                                 }
                             }
                         }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.club.primary, Color.club.primaryContainer],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
                     }
+                    .disabled(bookingInProgress)
                     .padding(.horizontal, 20)
-
-                    // Special requests
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("SPECIAL REQUESTS")
-                            .font(.system(size: 10, weight: .bold))
-                            .tracking(1)
-                            .foregroundStyle(Color.club.outline)
-                        TextField("Allergies, celebrations, etc.", text: $specialRequests)
-                            .font(.system(size: 15))
-                            .foregroundStyle(Color.club.foreground)
-                            .padding(12)
-                            .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 10))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color.club.outlineVariant.opacity(0.5), lineWidth: 1)
-                            )
-                    }
-                    .padding(.horizontal, 20)
-
-                    Spacer(minLength: 120)
                 }
-                .padding(.top, 8)
             }
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.spring(response: 0.3), value: selectedDateStr)
+            .animation(.spring(response: 0.3), value: selectedSlot?.startTime)
 
-            // Confirm button
-            VStack(spacing: 8) {
-                Divider()
-                Button {
-                    Task { await bookReservation() }
-                } label: {
-                    Group {
-                        if bookingInProgress {
-                            ProgressView().tint(.white)
-                        } else {
-                            HStack(spacing: 8) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 16))
-                                Text("Confirm Reservation")
-                                    .font(.system(size: 16, weight: .bold))
-                            }
-                        }
-                    }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(
-                        LinearGradient(
-                            colors: [Color.club.primary, Color.club.primaryContainer],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        in: RoundedRectangle(cornerRadius: 14)
-                    )
-                }
-                .disabled(bookingInProgress)
-                .padding(.horizontal, 20)
-
-                Text("You'll receive an email confirmation for your reservation")
+            if reserveStep == .confirm {
+                Text("You'll receive an email confirmation")
                     .font(.system(size: 10))
                     .foregroundStyle(Color.club.outline)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 8)
+                    .padding(.top, 6)
             }
-            .background(.ultraThinMaterial)
         }
+        .padding(.top, 8)
+        .padding(.bottom, 4)
+    }
+
+    private func reserveNextButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 16, weight: .bold))
+                Spacer()
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(Color.club.primary, in: RoundedRectangle(cornerRadius: 14))
+        }
+        .padding(.horizontal, 20)
     }
 
     private func reserveSummaryItem(icon: String, label: String, value: String) -> some View {
