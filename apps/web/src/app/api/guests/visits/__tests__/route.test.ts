@@ -141,7 +141,7 @@ describe("POST /api/guests/visits", () => {
   // ---- Blackout days ----
 
   it("returns 400 on blackout day", async () => {
-    // June 15, 2025 is a Sunday (day 0)
+    // June 14, 2025 is a Saturday (day 6)
     mockAdminFrom.mockImplementation((table: string) => {
       if (table === "guests") {
         return createChainMock({ data: { is_blocked: false } });
@@ -154,7 +154,7 @@ describe("POST /api/guests/visits", () => {
       return createChainMock({ data: null });
     });
 
-    const req = createRequest({ guest_id: GUEST_ID, visit_date: "2025-06-15" }); // Saturday (day 6)
+    const req = createRequest({ guest_id: GUEST_ID, visit_date: "2025-06-14" }); // Saturday (day 6)
     const res = await POST(req);
     expect(res.status).toBe(400);
     const body = await res.json();

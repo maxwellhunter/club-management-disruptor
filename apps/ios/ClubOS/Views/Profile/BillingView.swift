@@ -1,23 +1,26 @@
 import SwiftUI
 
-// MARK: - Billing View (stub — full implementation in Phase 2)
+// MARK: - Billing View
+//
+// Lists the signed-in member's invoices with filter chips and a running
+// "outstanding balance" summary. All non-UI logic lives in
+// `BillingFormatting` so it can be unit-tested without spinning up SwiftUI.
 
 struct BillingView: View {
     @State private var invoices: [BillingInvoice] = []
-    @State private var filter: InvoiceFilter = .all
+    @State private var filter: BillingInvoiceFilter = .all
     @State private var isLoading = true
-
-    enum InvoiceFilter: String, CaseIterable {
-        case all = "All"
-        case paid = "Paid"
-        case outstanding = "Outstanding"
-    }
 
     var body: some View {
         VStack(spacing: 0) {
+            // Outstanding balance summary
+            if !isLoading && outstanding > 0 {
+                outstandingHeader
+            }
+
             // Filter tabs
             HStack(spacing: 0) {
-                ForEach(InvoiceFilter.allCases, id: \.self) { tab in
+                ForEach(BillingInvoiceFilter.allCases, id: \.self) { tab in
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) { filter = tab }
                     } label: {
@@ -58,6 +61,7 @@ struct BillingView: View {
                         }
                     }
                     .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
                 }
             }
         }
@@ -67,17 +71,38 @@ struct BillingView: View {
         .task { await loadInvoices() }
     }
 
+    // MARK: - Computed
+
     private var filteredInvoices: [BillingInvoice] {
-        switch filter {
-        case .all: return invoices
-        case .paid: return invoices.filter { $0.status == "paid" }
-        case .outstanding: return invoices.filter { $0.status == "sent" || $0.status == "overdue" }
+        BillingFormatting.filter(invoices, by: filter)
+    }
+
+    private var outstanding: Double {
+        BillingFormatting.outstandingBalance(invoices)
+    }
+
+    // MARK: - Subviews
+
+    private var outstandingHeader: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Outstanding balance")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color.club.onSurfaceVariant)
+            Text(BillingFormatting.currency(outstanding))
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(Color.club.foreground)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 16))
+        .padding(.horizontal, 24)
+        .padding(.top, 16)
     }
 
     private func invoiceRow(_ invoice: BillingInvoice) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: iconFor(invoice.description))
+        let overdue = BillingFormatting.isOverdue(invoice)
+        return HStack(spacing: 12) {
+            Image(systemName: BillingFormatting.icon(for: invoice.description))
                 .font(.system(size: 18))
                 .foregroundStyle(Color.club.primary)
                 .frame(width: 40, height: 40)
@@ -88,25 +113,27 @@ struct BillingView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.club.foreground)
                     .lineLimit(1)
-                Text(invoice.dueDate ?? "")
+                Text(BillingFormatting.formattedDueDate(invoice.dueDate))
                     .font(.system(size: 11))
-                    .foregroundStyle(Color.club.onSurfaceVariant)
+                    .foregroundStyle(overdue ? Color(hex: "dc2626") : Color.club.onSurfaceVariant)
             }
 
             Spacer()
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text("$\(String(format: "%.2f", invoice.amount))")
+                Text(BillingFormatting.currency(invoice.amount))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.club.foreground)
-                Text(invoice.status.capitalized)
+                Text(BillingFormatting.statusLabel(invoice.status))
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(statusColor(invoice.status))
+                    .foregroundStyle(Color(hex: BillingFormatting.statusHex(invoice.status)))
             }
         }
         .padding(14)
         .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 16))
     }
+
+    // MARK: - Networking
 
     private func loadInvoices() async {
         isLoading = true
@@ -120,30 +147,4 @@ struct BillingView: View {
             invoices = []
         }
     }
-
-    private func iconFor(_ description: String) -> String {
-        let lower = description.lowercased()
-        if lower.contains("dining") || lower.contains("restaurant") { return "fork.knife" }
-        if lower.contains("golf") || lower.contains("pro shop") { return "figure.golf" }
-        if lower.contains("membership") || lower.contains("dues") { return "creditcard" }
-        return "doc.text"
-    }
-
-    private func statusColor(_ status: String) -> Color {
-        switch status {
-        case "paid": return Color(hex: "16a34a")
-        case "overdue": return Color(hex: "dc2626")
-        case "sent": return Color(hex: "d97706")
-        default: return Color(hex: "6b7280")
-        }
-    }
-}
-
-private struct BillingInvoice: Decodable, Identifiable {
-    let id: UUID
-    let amount: Double
-    let status: String
-    let description: String
-    let dueDate: String?
-    let createdAt: String?
 }
