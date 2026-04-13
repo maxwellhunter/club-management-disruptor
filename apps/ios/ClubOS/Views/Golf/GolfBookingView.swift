@@ -506,41 +506,30 @@ struct GolfBookingView: View {
             .clipShape(UnevenRoundedRectangle(topLeadingRadius: 16, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 16))
 
             // Card body
-            VStack(spacing: 12) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(formatDate(booking.date))
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(Color.club.foreground)
-                        Text("\(formatTime(booking.startTime)) \u{00B7} \(booking.partySize) \(booking.partySize == 1 ? "Player" : "Players")")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Color.club.onSurfaceVariant)
+            HStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(formatDate(booking.date))
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Color.club.foreground)
+
+                    HStack(spacing: 12) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock")
+                                .font(.system(size: 11))
+                            Text(formatTime(booking.startTime))
+                                .font(.system(size: 13))
+                        }
+
+                        HStack(spacing: 4) {
+                            Image(systemName: booking.partySize > 2 ? "person.2.fill" : "person.fill")
+                                .font(.system(size: 11))
+                            Text("\(booking.partySize) \(booking.partySize == 1 ? "Player" : "Players")")
+                                .font(.system(size: 13))
+                        }
                     }
+                    .foregroundStyle(Color.club.onSurfaceVariant)
 
-                    Spacer()
-
-                    Image(systemName: booking.partySize > 2 ? "person.2.fill" : "person.fill")
-                        .font(.system(size: 18))
-                        .foregroundStyle(Color.club.primary)
-                        .frame(width: 36, height: 36)
-                        .background(Color.club.accent, in: Circle())
-                }
-
-                // Actions
-                HStack(spacing: 10) {
-                    Spacer()
-
-                    // "Invited" badge for non-owner bookings
-                    if booking.isOwner == false {
-                        Text("Invited")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Color.club.onSurfaceVariant)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Color.club.surfaceContainerLow, in: Capsule())
-                    }
-
-                    // Start Round button — only for today's golf bookings
+                    // Start Round — inline, only for today
                     if isStartRoundEligible(booking) {
                         NavigationLink {
                             ScorecardView()
@@ -556,27 +545,36 @@ struct GolfBookingView: View {
                             .padding(.vertical, 8)
                             .background(Color.club.primary, in: RoundedRectangle(cornerRadius: 10))
                         }
+                        .padding(.top, 4)
+                    }
+                }
+
+                Spacer()
+
+                VStack(spacing: 6) {
+                    if booking.isOwner == false {
+                        Text("Invited")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Color.club.onSurfaceVariant)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.club.surfaceContainerLow, in: Capsule())
                     }
 
-                    // Cancel button — only for booking owner
                     if booking.isOwner != false {
                         Button {
                             bookingToCancel = booking
                             showCancelAlert = true
                         } label: {
-                            Group {
-                                if cancellingId == booking.id {
-                                    ProgressView()
-                                        .controlSize(.small)
-                                        .tint(Color.club.destructive)
-                                } else {
-                                    Image(systemName: "xmark.circle")
-                                        .font(.system(size: 16))
-                                        .foregroundStyle(Color.club.onSurfaceVariant)
-                                }
+                            if cancellingId == booking.id {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .tint(Color.club.destructive)
+                            } else {
+                                Text("Cancel")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(Color.club.outline)
                             }
-                            .frame(width: 40, height: 36)
-                            .background(Color.club.surfaceContainerLow, in: RoundedRectangle(cornerRadius: 10))
                         }
                         .disabled(cancellingId == booking.id)
                     }
