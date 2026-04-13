@@ -301,29 +301,28 @@ export default function CourseSetupAdmin() {
         </div>
       )}
 
-      {/* Course Image */}
+      {/* Course Image — compact inline */}
       {selectedFacilityId && (
-        <div className="rounded-xl border border-[var(--border)] p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <ImageIcon className="h-4 w-4 text-[var(--primary)]" />
-            <h3 className="text-sm font-semibold">Course Image</h3>
-            <span className="text-xs text-[var(--muted-foreground)]">
-              Shown on tee time cards in the mobile app
-            </span>
+        <div className="flex items-center gap-4 rounded-xl border border-[var(--border)] p-3">
+          <div className="flex-shrink-0 w-28">
+            <ImageUpload
+              value={facilityImageUrl}
+              onChange={(url) => saveFacilityImage(url)}
+              bucket="facility-images"
+              label=""
+              height="h-16"
+              aspect="auto"
+              placeholder="Add photo"
+            />
           </div>
-          <ImageUpload
-            value={facilityImageUrl}
-            onChange={(url) => saveFacilityImage(url)}
-            bucket="facility-images"
-            label=""
-            aspect="video"
-            placeholder="Upload a course photo"
-          />
-          {savingImage && (
-            <p className="text-xs text-[var(--muted-foreground)] mt-2 flex items-center gap-1">
-              <Loader2 className="h-3 w-3 animate-spin" /> Saving...
-            </p>
-          )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <ImageIcon className="h-3.5 w-3.5 text-[var(--primary)] flex-shrink-0" />
+              <span className="text-sm font-medium">Course Photo</span>
+              {savingImage && <Loader2 className="h-3 w-3 animate-spin text-[var(--muted-foreground)]" />}
+            </div>
+            <p className="text-xs text-[var(--muted-foreground)] mt-0.5">Shown on tee time cards in the app</p>
+          </div>
         </div>
       )}
 
