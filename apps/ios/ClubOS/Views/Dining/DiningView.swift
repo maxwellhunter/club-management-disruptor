@@ -8,6 +8,9 @@ struct DiningFacility: Decodable, Identifiable {
     let type: String
     let description: String?
     let imageUrl: String?
+    let maxPartySize: Int?
+
+    var effectiveMaxPartySize: Int { maxPartySize ?? 12 }
 }
 
 struct DiningFacilitiesResponse: Decodable {
@@ -203,6 +206,7 @@ struct DiningView: View {
     // Edit Reservation
     @State private var editingReservation: MyDiningReservation?
     @State private var editPartySize: Int = 2
+    @State private var editMaxPartySize: Int = 12
     @State private var editDateStr: String = ""
     @State private var editSlots: [DiningSlot] = []
     @State private var editSelectedSlot: DiningSlot?
@@ -708,30 +712,67 @@ struct DiningView: View {
                     .tracking(1)
                     .foregroundStyle(Color.club.outline)
 
-                HStack(spacing: 8) {
-                    ForEach(1...6, id: \.self) { size in
-                        let isSelected = partySize == size
-                        Button { withAnimation(.spring(response: 0.25)) { partySize = size } } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: size == 1 ? "person.fill" : "person.\(min(size, 3)).fill")
-                                    .font(.system(size: 14))
-                                Text("\(size)")
-                                    .font(.system(size: 13, weight: .bold))
+                let maxParty = selectedFacility?.effectiveMaxPartySize ?? 12
+                if maxParty <= 8 {
+                    // Grid of buttons for small max
+                    HStack(spacing: 8) {
+                        ForEach(1...maxParty, id: \.self) { size in
+                            let isSelected = partySize == size
+                            Button { withAnimation(.spring(response: 0.25)) { partySize = size } } label: {
+                                VStack(spacing: 4) {
+                                    Image(systemName: size == 1 ? "person.fill" : "person.\(min(size, 3)).fill")
+                                        .font(.system(size: 14))
+                                    Text("\(size)")
+                                        .font(.system(size: 13, weight: .bold))
+                                }
+                                .foregroundStyle(isSelected ? .white : Color.club.onSurfaceVariant)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(
+                                    isSelected ? Color.club.primary : Color.club.surfaceContainerLowest,
+                                    in: RoundedRectangle(cornerRadius: 12)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(isSelected ? Color.clear : Color.club.outlineVariant.opacity(0.3), lineWidth: 1)
+                                )
                             }
-                            .foregroundStyle(isSelected ? .white : Color.club.onSurfaceVariant)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(
-                                isSelected ? Color.club.primary : Color.club.surfaceContainerLowest,
-                                in: RoundedRectangle(cornerRadius: 12)
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(isSelected ? Color.clear : Color.club.outlineVariant.opacity(0.3), lineWidth: 1)
-                            )
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
+                } else {
+                    // Stepper for larger max
+                    HStack(spacing: 16) {
+                        Button {
+                            if partySize > 1 { withAnimation { partySize -= 1 } }
+                        } label: {
+                            Image(systemName: "minus.circle.fill")
+                                .font(.system(size: 28))
+                                .foregroundStyle(partySize > 1 ? Color.club.primary : Color.club.outlineVariant)
+                        }
+                        .disabled(partySize <= 1)
+
+                        Text("\(partySize)")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(Color.club.foreground)
+                            .frame(width: 40)
+
+                        Button {
+                            if partySize < maxParty { withAnimation { partySize += 1 } }
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 28))
+                                .foregroundStyle(partySize < maxParty ? Color.club.primary : Color.club.outlineVariant)
+                        }
+                        .disabled(partySize >= maxParty)
+
+                        Spacer()
+                        Text("of \(maxParty) max")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.club.onSurfaceVariant)
+                    }
+                    .padding(16)
+                    .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 14))
                 }
             }
             .padding(.horizontal, 20)
@@ -1925,6 +1966,17 @@ struct DiningView: View {
         editSelectedSlot = nil
         editSlots = []
         editError = nil
+        // Look up facility max party size
+        if let facId = res.facilityId,
+           let fac = facilities.first(where: { $0.id == facId }) {
+            editMaxPartySize = fac.effectiveMaxPartySize
+        } else {
+            editMaxPartySize = 12
+        }
+        // Clamp current party size to max
+        if editPartySize > editMaxPartySize {
+            editPartySize = editMaxPartySize
+        }
         editingReservation = res
         // Load available slots for the current date
         if let facId = res.facilityId {
@@ -2065,13 +2117,13 @@ struct DiningView: View {
                                 .multilineTextAlignment(.center)
 
                             Button {
-                                if editPartySize < 12 { editPartySize += 1 }
+                                if editPartySize < editMaxPartySize { editPartySize += 1 }
                             } label: {
                                 Image(systemName: "plus.circle.fill")
                                     .font(.system(size: 28))
-                                    .foregroundStyle(editPartySize < 12 ? Color.club.primary : Color.club.outlineVariant)
+                                    .foregroundStyle(editPartySize < editMaxPartySize ? Color.club.primary : Color.club.outlineVariant)
                             }
-                            .disabled(editPartySize >= 12)
+                            .disabled(editPartySize >= editMaxPartySize)
 
                             Spacer()
 

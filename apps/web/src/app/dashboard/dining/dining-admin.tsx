@@ -2093,6 +2093,7 @@ interface SettingsFacility {
   id: string;
   name: string;
   tables: { number: string; seats: number; location: string }[];
+  maxPartySize: number;
 }
 
 function SettingsTab() {
@@ -2129,10 +2130,11 @@ function SettingsTab() {
         if (res.ok) {
           const data = await res.json();
           const facs: SettingsFacility[] = (data.facilities ?? []).map(
-            (f: { id: string; name: string; tables?: unknown }) => ({
+            (f: { id: string; name: string; tables?: unknown; max_party_size?: number }) => ({
               id: f.id,
               name: f.name,
               tables: Array.isArray(f.tables) ? f.tables : [],
+              maxPartySize: f.max_party_size ?? 12,
             })
           );
           setFacilities(facs);
@@ -2381,6 +2383,41 @@ function SettingsTab() {
           ))}
         </div>
       )}
+
+      {/* ── Max Party Size ── */}
+      {selectedFacility && (() => {
+        const fac = facilities.find(f => f.id === selectedFacility);
+        if (!fac) return null;
+        return (
+          <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 p-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-[var(--foreground)]">Max Party Size</p>
+              <p className="text-xs text-[var(--muted-foreground)]">Maximum guests per reservation</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={fac.maxPartySize}
+                onChange={async (e) => {
+                  const val = Math.max(1, Math.min(50, parseInt(e.target.value) || 12));
+                  setFacilities(prev => prev.map(f => f.id === selectedFacility ? { ...f, maxPartySize: val } : f));
+                  try {
+                    await fetch(`/api/facilities/${selectedFacility}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ max_party_size: val }),
+                    });
+                  } catch { /* silent */ }
+                }}
+                className="w-16 rounded-lg border border-[var(--outline-variant)]/30 bg-[var(--background)] px-2 py-1.5 text-sm text-center font-semibold text-[var(--foreground)]"
+              />
+              <span className="text-xs text-[var(--muted-foreground)]">guests</span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Schedule Sub-Tab ── */}
       {settingsSubTab === "schedule" && (
