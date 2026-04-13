@@ -75,6 +75,7 @@ struct MyDiningOrdersResponse: Decodable {
 
 struct MyDiningReservation: Decodable, Identifiable {
     let id: String
+    let facilityId: String?
     let date: String
     let startTime: String
     let endTime: String?
@@ -83,6 +84,7 @@ struct MyDiningReservation: Decodable, Identifiable {
     let facilityName: String?
     let facilityType: String?
     let facilityImageUrl: String?
+    let notes: String?
 }
 
 private struct MyDiningReservationsResponse: Decodable {
@@ -198,6 +200,19 @@ struct DiningView: View {
     @State private var myOrders: [MyDiningOrder] = []
     @State private var loadingActivity = true
 
+    // Edit Reservation
+    @State private var editingReservation: MyDiningReservation?
+    @State private var editPartySize: Int = 2
+    @State private var editDateStr: String = ""
+    @State private var editSlots: [DiningSlot] = []
+    @State private var editSelectedSlot: DiningSlot?
+    @State private var editLoadingSlots = false
+    @State private var editSaving = false
+    @State private var editError: String?
+    @State private var showEditSuccess = false
+    @State private var showCancelReservationAlert = false
+    @State private var cancellingReservation = false
+
     // Reserve sheet flow
     @State private var showReserveSheet = false
     @State private var reserveStep: ReserveStep = .date
@@ -271,6 +286,29 @@ struct DiningView: View {
             Button("OK") { reservationError = nil }
         } message: {
             Text(reservationError ?? "")
+        }
+        .sheet(item: $editingReservation) { reservation in
+            editReservationSheet(reservation)
+        }
+        .alert("Reservation Updated", isPresented: $showEditSuccess) {
+            Button("OK") {}
+        } message: {
+            Text("Your reservation has been updated.")
+        }
+        .alert("Cancel Reservation?", isPresented: $showCancelReservationAlert) {
+            Button("Keep", role: .cancel) {}
+            Button("Cancel Reservation", role: .destructive) {
+                if let res = editingReservation {
+                    Task { await cancelReservation(res) }
+                }
+            }
+        } message: {
+            Text("This will cancel your dining reservation. This cannot be undone.")
+        }
+        .alert("Edit Error", isPresented: .constant(editError != nil)) {
+            Button("OK") { editError = nil }
+        } message: {
+            Text(editError ?? "")
         }
     }
 
@@ -1718,7 +1756,10 @@ struct DiningView: View {
                 HStack(spacing: 12) {
                     // Reservations
                     ForEach(myReservations) { res in
-                        reservationCard(res)
+                        Button { openEditReservation(res) } label: {
+                            reservationCard(res)
+                        }
+                        .buttonStyle(.plain)
                     }
                     // Active orders
                     ForEach(myOrders) { order in
@@ -1761,13 +1802,25 @@ struct DiningView: View {
             .font(.system(size: 12))
             .foregroundStyle(Color.club.onSurfaceVariant)
 
-            HStack(spacing: 4) {
-                Image(systemName: "person.2")
-                    .font(.system(size: 11))
-                Text("Party of \(res.partySize)")
-                    .font(.system(size: 12, weight: .medium))
+            HStack {
+                HStack(spacing: 4) {
+                    Image(systemName: "person.2")
+                        .font(.system(size: 11))
+                    Text("Party of \(res.partySize)")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .foregroundStyle(Color.club.onSurfaceVariant)
+
+                Spacer()
+
+                HStack(spacing: 4) {
+                    Text("Edit")
+                        .font(.system(size: 12, weight: .semibold))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10))
+                }
+                .foregroundStyle(Color.club.primary)
             }
-            .foregroundStyle(Color.club.onSurfaceVariant)
         }
         .padding(16)
         .frame(width: 240)
@@ -1860,6 +1913,321 @@ struct DiningView: View {
         let period = hour >= 12 ? "PM" : "AM"
         let h = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour)
         return min == 0 ? "\(h) \(period)" : "\(h):\(String(format: "%02d", min)) \(period)"
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // MARK: - Edit Reservation Sheet
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private func openEditReservation(_ res: MyDiningReservation) {
+        editPartySize = res.partySize
+        editDateStr = res.date
+        editSelectedSlot = nil
+        editSlots = []
+        editError = nil
+        editingReservation = res
+        // Load available slots for the current date
+        if let facId = res.facilityId {
+            Task { await fetchEditSlots(facilityId: facId, date: res.date) }
+        }
+    }
+
+    private func editReservationSheet(_ reservation: MyDiningReservation) -> some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+
+                    // Header
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(reservation.facilityName ?? "Dining")
+                            .font(.custom("Georgia", size: 22).weight(.bold))
+                            .foregroundStyle(Color.club.foreground)
+                        HStack(spacing: 6) {
+                            Image(systemName: "calendar.badge.clock")
+                                .font(.system(size: 13))
+                            Text("Edit Reservation")
+                                .font(.system(size: 14))
+                        }
+                        .foregroundStyle(Color.club.onSurfaceVariant)
+                    }
+
+                    // Date picker
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("DATE")
+                            .font(.system(size: 11, weight: .bold))
+                            .tracking(1)
+                            .foregroundStyle(Color.club.outline)
+
+                        let editDates = generateEditDates()
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(editDates) { d in
+                                    let isSelected = editDateStr == d.dateString
+                                    Button {
+                                        editDateStr = d.dateString
+                                        editSelectedSlot = nil
+                                        if let facId = reservation.facilityId {
+                                            Task { await fetchEditSlots(facilityId: facId, date: d.dateString) }
+                                        }
+                                    } label: {
+                                        VStack(spacing: 4) {
+                                            Text(d.dayName)
+                                                .font(.system(size: 10, weight: .semibold))
+                                                .tracking(0.5)
+                                            Text(d.dayNum)
+                                                .font(.system(size: 18, weight: .bold))
+                                            Text(d.monthName)
+                                                .font(.system(size: 10))
+                                        }
+                                        .foregroundStyle(isSelected ? .white : Color.club.foreground)
+                                        .frame(width: 56, height: 72)
+                                        .background(
+                                            isSelected ? Color.club.primary : Color.club.surfaceContainerLowest,
+                                            in: RoundedRectangle(cornerRadius: 14)
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 14)
+                                                .stroke(isSelected ? Color.clear : Color.club.outlineVariant.opacity(0.3), lineWidth: 1)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+
+                    // Time slots
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("TIME")
+                            .font(.system(size: 11, weight: .bold))
+                            .tracking(1)
+                            .foregroundStyle(Color.club.outline)
+
+                        if editLoadingSlots {
+                            ProgressView()
+                                .tint(Color.club.primary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 20)
+                        } else if editSlots.isEmpty {
+                            Text("No available times for this date")
+                                .font(.system(size: 14))
+                                .foregroundStyle(Color.club.onSurfaceVariant)
+                                .padding(.vertical, 12)
+                        } else {
+                            let columns = [GridItem(.adaptive(minimum: 90), spacing: 8)]
+                            LazyVGrid(columns: columns, spacing: 8) {
+                                ForEach(editSlots.filter(\.isAvailable), id: \.startTime) { slot in
+                                    let isSelected = editSelectedSlot?.startTime == slot.startTime
+                                    Button {
+                                        editSelectedSlot = slot
+                                    } label: {
+                                        Text(formatActivityTime(slot.startTime))
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(isSelected ? .white : Color.club.foreground)
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 10)
+                                            .background(
+                                                isSelected ? Color.club.primary : Color.club.surfaceContainerLowest,
+                                                in: RoundedRectangle(cornerRadius: 10)
+                                            )
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 10)
+                                                    .stroke(isSelected ? Color.clear : Color.club.outlineVariant.opacity(0.3), lineWidth: 1)
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+
+                    // Party size
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("PARTY SIZE")
+                            .font(.system(size: 11, weight: .bold))
+                            .tracking(1)
+                            .foregroundStyle(Color.club.outline)
+
+                        HStack(spacing: 16) {
+                            Button {
+                                if editPartySize > 1 { editPartySize -= 1 }
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .font(.system(size: 28))
+                                    .foregroundStyle(editPartySize > 1 ? Color.club.primary : Color.club.outlineVariant)
+                            }
+                            .disabled(editPartySize <= 1)
+
+                            Text("\(editPartySize)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(Color.club.foreground)
+                                .frame(width: 40)
+                                .multilineTextAlignment(.center)
+
+                            Button {
+                                if editPartySize < 12 { editPartySize += 1 }
+                            } label: {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 28))
+                                    .foregroundStyle(editPartySize < 12 ? Color.club.primary : Color.club.outlineVariant)
+                            }
+                            .disabled(editPartySize >= 12)
+
+                            Spacer()
+
+                            Text(editPartySize == 1 ? "Guest" : "Guests")
+                                .font(.system(size: 14))
+                                .foregroundStyle(Color.club.onSurfaceVariant)
+                        }
+                        .padding(16)
+                        .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 14))
+                    }
+
+                    // Save button
+                    Button {
+                        Task { await saveReservationEdit(reservation) }
+                    } label: {
+                        HStack {
+                            if editSaving {
+                                ProgressView().tint(.white)
+                            }
+                            Text("Save Changes")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(Color.club.primary, in: RoundedRectangle(cornerRadius: 14))
+                    }
+                    .disabled(editSaving)
+
+                    // Cancel reservation
+                    Button {
+                        showCancelReservationAlert = true
+                    } label: {
+                        Text("Cancel Reservation")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.club.destructive)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Color.club.destructive.opacity(0.25), lineWidth: 1)
+                            )
+                    }
+                    .disabled(cancellingReservation)
+                }
+                .padding(20)
+            }
+            .background(Color.club.background)
+            .navigationTitle("Edit Reservation")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { editingReservation = nil }
+                }
+            }
+        }
+        .presentationDetents([.large])
+    }
+
+    private func generateEditDates() -> [BookableDate] {
+        let cal = Calendar.current
+        let today = Date()
+        return (0..<14).compactMap { offset -> BookableDate? in
+            guard let date = cal.date(byAdding: .day, value: offset, to: today) else { return nil }
+            let df = DateFormatter()
+            df.dateFormat = "yyyy-MM-dd"
+            let dateString = df.string(from: date)
+            df.dateFormat = "EEE"
+            let dayLabel = df.string(from: date).uppercased()
+            df.dateFormat = "d"
+            let dayNumber = df.string(from: date)
+            df.dateFormat = "MMM"
+            let monthLabel = df.string(from: date)
+            return BookableDate(dateString: dateString, dayName: dayLabel, dayNum: dayNumber, monthName: monthLabel)
+        }
+    }
+
+    private func fetchEditSlots(facilityId: String, date: String) async {
+        editLoadingSlots = true
+        editSelectedSlot = nil
+        defer { editLoadingSlots = false }
+
+        do {
+            let response: DiningSlotsResponse = try await APIClient.shared.get("/dining/availability", query: [
+                "facility_id": facilityId,
+                "date": date,
+            ])
+            editSlots = response.slots
+        } catch {
+            editSlots = []
+        }
+    }
+
+    private func saveReservationEdit(_ reservation: MyDiningReservation) async {
+        editSaving = true
+        defer { editSaving = false }
+
+        struct ModifyRequest: Encodable {
+            var date: String?
+            var startTime: String?
+            var endTime: String?
+            var partySize: Int?
+        }
+
+        var changes = ModifyRequest()
+        var hasChanges = false
+
+        // Date changed?
+        if editDateStr != reservation.date {
+            changes.date = editDateStr
+            hasChanges = true
+        }
+
+        // Time changed?
+        if let slot = editSelectedSlot {
+            let currentTime = String(reservation.startTime.prefix(5))
+            let newTime = String(slot.startTime.prefix(5))
+            if newTime != currentTime {
+                changes.startTime = newTime
+                changes.endTime = String(slot.endTime.prefix(5))
+                hasChanges = true
+            }
+        }
+
+        // Party size changed?
+        if editPartySize != reservation.partySize {
+            changes.partySize = editPartySize
+            hasChanges = true
+        }
+
+        guard hasChanges else {
+            editingReservation = nil
+            return
+        }
+
+        do {
+            try await APIClient.shared.patch("/bookings/\(reservation.id)/modify", body: changes)
+            editingReservation = nil
+            showEditSuccess = true
+            await fetchMyActivity()
+        } catch {
+            editError = error.localizedDescription
+        }
+    }
+
+    private func cancelReservation(_ reservation: MyDiningReservation) async {
+        cancellingReservation = true
+        defer { cancellingReservation = false }
+
+        do {
+            try await APIClient.shared.patch("/bookings/\(reservation.id)/cancel")
+            editingReservation = nil
+            myReservations.removeAll { $0.id == reservation.id }
+        } catch {
+            editError = error.localizedDescription
+        }
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
