@@ -25,8 +25,12 @@ export async function GET(request: Request) {
     const memberId = result.member.id;
     const today = new Date().toISOString().split("T")[0];
 
+    // Optional facility type filter (e.g. ?type=golf)
+    const { searchParams } = new URL(request.url);
+    const facilityType = searchParams.get("type");
+
     // 1. Bookings I created
-    const { data: ownBookings, error: ownError } = await supabase
+    let ownQuery = supabase
       .from("bookings")
       .select(
         `
@@ -42,7 +46,7 @@ export async function GET(request: Request) {
         notes,
         created_at,
         updated_at,
-        facilities (
+        facilities!inner (
           name,
           type
         )
@@ -53,6 +57,12 @@ export async function GET(request: Request) {
       .in("status", ["confirmed", "pending"])
       .order("date", { ascending: true })
       .order("start_time", { ascending: true });
+
+    if (facilityType) {
+      ownQuery = ownQuery.eq("facilities.type", facilityType);
+    }
+
+    const { data: ownBookings, error: ownError } = await ownQuery;
 
     if (ownError) {
       console.error("My bookings query error:", ownError);
@@ -77,7 +87,7 @@ export async function GET(request: Request) {
 
     let invitedBookings: typeof ownBookings = [];
     if (playerBookingIds.length > 0) {
-      const { data } = await admin
+      let invitedQuery = admin
         .from("bookings")
         .select(
           `
@@ -93,7 +103,7 @@ export async function GET(request: Request) {
           notes,
           created_at,
           updated_at,
-          facilities (
+          facilities!inner (
             name,
             type
           )
@@ -104,6 +114,12 @@ export async function GET(request: Request) {
         .in("status", ["confirmed", "pending"])
         .order("date", { ascending: true })
         .order("start_time", { ascending: true });
+
+      if (facilityType) {
+        invitedQuery = invitedQuery.eq("facilities.type", facilityType);
+      }
+
+      const { data } = await invitedQuery;
 
       invitedBookings = data ?? [];
     }

@@ -63,7 +63,9 @@ struct EventsView: View {
     }
 
     // RSVP
-    @State private var rsvpInProgress: String? = nil  // tracks which status is loading
+    @Namespace private var rsvpAnimation
+    @State private var rsvpInProgress: String? = nil
+    @State private var optimisticRsvp: String? = nil  // instant UI update before API responds
     @State private var showRsvpSuccess = false
     @State private var rsvpSuccessMessage = ""
     @State private var rsvpError: String?
@@ -82,11 +84,6 @@ struct EventsView: View {
         }
         .sheet(item: $selectedEvent) { event in
             eventDetailSheet(event)
-        }
-        .alert("RSVP Updated!", isPresented: $showRsvpSuccess) {
-            Button("OK") {}
-        } message: {
-            Text(rsvpSuccessMessage)
         }
         .alert("RSVP Error", isPresented: .constant(rsvpError != nil)) {
             Button("OK") { rsvpError = nil }
@@ -422,136 +419,98 @@ struct EventsView: View {
         let currentStatus = event.userRsvpStatus
 
         return NavigationStack {
-            ZStack(alignment: .bottom) {
-                Color.club.background.ignoresSafeArea()
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 20) {
 
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 0) {
-                        // Hero image — fixed size, no stretch on drag
-                        ZStack(alignment: .bottom) {
-                            if let imageUrl = event.imageUrl, let url = URL(string: imageUrl) {
-                                CachedAsyncImage(url: url) { phase in
-                                    switch phase {
-                                    case .success(let image):
-                                        image
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                            .frame(height: 240)
-                                            .clipped()
-                                    case .failure:
-                                        eventGradientHero(icon: icon, colors: gradientColors)
-                                    default:
-                                        ShimmerView()
-                                            .frame(height: 240)
-                                    }
-                                }
+                    // Event image — rounded card, Apple-style
+                    eventDetailImage(event: event, icon: icon, gradientColors: gradientColors)
+
+                    // RSVP — inline segmented control
+                    rsvpSegmentedControl(event: event)
+
+                    // Tags row
+                    HStack(spacing: 6) {
+                            if event.priceValue == nil || event.priceValue == 0 {
+                                tagBadge("FREE", color: Color.club.primary)
                             } else {
-                                eventGradientHero(icon: icon, colors: gradientColors)
+                                tagBadge(formatPrice(event.priceValue!), color: Color(hex: "8b6914"))
                             }
 
-                            // Gradient fade at bottom
-                            LinearGradient(
-                                colors: [.clear, Color.club.background.opacity(0.8), Color.club.background],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                            .frame(height: 80)
+                            if let cap = event.capacity {
+                                let spotsLeft = cap - event.rsvpCount
+                                if spotsLeft <= 5 && spotsLeft > 0 {
+                                    tagBadge("\(spotsLeft) spots left", color: .red)
+                                } else if spotsLeft <= 0 {
+                                    tagBadge("FULL", color: .red)
+                                }
+                            }
+
+                            if currentStatus == "attending" {
+                                tagBadge("YOU'RE GOING", color: Color.club.primary)
+                            } else if currentStatus == "maybe" {
+                                tagBadge("MAYBE", color: Color(hex: "8b6914"))
+                            }
                         }
-                        .frame(height: 240)
-                        .clipped()
-                        // Fill overscroll area above hero with matching color
-                        .background(alignment: .top) {
-                            (gradientColors.first ?? Color.club.surfaceContainer)
-                                .frame(height: 600)
-                                .offset(y: -600)
+
+                        // Details card
+                        VStack(spacing: 14) {
+                            infoRow(icon: "calendar", label: "Date", value: eventDateLabel(event.startDate))
+                            infoRow(icon: "clock", label: "Time", value: eventTimeRange(event))
+                            if let loc = event.location, !loc.isEmpty {
+                                infoRow(icon: "mappin.and.ellipse", label: "Location", value: loc)
+                            }
+                            if let cap = event.capacity {
+                                infoRow(icon: "person.2", label: "Capacity", value: "\(event.rsvpCount) / \(cap) attending")
+                            }
+                            if let price = event.priceValue, price > 0 {
+                                infoRow(icon: "creditcard", label: "Price", value: formatPrice(price) + " per person")
+                            }
+                        }
+                        .padding(16)
+                        .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 14))
+
+                        // Capacity bar
+                        if let cap = event.capacity, cap > 0 {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("ATTENDANCE")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .tracking(1)
+                                    .foregroundStyle(Color.club.outline)
+                                capacityBar(attending: event.rsvpCount, capacity: cap)
+                            }
                         }
 
-                        VStack(alignment: .leading, spacing: 20) {
-                            // Tags
-                            HStack(spacing: 6) {
-                                if event.priceValue == nil || event.priceValue == 0 {
-                                    tagBadge("FREE", color: Color.club.primary)
-                                } else {
-                                    tagBadge(formatPrice(event.priceValue!), color: Color(hex: "8b6914"))
-                                }
+                        // Description
+                        if let desc = event.description, !desc.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("ABOUT THIS EVENT")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .tracking(1)
+                                    .foregroundStyle(Color.club.outline)
 
-                                if let cap = event.capacity {
-                                    let spotsLeft = cap - event.rsvpCount
-                                    if spotsLeft <= 5 && spotsLeft > 0 {
-                                        tagBadge("\(spotsLeft) spots left", color: .red)
-                                    } else if spotsLeft <= 0 {
-                                        tagBadge("FULL", color: .red)
-                                    }
-                                }
-
-                                if currentStatus == "attending" {
-                                    tagBadge("YOU'RE GOING", color: Color.club.primary)
-                                } else if currentStatus == "maybe" {
-                                    tagBadge("MAYBE", color: Color(hex: "8b6914"))
-                                }
+                                Text(desc)
+                                    .font(.system(size: 15))
+                                    .foregroundStyle(Color.club.foreground)
+                                    .lineSpacing(4)
                             }
-
-                            // Title
-                            Text(event.title)
-                                .font(.custom("Georgia", size: 24).weight(.bold))
-                                .foregroundStyle(Color.club.foreground)
-
-                            // Info rows
-                            VStack(spacing: 14) {
-                                infoRow(icon: "calendar", label: "Date", value: eventDateLabel(event.startDate))
-                                infoRow(icon: "clock", label: "Time", value: eventTimeRange(event))
-                                if let loc = event.location, !loc.isEmpty {
-                                    infoRow(icon: "mappin.and.ellipse", label: "Location", value: loc)
-                                }
-                                if let cap = event.capacity {
-                                    infoRow(icon: "person.2", label: "Capacity", value: "\(event.rsvpCount) / \(cap) attending")
-                                }
-                                if let price = event.priceValue, price > 0 {
-                                    infoRow(icon: "creditcard", label: "Price", value: formatPrice(price) + " per person")
-                                }
-                            }
-                            .padding(16)
-                            .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 14))
-
-                            // Capacity bar
-                            if let cap = event.capacity, cap > 0 {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("ATTENDANCE")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .tracking(1)
-                                        .foregroundStyle(Color.club.outline)
-                                    capacityBar(attending: event.rsvpCount, capacity: cap)
-                                }
-                            }
-
-                            // Description
-                            if let desc = event.description, !desc.isEmpty {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("ABOUT THIS EVENT")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .tracking(1)
-                                        .foregroundStyle(Color.club.outline)
-
-                                    Text(desc)
-                                        .font(.system(size: 15))
-                                        .foregroundStyle(Color.club.foreground)
-                                        .lineSpacing(4)
-                                }
-                            }
-
-                            Spacer(minLength: 120)
                         }
-                        .padding(20)
-                    }
+
+                    Spacer(minLength: 32)
                 }
-
-                // RSVP buttons
-                rsvpBar(event: event)
+                .padding(.horizontal, 20)
+                .padding(.top, 4)
             }
+            .background(Color.club.background)
+            .navigationTitle(event.title)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar(.hidden, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { selectedEvent = nil }
+                        .foregroundStyle(Color.club.primary)
+                }
+            }
         }
-        .presentationDetents([.large])
+        .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(24)
         .presentationBackground {
@@ -562,6 +521,32 @@ struct EventsView: View {
                 Color.club.background
             }
         }
+    }
+
+    /// Event image as a rounded card inside the sheet — Apple's pattern for sheet content.
+    private func eventDetailImage(event: ClubEvent, icon: String, gradientColors: [Color]) -> some View {
+        Group {
+            if let imageUrl = event.imageUrl, let url = URL(string: imageUrl) {
+                CachedAsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(height: 200)
+                            .clipped()
+                    case .failure:
+                        eventGradientHero(icon: icon, colors: gradientColors, height: 200)
+                    default:
+                        ShimmerView()
+                            .frame(height: 200)
+                    }
+                }
+            } else {
+                eventGradientHero(icon: icon, colors: gradientColors, height: 200)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func eventGradientHero(icon: String, colors: [Color], height: CGFloat = 240) -> some View {
@@ -598,79 +583,51 @@ struct EventsView: View {
         }
     }
 
-    private func rsvpBar(event: ClubEvent) -> some View {
-        let current = event.userRsvpStatus
+    private func rsvpSegmentedControl(event: ClubEvent) -> some View {
+        // Use optimistic state for instant feedback, fall back to server state
+        let displayStatus = optimisticRsvp ?? event.userRsvpStatus
         let isFull = event.capacity != nil && event.rsvpCount >= (event.capacity ?? 0)
 
-        return VStack(spacing: 8) {
-            Divider()
+        let options: [(label: String, icon: String, selectedIcon: String, status: String, disabled: Bool)] = [
+            ("Going", "checkmark.circle", "checkmark.circle.fill", "attending", isFull && displayStatus != "attending"),
+            ("Maybe", "questionmark.circle", "questionmark.circle.fill", "maybe", false),
+            ("Can't Go", "xmark.circle", "xmark.circle.fill", "declined", false),
+        ]
 
-            // RSVP action buttons — all gray by default, selected one is green
-            HStack(spacing: 10) {
-                rsvpButton(
-                    label: "I'm Going",
-                    icon: "hand.thumbsup",
-                    selectedIcon: "hand.thumbsup.fill",
-                    status: "attending",
-                    current: current,
-                    eventId: event.id,
-                    disabled: isFull && current != "attending"
-                )
+        return HStack(spacing: 4) {
+            ForEach(options, id: \.status) { option in
+                let isSelected = displayStatus == option.status
 
-                rsvpButton(
-                    label: "Maybe",
-                    icon: "hand.raised",
-                    selectedIcon: "hand.raised.fill",
-                    status: "maybe",
-                    current: current,
-                    eventId: event.id,
-                    disabled: false
-                )
-
-                rsvpButton(
-                    label: "Can't Go",
-                    icon: "hand.thumbsdown",
-                    selectedIcon: "hand.thumbsdown.fill",
-                    status: "declined",
-                    current: current,
-                    eventId: event.id,
-                    disabled: false
-                )
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 8)
-        }
-        .background(.ultraThinMaterial)
-    }
-
-    private func rsvpButton(label: String, icon: String, selectedIcon: String, status: String, current: String?, eventId: String, disabled: Bool) -> some View {
-        let isSelected = current == status
-        let isLoading = rsvpInProgress == status
-
-        return Button {
-            Task { await submitRsvp(eventId: eventId, status: status) }
-        } label: {
-            VStack(spacing: 4) {
-                if isLoading {
-                    ProgressView()
-                        .tint(isSelected ? .white : Color.club.onSurfaceVariant)
-                        .frame(height: 15)
-                } else {
-                    Image(systemName: isSelected ? selectedIcon : icon)
-                        .font(.system(size: 15))
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                        optimisticRsvp = option.status
+                    }
+                    Task { await submitRsvp(eventId: event.id, status: option.status) }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: isSelected ? option.selectedIcon : option.icon)
+                            .font(.system(size: 14, weight: .medium))
+                        Text(option.label)
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundStyle(isSelected ? .white : Color.club.onSurfaceVariant)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background {
+                        if isSelected {
+                            Capsule()
+                                .fill(Color.club.primary)
+                                .matchedGeometryEffect(id: "rsvpPill", in: rsvpAnimation)
+                        }
+                    }
+                    .contentShape(Capsule())
                 }
-                Text(label)
-                    .font(.system(size: 12, weight: .semibold))
+                .disabled(rsvpInProgress != nil || option.disabled)
+                .opacity(option.disabled ? 0.4 : 1)
             }
-            .foregroundStyle(isSelected ? .white : Color.club.onSurfaceVariant)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(
-                isSelected ? Color.club.primary : Color.club.surfaceContainerHigh,
-                in: RoundedRectangle(cornerRadius: 12)
-            )
         }
-        .disabled(rsvpInProgress != nil || disabled)
+        .padding(4)
+        .background(Color.club.surfaceContainerLowest, in: Capsule())
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -839,7 +796,10 @@ struct EventsView: View {
             }
 
             if httpResponse.statusCode >= 400 {
-                // Try to extract error message
+                // Revert optimistic update on failure
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    optimisticRsvp = nil
+                }
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let errorMsg = json["error"] as? String {
                     rsvpError = errorMsg
@@ -849,17 +809,18 @@ struct EventsView: View {
                 return
             }
 
-            // Success — re-fetch events to get updated RSVP status and counts
+            // Success — re-fetch events to get updated server state
             await fetchEvents()
             if let updatedEvent = events.first(where: { $0.id == eventId }) {
                 selectedEvent = updatedEvent
             }
-
-            let statusLabel = status == "attending" ? "You're going!" :
-                             status == "maybe" ? "Marked as maybe." : "RSVP declined."
-            rsvpSuccessMessage = statusLabel
-            showRsvpSuccess = true
+            // Clear optimistic state now that server state is authoritative
+            optimisticRsvp = nil
         } catch {
+            // Revert optimistic update on error
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                optimisticRsvp = nil
+            }
             rsvpError = error.localizedDescription
         }
     }

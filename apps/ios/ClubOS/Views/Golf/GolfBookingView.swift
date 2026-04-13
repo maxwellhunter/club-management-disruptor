@@ -1528,7 +1528,7 @@ struct GolfBookingView: View {
         defer { loadingBookings = false }
 
         do {
-            let response: MyBookingsResponse = try await APIClient.shared.get("/bookings/my")
+            let response: MyBookingsResponse = try await APIClient.shared.get("/bookings/my", query: ["type": "golf"])
             bookings = response.bookings
         } catch {
             print("Failed to fetch bookings:", error)
