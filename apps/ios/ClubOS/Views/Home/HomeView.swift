@@ -16,6 +16,8 @@ private struct UpcomingItem: Identifiable {
     let timeLabel: String
     let icon: String
     let iconColor: Color
+    let imageUrl: String?
+    let eventRef: ClubEvent?  // for sheet presentation
 }
 
 // MARK: - Home Booking Model
@@ -29,6 +31,7 @@ private struct HomeBooking: Decodable {
     let status: String
     let facilityName: String?
     let facilityType: String?
+    let facilityImageUrl: String?
 }
 
 private struct HomeBookingsResponse: Decodable {
@@ -136,7 +139,7 @@ struct HomeView: View {
                             .foregroundStyle(Color.club.foreground)
 
                         ForEach(upcomingItems.prefix(6)) { item in
-                            upcomingRow(item)
+                            upcomingRowLink(item)
                         }
                     }
                 }
@@ -243,7 +246,9 @@ struct HomeView: View {
                     dateLabel: formatUpcomingDate(date),
                     timeLabel: formatTime(b.startTime),
                     icon: icon,
-                    iconColor: iconColor
+                    iconColor: iconColor,
+                    imageUrl: b.facilityImageUrl,
+                    eventRef: nil
                 ))
             }
         }
@@ -262,7 +267,9 @@ struct HomeView: View {
                     dateLabel: formatUpcomingDate(date),
                     timeLabel: formatEventTime(e.startDate),
                     icon: "calendar",
-                    iconColor: Color(hex: "7c3aed")
+                    iconColor: Color(hex: "7c3aed"),
+                    imageUrl: e.imageUrl,
+                    eventRef: e
                 ))
             }
         }
@@ -272,13 +279,40 @@ struct HomeView: View {
 
     // MARK: - Upcoming Row
 
+    @ViewBuilder
+    private func upcomingRowLink(_ item: UpcomingItem) -> some View {
+        switch item.kind {
+        case .teeTime:
+            NavigationLink { GolfBookingView() } label: { upcomingRow(item) }
+                .buttonStyle(.plain)
+        case .dining:
+            NavigationLink { DiningView() } label: { upcomingRow(item) }
+                .buttonStyle(.plain)
+        case .event:
+            NavigationLink { EventsView() } label: { upcomingRow(item) }
+                .buttonStyle(.plain)
+        }
+    }
+
     private func upcomingRow(_ item: UpcomingItem) -> some View {
         HStack(spacing: 14) {
-            Image(systemName: item.icon)
-                .font(.system(size: 18))
-                .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
-                .background(item.iconColor, in: RoundedRectangle(cornerRadius: 12))
+            // Image thumbnail or icon fallback
+            if let urlStr = item.imageUrl, let url = URL(string: urlStr) {
+                CachedAsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 52, height: 52)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    default:
+                        upcomingIconFallback(item)
+                    }
+                }
+            } else {
+                upcomingIconFallback(item)
+            }
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.title)
@@ -300,9 +334,21 @@ struct HomeView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(Color.club.onSurfaceVariant)
             }
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12))
+                .foregroundStyle(Color.club.outlineVariant)
         }
         .padding(14)
         .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func upcomingIconFallback(_ item: UpcomingItem) -> some View {
+        Image(systemName: item.icon)
+            .font(.system(size: 20))
+            .foregroundStyle(.white)
+            .frame(width: 52, height: 52)
+            .background(item.iconColor, in: RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: - Date Parsing Helpers
