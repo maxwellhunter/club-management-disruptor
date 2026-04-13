@@ -49,6 +49,7 @@ struct MyBooking: Decodable, Identifiable {
     let notes: String?
     let facilityName: String
     let facilityType: String
+    let facilityImageUrl: String?
     let isOwner: Bool?
 }
 
@@ -448,23 +449,50 @@ struct GolfBookingView: View {
 
     private func bookingCard(_ booking: MyBooking) -> some View {
         VStack(spacing: 0) {
-            // Course header gradient
+            // Course header — image or gradient fallback
             ZStack(alignment: .topLeading) {
-                LinearGradient(
-                    colors: [Color.club.primaryContainer, Color.club.primary],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .frame(height: 80)
+                if let imageUrl = booking.facilityImageUrl, let url = URL(string: imageUrl) {
+                    CachedAsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(height: 100)
+                                .clipped()
+                                .overlay {
+                                    LinearGradient(
+                                        colors: [.clear, .black.opacity(0.3)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                }
+                        default:
+                            LinearGradient(
+                                colors: [Color.club.primaryContainer, Color.club.primary],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            .frame(height: 100)
+                        }
+                    }
+                } else {
+                    LinearGradient(
+                        colors: [Color.club.primaryContainer, Color.club.primary],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .frame(height: 100)
 
-                HStack {
-                    Spacer()
-                    Image(systemName: "figure.golf")
-                        .font(.system(size: 50))
-                        .foregroundStyle(.white.opacity(0.1))
-                        .offset(x: 10, y: 10)
+                    HStack {
+                        Spacer()
+                        Image(systemName: "figure.golf")
+                            .font(.system(size: 50))
+                            .foregroundStyle(.white.opacity(0.1))
+                            .offset(x: 10, y: 10)
+                    }
+                    .frame(height: 100)
                 }
-                .frame(height: 80)
 
                 Text(booking.facilityName)
                     .font(.system(size: 11, weight: .bold))
@@ -474,6 +502,8 @@ struct GolfBookingView: View {
                     .background(.ultraThinMaterial.opacity(0.6), in: Capsule())
                     .padding(12)
             }
+            .frame(height: 100)
+            .clipShape(UnevenRoundedRectangle(topLeadingRadius: 16, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 16))
 
             // Card body
             VStack(spacing: 12) {

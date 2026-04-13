@@ -48,7 +48,8 @@ export async function GET(request: Request) {
         updated_at,
         facilities!inner (
           name,
-          type
+          type,
+          image_url
         )
       `
       )
@@ -105,7 +106,8 @@ export async function GET(request: Request) {
           updated_at,
           facilities!inner (
             name,
-            type
+            type,
+            image_url
           )
         `
         )
@@ -127,7 +129,7 @@ export async function GET(request: Request) {
     // Transform to BookingWithDetails shape, tagging ownership
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     function formatBooking(b: any, isOwner: boolean) {
-      const facility = b.facilities as { name: string; type: string } | null;
+      const facility = b.facilities as { name: string; type: string; image_url: string | null } | null;
       return {
         id: b.id,
         club_id: b.club_id,
@@ -143,6 +145,7 @@ export async function GET(request: Request) {
         updated_at: b.updated_at,
         facility_name: facility?.name ?? "Unknown",
         facility_type: facility?.type ?? "other",
+        facility_image_url: facility?.image_url ?? null,
         member_first_name: result!.member.first_name,
         member_last_name: result!.member.last_name,
         is_owner: isOwner,

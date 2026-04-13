@@ -9,11 +9,14 @@ import {
   AlertCircle,
   CheckCircle2,
   ChevronDown,
+  ImageIcon,
 } from "lucide-react";
+import { ImageUpload } from "@/components/image-upload";
 
 interface Facility {
   id: string;
   name: string;
+  image_url: string | null;
 }
 
 interface CourseHole {
@@ -54,6 +57,8 @@ export default function CourseSetupAdmin() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [facilityImageUrl, setFacilityImageUrl] = useState("");
+  const [savingImage, setSavingImage] = useState(false);
 
   // Fetch golf facilities
   const fetchFacilities = useCallback(async () => {
@@ -78,12 +83,14 @@ export default function CourseSetupAdmin() {
     fetchFacilities();
   }, [fetchFacilities]);
 
-  // Load course holes when facility changes
+  // Load course holes + image when facility changes
   useEffect(() => {
     if (selectedFacilityId) {
       loadCourse(selectedFacilityId);
+      const fac = facilities.find((f) => f.id === selectedFacilityId);
+      setFacilityImageUrl(fac?.image_url ?? "");
     }
-  }, [selectedFacilityId]);
+  }, [selectedFacilityId, facilities]);
 
   async function loadCourse(facilityId: string) {
     setLoadingCourse(true);
@@ -189,6 +196,35 @@ export default function CourseSetupAdmin() {
     });
   }
 
+  async function saveFacilityImage(url: string) {
+    if (!selectedFacilityId) return;
+    setSavingImage(true);
+    try {
+      const res = await fetch(`/api/facilities/${selectedFacilityId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_url: url || null }),
+      });
+      if (res.ok) {
+        setFacilityImageUrl(url);
+        // Update local facilities list
+        setFacilities((prev) =>
+          prev.map((f) =>
+            f.id === selectedFacilityId ? { ...f, image_url: url || null } : f
+          )
+        );
+        setSuccess("Course image updated!");
+        setTimeout(() => setSuccess(null), 3000);
+      } else {
+        setError("Failed to save course image");
+      }
+    } catch {
+      setError("Failed to save course image");
+    } finally {
+      setSavingImage(false);
+    }
+  }
+
   // Totals
   const totalPar = holes.reduce((sum, h) => sum + h.par, 0);
   const totalBack = holes.reduce((sum, h) => sum + h.yardageBack, 0);
@@ -262,6 +298,32 @@ export default function CourseSetupAdmin() {
             ))}
           </select>
           <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)]" />
+        </div>
+      )}
+
+      {/* Course Image */}
+      {selectedFacilityId && (
+        <div className="rounded-xl border border-[var(--border)] p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <ImageIcon className="h-4 w-4 text-[var(--primary)]" />
+            <h3 className="text-sm font-semibold">Course Image</h3>
+            <span className="text-xs text-[var(--muted-foreground)]">
+              Shown on tee time cards in the mobile app
+            </span>
+          </div>
+          <ImageUpload
+            value={facilityImageUrl}
+            onChange={(url) => saveFacilityImage(url)}
+            bucket="facility-images"
+            label=""
+            aspect="video"
+            placeholder="Upload a course photo"
+          />
+          {savingImage && (
+            <p className="text-xs text-[var(--muted-foreground)] mt-2 flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" /> Saving...
+            </p>
+          )}
         </div>
       )}
 
