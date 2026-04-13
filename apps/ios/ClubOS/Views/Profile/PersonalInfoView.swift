@@ -61,21 +61,41 @@ struct PersonalInfoView: View {
 
     private var avatarSection: some View {
         VStack(spacing: 12) {
-            Circle()
-                .fill(Color.club.surfaceContainerHigh)
-                .frame(width: 88, height: 88)
-                .overlay {
-                    Text(initials)
-                        .font(.system(size: 32, weight: .bold))
-                        .foregroundStyle(Color.club.onSurfaceVariant)
+            if let url = UserDefaults.standard.string(forKey: "clubos_cache_avatar_url"),
+               let imageUrl = URL(string: url) {
+                CachedAsyncImage(url: imageUrl) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 88, height: 88)
+                            .clipShape(Circle())
+                    default:
+                        personalInfoInitials
+                    }
                 }
-                .overlay(Circle().stroke(Color.club.outlineVariant, lineWidth: 3))
+            } else {
+                personalInfoInitials
+            }
 
             Text("\(firstName) \(lastName)")
                 .font(.custom("Georgia", size: 20).weight(.bold))
                 .foregroundStyle(Color.club.foreground)
         }
         .padding(.bottom, 8)
+    }
+
+    private var personalInfoInitials: some View {
+        Circle()
+            .fill(Color.club.surfaceContainerHigh)
+            .frame(width: 88, height: 88)
+            .overlay {
+                Text(initials)
+                    .font(.system(size: 32, weight: .bold))
+                    .foregroundStyle(Color.club.onSurfaceVariant)
+            }
+            .overlay(Circle().stroke(Color.club.outlineVariant, lineWidth: 3))
     }
 
     // MARK: - Editable Fields

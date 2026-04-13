@@ -57,8 +57,12 @@ struct ProfileView: View {
     @State private var showSignOutAlert = false
     @State private var actionLoading = false
 
-    // Avatar
-    @State private var avatarUrl: String?
+    // Avatar — URL persisted in UserDefaults via AppCacheService so it's instant on re-nav
+    @State private var avatarUrl: String? = {
+        // Synchronous read from cache — no flash
+        let defaults = UserDefaults.standard
+        return defaults.string(forKey: "clubos_cache_avatar_url")
+    }()
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var uploadingAvatar = false
 
@@ -568,6 +572,7 @@ struct ProfileView: View {
 
             await MainActor.run {
                 avatarUrl = response.url
+                UserDefaults.standard.set(response.url, forKey: "clubos_cache_avatar_url")
             }
         } catch {
             print("Avatar upload failed: \(error)")
@@ -617,8 +622,9 @@ struct ProfileView: View {
             let userEmail = auth.user?.email
             if let me = response.members.first(where: { $0.email == userEmail }) {
                 await MainActor.run {
-                    if avatarUrl == nil { // Don't overwrite a freshly uploaded avatar
-                        avatarUrl = me.avatarUrl
+                    if let url = me.avatarUrl {
+                        avatarUrl = url
+                        UserDefaults.standard.set(url, forKey: "clubos_cache_avatar_url")
                     }
                 }
             }

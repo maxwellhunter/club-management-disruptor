@@ -112,12 +112,23 @@ struct MembersView: View {
 
     private func memberCard(_ member: DirectoryMember) -> some View {
         HStack(spacing: 14) {
-            // Avatar
-            Text(initials(for: member.fullName))
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
-                .background(avatarColor(for: member.fullName), in: Circle())
+            // Avatar — show image if available, initials fallback
+            if let url = member.avatarUrl, let imageUrl = URL(string: url) {
+                CachedAsyncImage(url: imageUrl) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 44, height: 44)
+                            .clipShape(Circle())
+                    default:
+                        memberInitialsCircle(member)
+                    }
+                }
+            } else {
+                memberInitialsCircle(member)
+            }
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
@@ -229,6 +240,14 @@ struct MembersView: View {
         } catch {
             // Keep existing data on error
         }
+    }
+
+    private func memberInitialsCircle(_ member: DirectoryMember) -> some View {
+        Text(initials(for: member.fullName))
+            .font(.system(size: 14, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: 44, height: 44)
+            .background(avatarColor(for: member.fullName), in: Circle())
     }
 
     // MARK: - Helpers

@@ -50,6 +50,45 @@ struct DiningOrderResult: Decodable {
     let id: String
 }
 
+// MARK: - My Activity Models
+
+struct MyDiningOrder: Decodable, Identifiable {
+    let id: String
+    let facilityName: String
+    let status: String
+    let total: Double
+    let tableNumber: String?
+    let createdAt: String?
+    let items: [MyDiningOrderItem]
+}
+
+struct MyDiningOrderItem: Decodable, Identifiable {
+    let id: String
+    let name: String
+    let quantity: Int
+    let price: Double
+}
+
+struct MyDiningOrdersResponse: Decodable {
+    let orders: [MyDiningOrder]
+}
+
+struct MyDiningReservation: Decodable, Identifiable {
+    let id: String
+    let date: String
+    let startTime: String
+    let endTime: String?
+    let partySize: Int
+    let status: String
+    let facilityName: String?
+    let facilityType: String?
+    let facilityImageUrl: String?
+}
+
+private struct MyDiningReservationsResponse: Decodable {
+    let bookings: [MyDiningReservation]
+}
+
 struct DiningSlot: Decodable {
     let startTime: String
     let endTime: String
@@ -154,6 +193,11 @@ struct DiningView: View {
     @State private var showOrderSuccess = false
     @State private var orderError: String?
 
+    // My Activity
+    @State private var myReservations: [MyDiningReservation] = []
+    @State private var myOrders: [MyDiningOrder] = []
+    @State private var loadingActivity = true
+
     // Reserve sheet flow
     @State private var showReserveSheet = false
     @State private var reserveStep: ReserveStep = .date
@@ -195,7 +239,9 @@ struct DiningView: View {
         .toolbarBackground(screen == .venues && hasHeroContent ? .hidden : .visible, for: .navigationBar)
         .task {
             await fetchFacilities()
-            await fetchDiningHero()
+            async let heroTask: Void = fetchDiningHero()
+            async let activityTask: Void = fetchMyActivity()
+            _ = await (heroTask, activityTask)
         }
         .alert("Order Placed!", isPresented: $showOrderSuccess) {
             Button("OK") {
@@ -297,6 +343,12 @@ struct DiningView: View {
                 flowModeToggle
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
+
+                // My Activity section
+                if !loadingActivity && (!myReservations.isEmpty || !myOrders.isEmpty) {
+                    myActivitySection
+                        .padding(.top, 20)
+                }
 
                 if loadingFacilities {
                     ProgressView()
@@ -1652,8 +1704,181 @@ struct DiningView: View {
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // MARK: - My Activity Section
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private var myActivitySection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Your Activity")
+                .font(.custom("Georgia", size: 18).weight(.bold))
+                .foregroundStyle(Color.club.foreground)
+                .padding(.horizontal, 20)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    // Reservations
+                    ForEach(myReservations) { res in
+                        reservationCard(res)
+                    }
+                    // Active orders
+                    ForEach(myOrders) { order in
+                        orderCard(order)
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+
+    private func reservationCard(_ res: MyDiningReservation) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "calendar.badge.clock")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.club.primary)
+                Text("Reservation")
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(0.5)
+                    .foregroundStyle(Color.club.primary)
+                Spacer()
+                Text(res.status.capitalized)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(statusColor(res.status))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(statusColor(res.status).opacity(0.12), in: Capsule())
+            }
+
+            Text(res.facilityName ?? "Dining")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color.club.foreground)
+                .lineLimit(1)
+
+            HStack(spacing: 12) {
+                Label(formatActivityDate(res.date), systemImage: "calendar")
+                Label(formatActivityTime(res.startTime), systemImage: "clock")
+            }
+            .font(.system(size: 12))
+            .foregroundStyle(Color.club.onSurfaceVariant)
+
+            HStack(spacing: 4) {
+                Image(systemName: "person.2")
+                    .font(.system(size: 11))
+                Text("Party of \(res.partySize)")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .foregroundStyle(Color.club.onSurfaceVariant)
+        }
+        .padding(16)
+        .frame(width: 240)
+        .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 16))
+        .shadow(color: Color.club.foreground.opacity(0.04), radius: 8, y: 4)
+    }
+
+    private func orderCard(_ order: MyDiningOrder) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "bag.fill")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color(hex: "ea580c"))
+                Text("Order")
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(0.5)
+                    .foregroundStyle(Color(hex: "ea580c"))
+                Spacer()
+                Text(orderStatusLabel(order.status))
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(statusColor(order.status))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(statusColor(order.status).opacity(0.12), in: Capsule())
+            }
+
+            Text(order.facilityName)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color.club.foreground)
+                .lineLimit(1)
+
+            // Item summary
+            Text(order.items.prefix(3).map { "\($0.quantity)× \($0.name)" }.joined(separator: ", "))
+                .font(.system(size: 12))
+                .foregroundStyle(Color.club.onSurfaceVariant)
+                .lineLimit(2)
+
+            HStack {
+                if let table = order.tableNumber, !table.isEmpty {
+                    Label("Table \(table)", systemImage: "tablecells")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.club.onSurfaceVariant)
+                }
+                Spacer()
+                Text(formatPrice(order.total))
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Color.club.foreground)
+            }
+        }
+        .padding(16)
+        .frame(width: 240)
+        .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 16))
+        .shadow(color: Color.club.foreground.opacity(0.04), radius: 8, y: 4)
+    }
+
+    private func orderStatusLabel(_ status: String) -> String {
+        switch status {
+        case "pending": return "Pending"
+        case "confirmed": return "Confirmed"
+        case "preparing": return "Preparing"
+        case "ready": return "Ready"
+        default: return status.capitalized
+        }
+    }
+
+    private func statusColor(_ status: String) -> Color {
+        switch status {
+        case "confirmed": return Color(hex: "16a34a")
+        case "pending": return Color(hex: "d97706")
+        case "preparing": return Color(hex: "2563eb")
+        case "ready": return Color(hex: "16a34a")
+        default: return Color(hex: "6b7280")
+        }
+    }
+
+    private func formatActivityDate(_ dateStr: String) -> String {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        guard let date = df.date(from: dateStr) else { return dateStr }
+        let cal = Calendar.current
+        if cal.isDateInToday(date) { return "Today" }
+        if cal.isDateInTomorrow(date) { return "Tomorrow" }
+        df.dateFormat = "EEE, MMM d"
+        return df.string(from: date)
+    }
+
+    private func formatActivityTime(_ time: String) -> String {
+        let parts = time.split(separator: ":")
+        guard parts.count >= 2, let hour = Int(parts[0]), let min = Int(parts[1]) else { return time }
+        let period = hour >= 12 ? "PM" : "AM"
+        let h = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour)
+        return min == 0 ? "\(h) \(period)" : "\(h):\(String(format: "%02d", min)) \(period)"
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // MARK: - API Calls
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private func fetchMyActivity() async {
+        loadingActivity = true
+        defer { loadingActivity = false }
+
+        async let reservationsTask: MyDiningReservationsResponse? = try? await APIClient.shared.get(
+            "/bookings/my", query: ["type": "dining"]
+        )
+        async let ordersTask: MyDiningOrdersResponse? = try? await APIClient.shared.get("/dining/orders/my")
+
+        let (resResult, ordResult) = await (reservationsTask, ordersTask)
+        myReservations = resResult?.bookings ?? []
+        myOrders = ordResult?.orders ?? []
+    }
 
     private func fetchFacilities() async {
         loadingFacilities = true

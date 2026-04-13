@@ -7,6 +7,11 @@ struct HomeView: View {
     @State private var todaysBookings: [Booking] = []
     @State private var isLoading = true
 
+    // Avatar — read cached URL so it's instant (no flash)
+    private var avatarUrl: String? {
+        UserDefaults.standard.string(forKey: "clubos_cache_avatar_url")
+    }
+
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
         switch hour {
@@ -25,6 +30,18 @@ struct HomeView: View {
             .prefix(2)
             .compactMap { $0.first.map { String($0).uppercased() } }
             .joined()
+    }
+
+    private var homeInitialsCircle: some View {
+        Circle()
+            .fill(Color.club.surfaceContainerHigh)
+            .frame(width: 40, height: 40)
+            .overlay {
+                Text(initials)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Color.club.onSurfaceVariant)
+            }
+            .overlay(Circle().stroke(Color.club.outlineVariant.opacity(0.5), lineWidth: 1.5))
     }
 
     var body: some View {
@@ -57,15 +74,22 @@ struct HomeView: View {
                     NavigationLink {
                         ProfileView()
                     } label: {
-                        Circle()
-                            .fill(Color.club.surfaceContainerHigh)
-                            .frame(width: 40, height: 40)
-                            .overlay {
-                                Text(initials)
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(Color.club.onSurfaceVariant)
+                        if let url = avatarUrl, let imageUrl = URL(string: url) {
+                            CachedAsyncImage(url: imageUrl) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 40, height: 40)
+                                        .clipShape(Circle())
+                                default:
+                                    homeInitialsCircle
+                                }
                             }
-                            .overlay(Circle().stroke(Color.club.outlineVariant.opacity(0.5), lineWidth: 1.5))
+                        } else {
+                            homeInitialsCircle
+                        }
                     }
                 }
 
