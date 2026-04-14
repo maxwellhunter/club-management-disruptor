@@ -1,0 +1,117 @@
+import Foundation
+
+// MARK: - Date Utilities
+//
+// Shared date parsing / formatting helpers.
+//
+// Supabase `timestamptz` columns are serialized as ISO-8601 strings, but
+// sometimes with fractional seconds ("2025-01-02T03:04:05.123Z") and sometimes
+// without ("2025-01-02T03:04:05Z"). We try both formats.
+//
+// Previously this logic was duplicated (and slightly inconsistent) across
+// AnnouncementsView, HomeView, EventsView, ChatView, MembershipCardView, and
+// ProfileView. Consolidating here lets us cache the formatters and unit-test
+// the relative-time formatting.
+
+enum DateUtilities {
+    // Formatters are expensive to create; cache them as static properties.
+    // ISO8601DateFormatter is thread-safe for reading once configured.
+    private static let isoFractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    private static let isoBasic: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
+    /// Parse an ISO-8601 string, tolerating both with- and without-fractional-seconds.
+    /// Returns `nil` if the string is nil, empty, or unparseable.
+    static func parseISODate(_ string: String?) -> Date? {
+        guard let string, !string.isEmpty else { return nil }
+        if let d = isoFractional.date(from: string) { return d }
+        return isoBasic.date(from: string)
+    }
+
+    /// Human-friendly relative time string (e.g. "5m ago", "Yesterday", "3w ago").
+    ///
+    /// - Parameters:
+    ///   - dateStr: An ISO-8601 date string (may be nil).
+    ///   - now: The reference date to compute relative to. Exposed for testability.
+    ///   - calendar: Calendar to use for "Yesterday" detection. Defaults to `.current`.
+    /// - Returns: A short relative string, or an empty string if the input is nil/empty,
+    ///   or the raw input string if it can't be parsed.
+    static func relativeTimeString(
+        from dateStr: String?,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> String {
+        guard let dateStr, !dateStr.isEmpty else { return "" }
+        guard let date = parseISODate(dateStr) else { return dateStr }
+        return relativeTimeString(from: date, now: now, calendar: calendar)
+    }
+
+    /// Overload that takes a parsed `Date` directly.
+    static func relativeTimeString(
+        from date: Date,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> String {
+        let diff = now.timeIntervalSince(date)
+
+        // Handle future dates — clamp to "Just now" for small skew, otherwise
+        // fall through to absolute formatting.
+        if diff < 0 {
+            // Up to 60s of clock skew is "Just now"; anything further in the
+            // future gets an absolute "MMM d" (or "MMM d, yyyy" if different year).
+            if diff > -60 { return "Just now" }
+            return absoluteDateString(date, now: now, calendar: calendar)
+        }
+
+        let mins = Int(diff / 60)
+        let hours = Int(diff / 3_600)
+        let days = Int(diff / 86_400)
+        let weeks = days / 7
+
+        if mins < 1 { return "Just now" }
+        if mins < 60 { return "\(mins)m ago" }
+        if hours < 24 { return "\(hours)h ago" }
+
+        // "Yesterday" is a *calendar* concept — 25 hours ago at midnight is
+        // "Yesterday", but 23 hours ago at 1am is also "Yesterday". Use the
+        // calendar, not the raw second count.
+        if calendar.isDateInYesterday(date) { return "Yesterday" }
+
+        if days < 7 { return "\(days)d ago" }
+        if weeks < 4 { return "\(weeks)w ago" }
+
+        return absoluteDateString(date, now: now, calendar: calendar)
+    }
+
+    /// Absolute short date: "MMM d" when same year, "MMM d, yyyy" otherwise.
+    static func absoluteDateString(
+        _ date: Date,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> String {
+        let sameYear = calendar.component(.year, from: date) == calendar.component(.year, from: now)
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = sameYear ? "MMM d" : "MMM d, yyyy"
+        return formatter.string(from: date)
+    }
+
+    /// "MMM d, yyyy" full date — used by invoice / billing rows.
+    static func longDateString(_ dateStr: String?) -> String {
+        guard let date = parseISODate(dateStr) else { return "—" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "MMM d, yyyy"
+        return formatter.string(from: date)
+    }
+}

@@ -663,10 +663,7 @@ struct ProfileView: View {
     }
 
     private func formatDate(_ dateStr: String?) -> String {
-        guard let dateStr, let date = ISO8601DateFormatter().date(from: dateStr) else { return "—" }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d, yyyy"
-        return formatter.string(from: date)
+        DateUtilities.longDateString(dateStr)
     }
 
     private func statusColor(_ status: String) -> Color {

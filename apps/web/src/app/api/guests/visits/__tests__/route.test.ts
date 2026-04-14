@@ -148,13 +148,13 @@ describe("POST /api/guests/visits", () => {
       }
       if (table === "guest_policies") {
         return createChainMock({
-          data: [{ facility_type: null, blackout_days: [6], guest_fee: 50, max_guest_visits_per_month: null, max_same_guest_per_month: null }],
+          data: [{ facility_type: null, blackout_days: [0], guest_fee: 50, max_guest_visits_per_month: null, max_same_guest_per_month: null }],
         });
       }
       return createChainMock({ data: null });
     });
 
-    const req = createRequest({ guest_id: GUEST_ID, visit_date: "2025-06-15" }); // Saturday (day 6)
+    const req = createRequest({ guest_id: GUEST_ID, visit_date: "2025-06-15" }); // Sunday (day 0)
     const res = await POST(req);
     expect(res.status).toBe(400);
     const body = await res.json();

@@ -48,7 +48,7 @@ struct AnnouncementsView: View {
             HStack {
                 priorityBadge(item.priority)
                 Spacer()
-                Text(timeAgo(item.publishedAt ?? item.createdAt))
+                Text(DateUtilities.relativeTimeString(from: item.publishedAt ?? item.createdAt))
                     .font(.system(size: 12))
                     .foregroundStyle(Color.club.onSurfaceVariant)
             }
@@ -137,37 +137,6 @@ struct AnnouncementsView: View {
         }
     }
 
-    // MARK: - Time Ago
-
-    private func timeAgo(_ dateStr: String?) -> String {
-        guard let dateStr else { return "" }
-
-        let formatters: [ISO8601DateFormatter] = {
-            let full = ISO8601DateFormatter()
-            full.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            let basic = ISO8601DateFormatter()
-            return [full, basic]
-        }()
-
-        guard let date = formatters.lazy.compactMap({ $0.date(from: dateStr) }).first else {
-            return dateStr
-        }
-
-        let diff = Date().timeIntervalSince(date)
-        let mins = Int(diff / 60)
-        let hours = Int(diff / 3600)
-        let days = Int(diff / 86400)
-
-        if mins < 1 { return "Just now" }
-        if mins < 60 { return "\(mins)m ago" }
-        if hours < 24 { return "\(hours)h ago" }
-        if days == 1 { return "Yesterday" }
-        if days < 7 { return "\(days)d ago" }
-
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
-        return formatter.string(from: date)
-    }
 }
 
 // MARK: - Model
