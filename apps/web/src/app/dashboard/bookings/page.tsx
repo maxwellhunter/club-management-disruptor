@@ -9,8 +9,17 @@ import ScheduleAdmin from "./schedule-admin";
 import GolfRatesAdmin from "./golf-rates-admin";
 import PlayerRatesAdmin from "./player-rates-admin";
 import CourseSetupAdmin from "./course-setup-admin";
+import SpacesBooking from "./spaces-booking";
+import SpacesAdmin from "./spaces-admin";
 
-type BookingsTab = "bookings" | "schedule" | "pricing" | "player-rates" | "course";
+type BookingsTab =
+  | "bookings"
+  | "spaces"
+  | "schedule"
+  | "pricing"
+  | "player-rates"
+  | "course"
+  | "spaces-admin";
 
 export default function BookingsPage() {
   const [showBooking, setShowBooking] = useState(false);
@@ -85,16 +94,13 @@ export default function BookingsPage() {
         )}
       </div>
 
-      {/* Admin tabs */}
-      {isAdmin && (
+      {/* Member tabs (Golf / Spaces) */}
+      {!isAdmin && (
         <div className="flex gap-1 border-b border-[var(--border)]">
           {(
             [
-              { key: "bookings", label: "Bookings" },
-              { key: "schedule", label: "Schedule Config" },
-              { key: "pricing", label: "Golf Pricing" },
-              { key: "player-rates", label: "Player Rates" },
-              { key: "course", label: "Course Setup" },
+              { key: "bookings", label: "Golf" },
+              { key: "spaces", label: "Spaces" },
             ] as const
           ).map((t) => (
             <button
@@ -112,7 +118,38 @@ export default function BookingsPage() {
         </div>
       )}
 
-      {tab === "schedule" && isAdmin ? (
+      {/* Admin tabs */}
+      {isAdmin && (
+        <div className="flex gap-1 border-b border-[var(--border)] overflow-x-auto">
+          {(
+            [
+              { key: "bookings", label: "Bookings" },
+              { key: "spaces", label: "Spaces" },
+              { key: "schedule", label: "Schedule Config" },
+              { key: "pricing", label: "Golf Pricing" },
+              { key: "player-rates", label: "Player Rates" },
+              { key: "course", label: "Course Setup" },
+              { key: "spaces-admin", label: "Manage Spaces" },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                tab === t.key
+                  ? "border-[var(--primary)] text-[var(--primary)]"
+                  : "border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tab === "spaces" ? (
+        <SpacesBooking />
+      ) : tab === "schedule" && isAdmin ? (
         <ScheduleAdmin />
       ) : tab === "pricing" && isAdmin ? (
         <GolfRatesAdmin />
@@ -120,6 +157,8 @@ export default function BookingsPage() {
         <PlayerRatesAdmin />
       ) : tab === "course" && isAdmin ? (
         <CourseSetupAdmin />
+      ) : tab === "spaces-admin" && isAdmin ? (
+        <SpacesAdmin />
       ) : (
         <>
           {/* Non-eligible upgrade prompt */}

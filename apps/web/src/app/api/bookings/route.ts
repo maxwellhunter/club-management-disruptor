@@ -105,8 +105,8 @@ export async function POST(request: Request) {
           { status: 409 }
         );
       }
-    } else {
-      // Golf/tennis/etc: single booking per slot
+    } else if (facility.type === "golf") {
+      // Golf: single booking per slot
       const { data: existingBooking } = await supabase
         .from("bookings")
         .select("id")
@@ -120,6 +120,35 @@ export async function POST(request: Request) {
       if (existingBooking) {
         return NextResponse.json(
           { error: "This tee time is already booked" },
+          { status: 409 }
+        );
+      }
+    } else {
+      // Spaces (tennis/pool/fitness/other): respect booking_slots.max_bookings
+      const dayOfWeek = new Date(date + "T12:00:00").getDay();
+      const { data: slot } = await supabase
+        .from("booking_slots")
+        .select("max_bookings")
+        .eq("facility_id", facility_id)
+        .eq("day_of_week", dayOfWeek)
+        .eq("start_time", start_time)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      const maxBookings = slot?.max_bookings ?? 1;
+
+      const { count } = await supabase
+        .from("bookings")
+        .select("*", { count: "exact", head: true })
+        .eq("facility_id", facility_id)
+        .eq("date", date)
+        .eq("start_time", start_time)
+        .eq("club_id", result.member.club_id)
+        .in("status", ["confirmed", "pending"]);
+
+      if ((count ?? 0) >= maxBookings) {
+        return NextResponse.json(
+          { error: "This time slot is fully booked" },
           { status: 409 }
         );
       }

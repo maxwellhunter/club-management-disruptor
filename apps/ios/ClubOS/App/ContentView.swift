@@ -16,12 +16,12 @@ struct ContentView: View {
             }
             .tag(0)
 
-            // Tab 1: Golf
+            // Tab 1: Book (Golf + Spaces)
             NavigationStack {
-                GolfBookingView()
+                BookView()
             }
             .tabItem {
-                Label("Golf", systemImage: "figure.golf")
+                Label("Book", systemImage: "calendar.badge.plus")
             }
             .tag(1)
 

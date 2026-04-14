@@ -33,7 +33,7 @@ export async function PATCH(
     const body = await request.json();
 
     // Only allow updating specific fields
-    const allowedFields = ["tables", "description", "capacity", "is_active", "image_url", "max_party_size"];
+    const allowedFields = ["name", "type", "tables", "description", "capacity", "is_active", "image_url", "max_party_size"];
     const updatePayload: Record<string, unknown> = {};
     for (const key of allowedFields) {
       if (body[key] !== undefined) {
@@ -69,6 +69,79 @@ export async function PATCH(
     return NextResponse.json({ facility });
   } catch (error) {
     console.error("Facility PATCH error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const supabase = await createApiClient(request);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const result = await getMemberWithTier(supabase, user.id);
+    if (!result) {
+      return NextResponse.json(
+        { error: "Member not found" },
+        { status: 404 }
+      );
+    }
+
+    if (result.member.role !== "admin") {
+      return NextResponse.json({ error: "Admin only" }, { status: 403 });
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // Soft delete by default (deactivate). Hard delete only if ?hard=true.
+    const { searchParams } = new URL(request.url);
+    const hard = searchParams.get("hard") === "true";
+
+    if (hard) {
+      const { error } = await supabaseAdmin
+        .from("facilities")
+        .delete()
+        .eq("id", id)
+        .eq("club_id", result.member.club_id);
+
+      if (error) {
+        console.error("Facility delete error:", error);
+        return NextResponse.json(
+          { error: "Failed to delete facility (may have existing bookings)" },
+          { status: 500 }
+        );
+      }
+    } else {
+      const { error } = await supabaseAdmin
+        .from("facilities")
+        .update({ is_active: false })
+        .eq("id", id)
+        .eq("club_id", result.member.club_id);
+
+      if (error) {
+        console.error("Facility deactivate error:", error);
+        return NextResponse.json(
+          { error: "Failed to deactivate facility" },
+          { status: 500 }
+        );
+      }
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Facility DELETE error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
