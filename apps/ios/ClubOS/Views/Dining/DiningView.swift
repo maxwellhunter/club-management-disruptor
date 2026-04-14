@@ -185,6 +185,7 @@ struct DiningView: View {
     // Venues
     @State private var facilities: [DiningFacility] = []
     @State private var loadingFacilities = true
+    @State private var hasLoadedFacilitiesOnce = false
     @State private var selectedFacility: DiningFacility?
 
     // Menu / Order flow
@@ -202,6 +203,7 @@ struct DiningView: View {
     @State private var myReservations: [MyDiningReservation] = []
     @State private var myOrders: [MyDiningOrder] = []
     @State private var loadingActivity = true
+    @State private var hasLoadedActivityOnce = false
 
     // Edit Reservation
     @State private var editingReservation: MyDiningReservation?
@@ -386,16 +388,21 @@ struct DiningView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
 
-                // My Activity section
-                if !loadingActivity && (!myReservations.isEmpty || !myOrders.isEmpty) {
+                // My Activity section — skeleton on first load, real content after
+                if loadingActivity && !hasLoadedActivityOnce {
+                    activitySkeletonSection
+                        .padding(.top, 20)
+                        .transition(.opacity)
+                } else if !myReservations.isEmpty || !myOrders.isEmpty {
                     myActivitySection
                         .padding(.top, 20)
                 }
 
-                if loadingFacilities {
-                    ProgressView()
-                        .tint(Color.club.primary)
-                        .padding(.top, 40)
+                if loadingFacilities && !hasLoadedFacilitiesOnce {
+                    diningSkeleton
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
+                        .transition(.opacity)
                 } else if facilities.isEmpty {
                     VStack(spacing: 12) {
                         Image(systemName: "fork.knife")
@@ -418,8 +425,45 @@ struct DiningView: View {
 
                 Spacer(minLength: 32)
             }
+            .animation(.easeInOut(duration: 0.25), value: loadingFacilities)
+            .animation(.easeInOut(duration: 0.25), value: loadingActivity)
         }
         .ignoresSafeArea(edges: hasHeroContent ? .top : [])
+    }
+
+    // MARK: - Skeleton
+
+    private var diningSkeleton: some View {
+        VStack(spacing: 16) {
+            ForEach(0..<2, id: \.self) { _ in
+                VStack(alignment: .leading, spacing: 0) {
+                    RoundedRectangle(cornerRadius: 0)
+                        .fill(Color.club.surfaceContainerHigh)
+                        .frame(height: 120)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Placeholder venue name")
+                            .font(.custom("Georgia", size: 18).weight(.semibold))
+                        Text("Placeholder tagline describing this dining venue and its cuisine.")
+                            .font(.system(size: 13))
+                        HStack(spacing: 4) {
+                            Text("Open 00:00 AM – 00:00 PM")
+                                .font(.system(size: 11))
+                        }
+                        Text("Reserve Table")
+                            .font(.system(size: 14, weight: .semibold))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Color.club.surfaceContainerHigh, in: RoundedRectangle(cornerRadius: 10))
+                            .padding(.top, 4)
+                    }
+                    .padding(16)
+                }
+                .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 16))
+            }
+        }
+        .redacted(reason: .placeholder)
+        .allowsHitTesting(false)
     }
 
     private var flowModeToggle: some View {
@@ -1812,6 +1856,62 @@ struct DiningView: View {
         }
     }
 
+    private var activitySkeletonSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Your Activity")
+                .font(.custom("Georgia", size: 18).weight(.bold))
+                .foregroundStyle(Color.club.foreground)
+                .padding(.horizontal, 20)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(0..<2, id: \.self) { _ in
+                        activitySkeletonCard
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+            .redacted(reason: .placeholder)
+            .allowsHitTesting(false)
+        }
+    }
+
+    private var activitySkeletonCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "calendar.badge.clock")
+                    .font(.system(size: 13))
+                Text("Reservation")
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(0.5)
+                Spacer()
+                Text("Status")
+                    .font(.system(size: 10, weight: .bold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.club.surfaceContainerHigh, in: Capsule())
+            }
+            Text("Placeholder venue name")
+                .font(.system(size: 15, weight: .semibold))
+            HStack(spacing: 12) {
+                Label("Placeholder date", systemImage: "calendar")
+                Label("0:00 PM", systemImage: "clock")
+            }
+            .font(.system(size: 12))
+            HStack {
+                HStack(spacing: 4) {
+                    Image(systemName: "person.2").font(.system(size: 11))
+                    Text("Party of 0").font(.system(size: 12, weight: .medium))
+                }
+                Spacer()
+                Text("Edit").font(.system(size: 12, weight: .semibold))
+            }
+        }
+        .padding(16)
+        .frame(width: 240)
+        .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 16))
+    }
+
     private func reservationCard(_ res: MyDiningReservation) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
@@ -2288,7 +2388,10 @@ struct DiningView: View {
 
     private func fetchMyActivity() async {
         loadingActivity = true
-        defer { loadingActivity = false }
+        defer {
+            loadingActivity = false
+            hasLoadedActivityOnce = true
+        }
 
         async let reservationsTask: MyDiningReservationsResponse? = try? await APIClient.shared.get(
             "/bookings/my", query: ["type": "dining"]
@@ -2296,18 +2399,23 @@ struct DiningView: View {
         async let ordersTask: MyDiningOrdersResponse? = try? await APIClient.shared.get("/dining/orders/my")
 
         let (resResult, ordResult) = await (reservationsTask, ordersTask)
-        myReservations = resResult?.bookings ?? []
-        myOrders = ordResult?.orders ?? []
+        // Preserve cached activity on failure — only overwrite on success.
+        if let r = resResult { myReservations = r.bookings }
+        if let o = ordResult { myOrders = o.orders }
     }
 
     private func fetchFacilities() async {
         loadingFacilities = true
-        defer { loadingFacilities = false }
+        defer {
+            loadingFacilities = false
+            hasLoadedFacilitiesOnce = true
+        }
 
         do {
             let response: DiningFacilitiesResponse = try await APIClient.shared.get("/facilities", query: ["type": "dining"])
             facilities = response.facilities
         } catch {
+            // Preserve cached facilities on failure — don't wipe the list.
             print("Failed to fetch dining facilities:", error)
         }
     }

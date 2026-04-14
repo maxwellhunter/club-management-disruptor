@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Models
 
-struct Space: Decodable, Identifiable {
+struct Space: Decodable, Identifiable, Hashable {
     let id: String
     let name: String
     let type: String
@@ -80,8 +80,18 @@ private func formatSpaceTime(_ t: String) -> String {
 struct SpacesView: View {
     @State private var spaces: [Space] = []
     @State private var loadingSpaces = true
+    @State private var hasLoadedSpacesOnce = false
     @State private var loadError: String?
 
+    // Navigation path drives the idiomatic NavigationStack. Pushing a Space
+    // onto the path triggers `.navigationDestination(for: Space.self)` and
+    // shows the detail view with a system-provided back chevron.
+    //
+    // `selectedSpace` is still kept as mirrored state so existing helpers
+    // (loadSlots / submitBooking / cancelBooking) can keep reading it
+    // unchanged. The destination sets it via `.onAppear` when pushed, and we
+    // reset it when popped back to root (path.isEmpty).
+    @Binding var path: [Space]
     @State private var selectedSpace: Space?
     @State private var selectedDate: String = {
         let f = DateFormatter()
@@ -107,14 +117,33 @@ struct SpacesView: View {
     var body: some View {
         ZStack {
             Color.club.background.ignoresSafeArea()
-
-            if let space = selectedSpace {
+            spacesListView
+        }
+        // NavigationStack lives in the parent (BookView) — a nested stack
+        // inside a VStack sibling of a Picker caused top-of-scroll taps to
+        // be eaten by an invisible UINavigationBar overlay.
+        .navigationDestination(for: Space.self) { space in
+            ZStack {
+                Color.club.background.ignoresSafeArea()
                 detailView(space)
-            } else {
-                spacesListView
+            }
+            .navigationTitle(space.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                // Mirror the pushed space into @State so existing helpers
+                // (loadSlots / submitBooking / cancelBooking) keep reading
+                // `selectedSpace` unchanged.
+                selectedSpace = space
+                errorMessage = nil
+                Task { await loadSlots(for: space) }
             }
         }
         .task { await loadSpaces() }
+        .onChange(of: path) { _, newPath in
+            // When popped to root, clear the mirrored state so stale values
+            // don't bleed into the next navigation.
+            if newPath.isEmpty { selectedSpace = nil }
+        }
         .sheet(item: $bookingSlot) { slot in
             bookingSheet(slot)
         }
@@ -140,18 +169,15 @@ struct SpacesView: View {
                     banner(msg, color: .red)
                 }
 
-                if loadingSpaces {
-                    HStack { Spacer(); ProgressView(); Spacer() }
-                        .padding(.top, 60)
+                if loadingSpaces && !hasLoadedSpacesOnce {
+                    spacesSkeleton
+                        .transition(.opacity)
                 } else if spaces.isEmpty {
                     emptyState
                 } else {
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
                         ForEach(spaces) { space in
-                            Button {
-                                selectedSpace = space
-                                Task { await loadSlots(for: space) }
-                            } label: {
+                            NavigationLink(value: space) {
                                 spaceCard(space)
                             }
                             .buttonStyle(.plain)
@@ -160,7 +186,38 @@ struct SpacesView: View {
                 }
             }
             .padding(16)
+            .animation(.easeInOut(duration: 0.25), value: loadingSpaces)
         }
+    }
+
+    private var spacesSkeleton: some View {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+            ForEach(0..<4, id: \.self) { _ in
+                VStack(alignment: .leading, spacing: 0) {
+                    RoundedRectangle(cornerRadius: 0)
+                        .fill(Color.club.surfaceContainerHigh)
+                        .frame(height: 100)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Placeholder name")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Type")
+                            .font(.system(size: 11))
+                        Text("Placeholder space description.")
+                            .font(.system(size: 11))
+                            .padding(.top, 2)
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(Color.club.outline.opacity(0.3), lineWidth: 1)
+                )
+            }
+        }
+        .redacted(reason: .placeholder)
+        .allowsHitTesting(false)
     }
 
     private func spaceCard(_ space: Space) -> some View {
@@ -240,18 +297,8 @@ struct SpacesView: View {
     private func detailView(_ space: Space) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Button {
-                    selectedSpace = nil
-                    errorMessage = nil
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                        Text("All Spaces")
-                    }
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.club.onSurfaceVariant)
-                }
-
+                // NavigationStack provides the back chevron automatically —
+                // no manual "All Spaces" button needed here.
                 VStack(alignment: .leading, spacing: 0) {
                     if let url = space.imageUrl, let u = URL(string: url) {
                         AsyncImage(url: u) { phase in
@@ -483,7 +530,10 @@ struct SpacesView: View {
     private func loadSpaces() async {
         loadingSpaces = true
         loadError = nil
-        defer { loadingSpaces = false }
+        defer {
+            loadingSpaces = false
+            hasLoadedSpacesOnce = true
+        }
         do {
             let res: SpacesListResponse = try await APIClient.shared.get(
                 "/facilities",
@@ -494,6 +544,7 @@ struct SpacesView: View {
             let excluded: Set<String> = ["golf", "dining"]
             spaces = res.facilities.filter { !excluded.contains($0.type.lowercased()) }
         } catch {
+            // Preserve cached spaces on failure.
             loadError = error.localizedDescription
         }
     }

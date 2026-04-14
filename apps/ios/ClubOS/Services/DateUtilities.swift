@@ -73,20 +73,24 @@ enum DateUtilities {
 
         let mins = Int(diff / 60)
         let hours = Int(diff / 3_600)
-        let days = Int(diff / 86_400)
-        let weeks = days / 7
+
+        // "Yesterday" / "Nd ago" are *calendar* concepts, not raw-second
+        // concepts: 23h ago at 1am today is still "today"; 18h ago at 6pm
+        // yesterday is "Yesterday". Compute the day delta using the
+        // provided `calendar` (so tests with a fixed `now` stay deterministic
+        // — we can't use `isDateInYesterday` here because it compares to the
+        // real system clock, not our `now` parameter).
+        let startOfNow = calendar.startOfDay(for: now)
+        let startOfDate = calendar.startOfDay(for: date)
+        let calDays = calendar.dateComponents([.day], from: startOfDate, to: startOfNow).day ?? 0
+        let calWeeks = calDays / 7
 
         if mins < 1 { return "Just now" }
         if mins < 60 { return "\(mins)m ago" }
-        if hours < 24 { return "\(hours)h ago" }
-
-        // "Yesterday" is a *calendar* concept — 25 hours ago at midnight is
-        // "Yesterday", but 23 hours ago at 1am is also "Yesterday". Use the
-        // calendar, not the raw second count.
-        if calendar.isDateInYesterday(date) { return "Yesterday" }
-
-        if days < 7 { return "\(days)d ago" }
-        if weeks < 4 { return "\(weeks)w ago" }
+        if calDays == 0 { return "\(hours)h ago" }
+        if calDays == 1 { return "Yesterday" }
+        if calDays < 7 { return "\(calDays)d ago" }
+        if calWeeks < 4 { return "\(calWeeks)w ago" }
 
         return absoluteDateString(date, now: now, calendar: calendar)
     }

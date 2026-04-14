@@ -167,6 +167,25 @@ pnpm test -- --watch  # Watch mode
 - **iOS**: Native SwiftUI views, Supabase Swift SDK for auth and data. When building new web features, always port them to the iOS app in the same session.
 - Green theme: primary color is `#16a34a` (light) / `#22c55e` (dark) — consistent across web and iOS
 
+## SwiftUI Pitfalls (iOS 26 — learned the hard way)
+
+### 1. `NavigationStack` + `Picker` sibling = invisible hit-test dead zone
+Wrapping a child view in a second `NavigationStack` while its sibling Picker lives in a `VStack` makes UIKit install an invisible `UINavigationBar` gesture region over the top of the child's scroll content. Symptom: the top button(s) and the first row of cards become unclickable.
+
+**Fix**: `NavigationStack` must be the OUTERMOST view. The Picker lives INSIDE its root, above the child. The child accepts the path as `@Binding`. See `apps/ios/ClubOS/Views/Spaces/BookView.swift` for the canonical pattern.
+
+### 2. `image.resizable().aspectRatio(.fill).frame(height: N).clipped()` projects an invisible hit-eating zone above the card
+`.clipped()` and `.clipShape(...)` clip VISUALS, not the hit-test region. With `.aspectRatio(.fill)` the underlying image view overflows the frame; the overflow grabs taps on whatever sits above (and sometimes below) the visual card.
+
+**Symptom**: cards laid out in a `VStack(spacing:)` with image headers cause the Buttons sitting in the gap immediately above each card to become unclickable. The card's own buttons (Edit, Cancel, etc.) may also stop firing because the overflow re-enters.
+
+**Fix**: add `.contentShape(Rectangle())` immediately after the `.clipShape(...)` (or after the image's `.clipped()`) on any image-backed card header. This forces the hit shape to match the visual bounds. See `bookingCard` in `apps/ios/ClubOS/Views/Golf/GolfBookingView.swift` for the canonical fix.
+
+**General rule**: any time you render a `CachedAsyncImage` / `AsyncImage` with `.fill` content mode followed by a frame + clip, append `.contentShape(Rectangle())` (or the matching shape).
+
+### 3. `Button { } label: { HStack(...).frame(maxWidth: .infinity).background(_, in: Shape) }.buttonStyle(.plain)` — pair the shape background with `.contentShape(Shape)`
+Full-width plain Buttons whose label uses the shape-variant of `.background(_, in: Shape)` can have a hit region that doesn't match the visible pill on iOS 26. Always pair the visual shape with `.contentShape(<sameShape>)` inside the label.
+
 ## Demo Accounts (Supabase Auth)
 | Role | Email | Name | Tier |
 |------|-------|------|------|

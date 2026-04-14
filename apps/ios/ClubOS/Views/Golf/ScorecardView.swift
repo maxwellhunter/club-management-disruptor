@@ -246,30 +246,7 @@ struct ScorecardView: View {
                         )
                     }
 
-                    if userRole == "admin" {
-                        Button {
-                            if !facilities.isEmpty && setupFacilityId.isEmpty {
-                                setupFacilityId = facilities.first?.id ?? ""
-                            }
-                            screen = .courseSetup
-                            Task { await loadCourseForSetup() }
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "gearshape.fill")
-                                    .font(.system(size: 14))
-                                Text("Course Setup")
-                                    .font(.system(size: 14, weight: .semibold))
-                            }
-                            .foregroundStyle(Color.club.primary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 12))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.club.primary.opacity(0.3), lineWidth: 1)
-                            )
-                        }
-                    }
+
                 }
                 .padding(.horizontal, 20)
 

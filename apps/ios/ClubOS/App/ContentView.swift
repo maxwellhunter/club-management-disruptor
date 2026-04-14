@@ -7,9 +7,12 @@ struct ContentView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            // Tab 0: Home (profile accessible via avatar in nav bar)
+            // Tab 0: Home (profile accessible via avatar in nav bar).
+            // Binding `selectedTab` down so the Concierge Services cards on
+            // the Home screen can deep-link into the right tab (Book /
+            // Dining / Events / Chat).
             NavigationStack {
-                HomeView()
+                HomeView(selectedTab: $selectedTab)
             }
             .tabItem {
                 Label("Home", systemImage: "house.fill")
@@ -17,13 +20,15 @@ struct ContentView: View {
             .tag(0)
 
             // Tab 1: Book (Golf + Spaces)
-            NavigationStack {
-                BookView()
-            }
-            .tabItem {
-                Label("Book", systemImage: "calendar.badge.plus")
-            }
-            .tag(1)
+            // NOTE: no outer NavigationStack here — both GolfBookingView and
+            // SpacesView manage their own NavigationStack with a `path`
+            // binding. Wrapping them in a second one caused nested-stack
+            // hit-testing issues (top-of-screen buttons became unresponsive).
+            BookView()
+                .tabItem {
+                    Label("Book", systemImage: "calendar.badge.plus")
+                }
+                .tag(1)
 
             // Tab 2: Dining
             NavigationStack {

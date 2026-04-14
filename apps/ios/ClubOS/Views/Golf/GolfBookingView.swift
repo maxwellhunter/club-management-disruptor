@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Models
 
-struct GolfFacility: Decodable, Identifiable {
+struct GolfFacility: Decodable, Identifiable, Hashable {
     let id: String
     let name: String
     let type: String
@@ -12,6 +12,20 @@ struct GolfFacility: Decodable, Identifiable {
 
 struct FacilitiesResponse: Decodable {
     let facilities: [GolfFacility]
+}
+
+// MARK: - Navigation Routes
+//
+// Each case corresponds to a drill-down destination pushed onto the
+// NavigationStack. This replaces the old `enum Screen` + `@State screen` +
+// manual ZStack switch pattern with idiomatic SwiftUI navigation — the
+// system back button, title animation, and swipe-back gesture all come for
+// free. `GolfFacility` is carried directly through the route so the wizard
+// destination doesn't need to read a parallel @State variable.
+enum GolfRoute: Hashable {
+    case courses
+    case book(facility: GolfFacility)
+    case scorecard
 }
 
 struct TeeTimeSlot: Decodable, Identifiable {
@@ -210,18 +224,24 @@ private func formatDate(_ dateStr: String) -> String {
 // MARK: - Golf Booking View
 
 struct GolfBookingView: View {
-    enum Screen { case list, courses, book }
-
-    @State private var screen: Screen = .list
+    // NavigationStack lives at the parent (BookView) so that a NavigationStack
+    // isn't nested inside a VStack sibling of a Picker — that nesting causes
+    // UIKit to install an invisible UINavigationBar gesture region at the top
+    // of the child's content, making the first card/CTA unclickable. The path
+    // is hoisted so we can still do programmatic nav (pop to root after
+    // booking, push from Track Round, etc.).
+    @Binding var path: [GolfRoute]
 
     // My bookings
     @State private var bookings: [MyBooking] = []
     @State private var loadingBookings = true
+    @State private var hasLoadedBookingsOnce = false
     @State private var cancellingId: String?
 
     // Course selection
     @State private var facilities: [GolfFacility] = []
     @State private var loadingFacilities = true
+    @State private var hasLoadedFacilitiesOnce = false
     @State private var facilitiesError: String?
     @State private var selectedFacility: GolfFacility?
 
@@ -259,84 +279,94 @@ struct GolfBookingView: View {
     // Waitlist
     @State private var joiningWaitlist: String?
 
+    // Edit booking
+    @State private var editingBooking: MyBooking?
+    @State private var editDateStr: String = ""
+    @State private var editSlots: [TeeTimeSlot] = []
+    @State private var editLoadingSlots = false
+    @State private var editSelectedSlot: TeeTimeSlot?
+    @State private var editPartySize: Int = 1
+    @State private var editSaving = false
+    @State private var editError: String?
+    @State private var showEditSuccess = false
+    @State private var showCancelFromEditAlert = false
+    @State private var cancellingFromEdit = false
+
     private let bookableDates = generateBookableDates()
 
     var body: some View {
-        ZStack {
-            Color.club.background.ignoresSafeArea()
-
-            switch screen {
-            case .list:
-                myBookingsView
-            case .courses:
-                courseSelectionView
-            case .book:
-                bookingWizardView
-            }
-        }
-        .navigationTitle(navTitle)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                NavigationLink {
+        myBookingsView
+            .background(Color.club.background.ignoresSafeArea())
+            .navigationDestination(for: GolfRoute.self) { route in
+                switch route {
+                case .courses:
+                    courseSelectionView
+                        .background(Color.club.background.ignoresSafeArea())
+                        .navigationTitle("Select Course")
+                        .navigationBarTitleDisplayMode(.inline)
+                case .book(let facility):
+                    bookingWizardView(for: facility)
+                        .background(Color.club.background.ignoresSafeArea())
+                        .navigationTitle("Book Tee Time")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .onAppear { selectedFacility = facility }
+                case .scorecard:
                     ScorecardView()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "flag.fill")
-                            .font(.system(size: 12))
-                        Text("Scorecard")
-                            .font(.system(size: 12, weight: .semibold))
+                }
+            }
+            .task {
+                async let b: () = fetchBookings()
+                async let f: () = fetchFacilities()
+                _ = await (b, f)
+            }
+            .onChange(of: addedPlayers.count) { _, _ in
+                Task { await fetchPricing() }
+            }
+            .onChange(of: selectedSlot?.startTime) { _, _ in
+                Task { await fetchPricing() }
+            }
+            .alert("Tee Time Confirmed!", isPresented: $showConfirmation) {
+                Button("OK") {
+                    resetBookingFlow()
+                    path.removeAll()
+                    Task { await fetchBookings() }
+                }
+            } message: {
+                Text("Your tee time has been booked. You'll receive a confirmation email shortly.")
+            }
+            .alert("Booking Error", isPresented: .constant(bookingError != nil)) {
+                Button("OK") { bookingError = nil }
+            } message: {
+                Text(bookingError ?? "")
+            }
+            .alert("Cancel Booking", isPresented: $showCancelAlert) {
+                Button("Keep", role: .cancel) { bookingToCancel = nil }
+                Button("Cancel Booking", role: .destructive) {
+                    if let booking = bookingToCancel {
+                        Task { await cancelBooking(booking) }
                     }
-                    .foregroundStyle(Color.club.primary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.club.accent, in: Capsule())
                 }
+            } message: {
+                Text("Are you sure you want to cancel this tee time?")
             }
-        }
-        .task {
-            async let b: () = fetchBookings()
-            async let f: () = fetchFacilities()
-            _ = await (b, f)
-        }
-        .onChange(of: addedPlayers.count) { _, _ in
-            Task { await fetchPricing() }
-        }
-        .onChange(of: selectedSlot?.startTime) { _, _ in
-            Task { await fetchPricing() }
-        }
-        .alert("Tee Time Confirmed!", isPresented: $showConfirmation) {
-            Button("OK") {
-                resetBookingFlow()
-                screen = .list
-                Task { await fetchBookings() }
+            .alert("Tee Time Updated", isPresented: $showEditSuccess) {
+                Button("OK") { showEditSuccess = false }
+            } message: {
+                Text("Your reservation has been updated.")
             }
-        } message: {
-            Text("Your tee time has been booked. You'll receive a confirmation email shortly.")
-        }
-        .alert("Booking Error", isPresented: .constant(bookingError != nil)) {
-            Button("OK") { bookingError = nil }
-        } message: {
-            Text(bookingError ?? "")
-        }
-        .alert("Cancel Booking", isPresented: $showCancelAlert) {
-            Button("Keep", role: .cancel) { bookingToCancel = nil }
-            Button("Cancel Booking", role: .destructive) {
-                if let booking = bookingToCancel {
-                    Task { await cancelBooking(booking) }
+            .alert("Cancel Tee Time", isPresented: $showCancelFromEditAlert) {
+                Button("Keep", role: .cancel) { }
+                Button("Cancel Tee Time", role: .destructive) {
+                    if let booking = editingBooking {
+                        Task { await cancelBookingFromEdit(booking) }
+                    }
                 }
+            } message: {
+                Text("Are you sure you want to cancel this tee time?")
             }
-        } message: {
-            Text("Are you sure you want to cancel this tee time?")
-        }
-    }
-
-    private var navTitle: String {
-        switch screen {
-        case .list: return "Golf"
-        case .courses: return "Select Course"
-        case .book: return "Book Tee Time"
-        }
+            .sheet(item: $editingBooking) { booking in
+                editBookingSheet(booking)
+            }
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -344,108 +374,66 @@ struct GolfBookingView: View {
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     private var myBookingsView: some View {
-        ZStack(alignment: .bottomTrailing) {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    // Hero
-                    heroSection
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 20) {
+                // Primary CTA — "Book a Tee Time" (top of screen)
+                bookTeeTimeCTA
+                    .padding(.horizontal, 20)
 
-                    if loadingBookings {
-                        ProgressView()
-                            .tint(Color.club.primary)
-                            .padding(.top, 40)
-                    } else if bookings.isEmpty {
-                        emptyBookingsState
-                    } else {
-                        // Upcoming header
-                        HStack {
-                            Text("Upcoming")
-                                .font(.custom("Georgia", size: 18).weight(.semibold))
-                                .foregroundStyle(Color.club.foreground)
-                            Spacer()
-                            Text("\(bookings.count) Booking\(bookings.count == 1 ? "" : "s")")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(Color.club.onSurfaceVariant)
-                        }
+                if loadingBookings && !hasLoadedBookingsOnce {
+                    bookingsSkeleton
                         .padding(.horizontal, 20)
-
-                        // Booking cards
-                        VStack(spacing: 12) {
-                            ForEach(bookings) { booking in
-                                bookingCard(booking)
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                    }
-
-                    Spacer(minLength: 100)
-                }
-                .padding(.top, 8)
-            }
-
-            // FAB
-            Button {
-                screen = .courses
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 56, height: 56)
-                    .background(Color.club.primary, in: Circle())
-                    .shadow(color: Color.club.primary.opacity(0.3), radius: 8, y: 4)
-            }
-            .padding(.trailing, 20)
-            .padding(.bottom, 20)
-        }
-    }
-
-    private var heroSection: some View {
-        HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("YOUR SCHEDULE")
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1)
-                    .foregroundStyle(Color.club.outline)
-
-                Text("Prepare for\nthe Green.")
-                    .font(.custom("Georgia", size: 26).weight(.bold))
-                    .foregroundStyle(Color.club.foreground)
-            }
-
-            Spacer()
-
-            if let next = bookings.first {
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("Next Appearance")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Color.club.outline)
-
-                    Text("\(formatDate(next.date))")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color.club.foreground)
-
-                    Text(formatTime(next.startTime))
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.club.onSurfaceVariant)
-
-                    HStack(spacing: 4) {
-                        Image(systemName: "sun.max.fill")
-                            .font(.system(size: 10))
-                            .foregroundStyle(Color.club.tertiary)
-                        Text("Clear Skies")
-                            .font(.system(size: 10))
+                } else if bookings.isEmpty {
+                    emptyBookingsState
+                } else {
+                    // Upcoming header
+                    HStack {
+                        Text("Upcoming")
+                            .font(.custom("Georgia", size: 18).weight(.semibold))
+                            .foregroundStyle(Color.club.foreground)
+                        Spacer()
+                        Text("\(bookings.count) Booking\(bookings.count == 1 ? "" : "s")")
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(Color.club.onSurfaceVariant)
                     }
-                    .padding(.top, 2)
+                    .padding(.horizontal, 20)
+
+                    // Booking cards
+                    VStack(spacing: 12) {
+                        ForEach(bookings) { booking in
+                            bookingCard(booking)
+                        }
+                    }
+                    .padding(.horizontal, 20)
                 }
-                .padding(12)
-                .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 12))
-                .shadow(color: Color.club.foreground.opacity(0.03), radius: 8, y: 2)
+
+                Spacer(minLength: 40)
             }
+            .padding(.top, 8)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
     }
+
+    private var bookTeeTimeCTA: some View {
+        Button {
+            path.append(.courses)
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "calendar.badge.plus")
+                    .font(.system(size: 15, weight: .semibold))
+                Text("Book a Tee Time")
+                    .font(.system(size: 16, weight: .semibold))
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(Color.club.primary, in: RoundedRectangle(cornerRadius: 14))
+            // HITTEST-FIX: match the visual pill shape for the hit region so
+            // the implicit hit rect can't overflow into adjacent views.
+            .contentShape(RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+    }
+
 
     private func bookingCard(_ booking: MyBooking) -> some View {
         VStack(spacing: 0) {
@@ -504,6 +492,12 @@ struct GolfBookingView: View {
             }
             .frame(height: 100)
             .clipShape(UnevenRoundedRectangle(topLeadingRadius: 16, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 16))
+            // HITTEST-FIX: the CachedAsyncImage inside uses .resizable()
+            // + .aspectRatio(.fill) + .frame(height: 100) + .clipped(), which
+            // clips VISUALS but not the hit-test region. The underlying image
+            // view overflows the 100pt frame and projects a hit-eating zone
+            // above the card. Force the hit shape to match the visual bounds.
+            .contentShape(Rectangle())
 
             // Card body
             HStack(alignment: .bottom) {
@@ -529,24 +523,28 @@ struct GolfBookingView: View {
                     }
                     .foregroundStyle(Color.club.onSurfaceVariant)
 
-                    // Start Round — inline, only for today
-                    if isStartRoundEligible(booking) {
-                        NavigationLink {
-                            ScorecardView()
-                        } label: {
-                            HStack(spacing: 5) {
-                                Image(systemName: "flag.fill")
-                                    .font(.system(size: 11))
-                                Text("Start Round")
-                                    .font(.system(size: 12, weight: .bold))
-                            }
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(Color.club.primary, in: RoundedRectangle(cornerRadius: 10))
+                    // Scorecard entry — primary style for today's booking,
+                    // accent for any other upcoming booking.
+                    let eligible = isStartRoundEligible(booking)
+                    Button {
+                        path.append(.scorecard)
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: eligible ? "flag.fill" : "square.and.pencil")
+                                .font(.system(size: 11))
+                            Text(eligible ? "Start Round" : "Track Round")
+                                .font(.system(size: 12, weight: .bold))
                         }
-                        .padding(.top, 4)
+                        .foregroundStyle(eligible ? .white : Color.club.primary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(
+                            eligible ? Color.club.primary : Color.club.accent,
+                            in: RoundedRectangle(cornerRadius: 10)
+                        )
                     }
+                    .buttonStyle(.plain)
+                    .padding(.top, 4)
                 }
 
                 Spacer()
@@ -563,6 +561,22 @@ struct GolfBookingView: View {
 
                     if booking.isOwner != false {
                         Button {
+                            openEditBooking(booking)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "pencil")
+                                    .font(.system(size: 10, weight: .semibold))
+                                Text("Edit")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundStyle(Color.club.primary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.club.accent, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
                             bookingToCancel = booking
                             showCancelAlert = true
                         } label: {
@@ -576,6 +590,7 @@ struct GolfBookingView: View {
                                     .foregroundStyle(Color.club.outline)
                             }
                         }
+                        .buttonStyle(.plain)
                         .disabled(cancellingId == booking.id)
                     }
                 }
@@ -603,7 +618,7 @@ struct GolfBookingView: View {
                 .foregroundStyle(Color.club.onSurfaceVariant)
 
             Button {
-                screen = .courses
+                path.append(.courses)
             } label: {
                 HStack(spacing: 6) {
                     Text("Book a Tee Time")
@@ -616,6 +631,7 @@ struct GolfBookingView: View {
                 .padding(.vertical, 12)
                 .background(Color.club.primary, in: RoundedRectangle(cornerRadius: 12))
             }
+            .buttonStyle(.plain)
             .padding(.top, 4)
         }
         .padding(.top, 40)
@@ -628,21 +644,7 @@ struct GolfBookingView: View {
     private var courseSelectionView: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 24) {
-                // Back + Hero
-                HStack(spacing: 12) {
-                    Button {
-                        screen = .list
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color.club.onSurfaceVariant)
-                            .frame(width: 32, height: 32)
-                            .background(Color.club.surfaceContainerHigh, in: Circle())
-                    }
-                    Spacer()
-                }
-                .padding(.horizontal, 20)
-
+                // NavigationStack provides back automatically; no manual chevron.
                 VStack(spacing: 8) {
                     Text("SELECT YOUR COURSE")
                         .font(.system(size: 10, weight: .bold))
@@ -661,10 +663,10 @@ struct GolfBookingView: View {
                 }
                 .padding(.bottom, 8)
 
-                if loadingFacilities {
-                    ProgressView()
-                        .tint(Color.club.primary)
-                        .padding(.top, 40)
+                if loadingFacilities && !hasLoadedFacilitiesOnce {
+                    coursesSkeleton
+                        .padding(.horizontal, 20)
+                        .transition(.opacity)
                 } else if let error = facilitiesError {
                     VStack(spacing: 8) {
                         Image(systemName: "exclamationmark.triangle")
@@ -693,14 +695,12 @@ struct GolfBookingView: View {
                 Spacer(minLength: 32)
             }
             .padding(.top, 8)
+            .animation(.easeInOut(duration: 0.25), value: loadingFacilities)
         }
     }
 
     private func courseCard(_ facility: GolfFacility, isPremier: Bool) -> some View {
-        Button {
-            selectedFacility = facility
-            screen = .book
-        } label: {
+        NavigationLink(value: GolfRoute.book(facility: facility)) {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .topLeading) {
                     LinearGradient(
@@ -843,11 +843,11 @@ struct GolfBookingView: View {
     // MARK: - Booking Wizard
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    private var bookingWizardView: some View {
+    private func bookingWizardView(for facility: GolfFacility) -> some View {
         ZStack(alignment: .bottom) {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 24) {
-                    wizardHeader
+                    wizardHeader(for: facility)
                     dateStripSection
                     playerSection
                     transportSection
@@ -873,25 +873,17 @@ struct GolfBookingView: View {
         }
     }
 
-    private var wizardHeader: some View {
+    // NavigationStack provides the back chevron automatically via toolbar.
+    // The header here is purely a section label showing which course is being
+    // booked — the facility is passed in via the route, not read from @State.
+    private func wizardHeader(for facility: GolfFacility) -> some View {
         HStack(spacing: 12) {
-            Button {
-                resetBookingFlow()
-                screen = .courses
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.club.onSurfaceVariant)
-                    .frame(width: 32, height: 32)
-                    .background(Color.club.surfaceContainerHigh, in: Circle())
-            }
-
             VStack(alignment: .leading, spacing: 2) {
                 Text("BOOK TEE TIME")
                     .font(.system(size: 10, weight: .bold))
                     .tracking(1)
                     .foregroundStyle(Color.club.outline)
-                Text(selectedFacility?.name ?? "")
+                Text(facility.name)
                     .font(.custom("Georgia", size: 18).weight(.semibold))
                     .foregroundStyle(Color.club.foreground)
             }
@@ -1548,17 +1540,85 @@ struct GolfBookingView: View {
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // MARK: - Skeletons
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private var bookingsSkeleton: some View {
+        VStack(spacing: 12) {
+            ForEach(0..<2, id: \.self) { _ in
+                VStack(spacing: 0) {
+                    RoundedRectangle(cornerRadius: 0)
+                        .fill(Color.club.surfaceContainerHigh)
+                        .frame(height: 100)
+                        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 16, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 16))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Placeholder date")
+                            .font(.system(size: 16, weight: .bold))
+                        HStack(spacing: 12) {
+                            Label("0:00 AM", systemImage: "clock")
+                            Label("0 Players", systemImage: "person.fill")
+                        }
+                        .font(.system(size: 13))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(16)
+                }
+                .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 16))
+            }
+        }
+        .redacted(reason: .placeholder)
+        .allowsHitTesting(false)
+    }
+
+    private var coursesSkeleton: some View {
+        VStack(spacing: 16) {
+            ForEach(0..<2, id: \.self) { _ in
+                VStack(alignment: .leading, spacing: 0) {
+                    RoundedRectangle(cornerRadius: 0)
+                        .fill(Color.club.surfaceContainerHigh)
+                        .frame(height: 140)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Placeholder course name")
+                            .font(.custom("Georgia", size: 18).weight(.semibold))
+                        HStack(spacing: 16) {
+                            Label("18 Holes", systemImage: "flag.fill").font(.system(size: 11))
+                            Label("Par 72", systemImage: "scope").font(.system(size: 11))
+                            Label("7,100 yds", systemImage: "ruler").font(.system(size: 11))
+                        }
+                        Text("Placeholder course description that mirrors the real course card layout.")
+                            .font(.system(size: 13))
+                        Text("Book Tee Time")
+                            .font(.system(size: 14, weight: .semibold))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Color.club.surfaceContainerHigh, in: RoundedRectangle(cornerRadius: 10))
+                            .padding(.top, 4)
+                    }
+                    .padding(16)
+                }
+                .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 16))
+            }
+        }
+        .redacted(reason: .placeholder)
+        .allowsHitTesting(false)
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // MARK: - API Calls
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     private func fetchBookings() async {
         loadingBookings = true
-        defer { loadingBookings = false }
+        defer {
+            loadingBookings = false
+            hasLoadedBookingsOnce = true
+        }
 
         do {
             let response: MyBookingsResponse = try await APIClient.shared.get("/bookings/my", query: ["type": "golf"])
             bookings = response.bookings
         } catch {
+            // Preserve cached bookings on failure.
             print("Failed to fetch bookings:", error)
         }
     }
@@ -1566,7 +1626,10 @@ struct GolfBookingView: View {
     private func fetchFacilities() async {
         loadingFacilities = true
         facilitiesError = nil
-        defer { loadingFacilities = false }
+        defer {
+            loadingFacilities = false
+            hasLoadedFacilitiesOnce = true
+        }
 
         do {
             let response: FacilitiesResponse = try await APIClient.shared.get("/facilities", query: ["type": "golf"])
@@ -1649,6 +1712,311 @@ struct GolfBookingView: View {
         } catch {
             bookingError = error.localizedDescription
         }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // MARK: - Edit Booking
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    private func openEditBooking(_ booking: MyBooking) {
+        editPartySize = booking.partySize
+        editDateStr = booking.date
+        editSelectedSlot = nil
+        editSlots = []
+        editError = nil
+        editingBooking = booking
+        Task { await fetchEditSlots(facilityId: booking.facilityId, date: booking.date) }
+    }
+
+    private func fetchEditSlots(facilityId: String, date: String) async {
+        editLoadingSlots = true
+        editSelectedSlot = nil
+        defer { editLoadingSlots = false }
+
+        do {
+            let response: TeeSlotsResponse = try await APIClient.shared.get(
+                "/bookings/tee-times",
+                query: ["facility_id": facilityId, "date": date]
+            )
+            editSlots = response.slots
+        } catch {
+            editSlots = []
+        }
+    }
+
+    private func saveBookingEdit(_ booking: MyBooking) async {
+        editSaving = true
+        defer { editSaving = false }
+
+        struct ModifyRequest: Encodable {
+            var date: String?
+            var startTime: String?
+            var endTime: String?
+            var partySize: Int?
+        }
+
+        var changes = ModifyRequest()
+        var hasChanges = false
+
+        if editDateStr != booking.date {
+            changes.date = editDateStr
+            hasChanges = true
+        }
+
+        if let slot = editSelectedSlot {
+            let currentTime = String(booking.startTime.prefix(5))
+            let newTime = String(slot.startTime.prefix(5))
+            if newTime != currentTime || editDateStr != booking.date {
+                changes.startTime = newTime
+                changes.endTime = String(slot.endTime.prefix(5))
+                hasChanges = true
+            }
+        }
+
+        if editPartySize != booking.partySize {
+            changes.partySize = editPartySize
+            hasChanges = true
+        }
+
+        guard hasChanges else {
+            editingBooking = nil
+            return
+        }
+
+        do {
+            try await APIClient.shared.patch("/bookings/\(booking.id)/modify", body: changes)
+            editingBooking = nil
+            showEditSuccess = true
+            await fetchBookings()
+        } catch {
+            editError = error.localizedDescription
+        }
+    }
+
+    private func cancelBookingFromEdit(_ booking: MyBooking) async {
+        cancellingFromEdit = true
+        defer { cancellingFromEdit = false }
+
+        do {
+            try await APIClient.shared.patch("/bookings/\(booking.id)/cancel")
+            editingBooking = nil
+            bookings.removeAll { $0.id == booking.id }
+        } catch {
+            editError = error.localizedDescription
+        }
+    }
+
+    @ViewBuilder
+    private func editBookingSheet(_ booking: MyBooking) -> some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    // Header
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(booking.facilityName)
+                            .font(.custom("Georgia", size: 22).weight(.bold))
+                            .foregroundStyle(Color.club.foreground)
+                        HStack(spacing: 6) {
+                            Image(systemName: "calendar.badge.clock")
+                                .font(.system(size: 13))
+                            Text("Edit Tee Time")
+                                .font(.system(size: 14))
+                        }
+                        .foregroundStyle(Color.club.onSurfaceVariant)
+                    }
+
+                    if let error = editError {
+                        Text(error)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.club.destructive)
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.club.destructive.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                    }
+
+                    // Date strip
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("DATE")
+                            .font(.system(size: 11, weight: .bold))
+                            .tracking(1)
+                            .foregroundStyle(Color.club.outline)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(bookableDates) { d in
+                                    let isSelected = editDateStr == d.dateString
+                                    Button {
+                                        editDateStr = d.dateString
+                                        editSelectedSlot = nil
+                                        Task { await fetchEditSlots(facilityId: booking.facilityId, date: d.dateString) }
+                                    } label: {
+                                        VStack(spacing: 4) {
+                                            Text(d.dayName)
+                                                .font(.system(size: 10, weight: .semibold))
+                                                .tracking(0.5)
+                                            Text(d.dayNum)
+                                                .font(.system(size: 18, weight: .bold))
+                                            Text(d.monthName)
+                                                .font(.system(size: 10))
+                                        }
+                                        .foregroundStyle(isSelected ? .white : Color.club.foreground)
+                                        .frame(width: 56, height: 72)
+                                        .background(
+                                            isSelected ? Color.club.primary : Color.club.surfaceContainerLowest,
+                                            in: RoundedRectangle(cornerRadius: 14)
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 14)
+                                                .stroke(isSelected ? Color.clear : Color.club.outlineVariant.opacity(0.3), lineWidth: 1)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+
+                    // Time slots
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("TIME")
+                            .font(.system(size: 11, weight: .bold))
+                            .tracking(1)
+                            .foregroundStyle(Color.club.outline)
+
+                        if editLoadingSlots {
+                            ProgressView()
+                                .tint(Color.club.primary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 20)
+                        } else {
+                            let availableSlots = editSlots.filter(\.isAvailable)
+                            if availableSlots.isEmpty {
+                                Text("No available times for this date")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(Color.club.onSurfaceVariant)
+                                    .padding(.vertical, 12)
+                            } else {
+                                let columns = [GridItem(.adaptive(minimum: 90), spacing: 8)]
+                                LazyVGrid(columns: columns, spacing: 8) {
+                                    ForEach(availableSlots, id: \.startTime) { slot in
+                                        let isSelected = editSelectedSlot?.startTime == slot.startTime
+                                        Button {
+                                            editSelectedSlot = slot
+                                        } label: {
+                                            Text(formatTime(slot.startTime))
+                                                .font(.system(size: 13, weight: .semibold))
+                                                .foregroundStyle(isSelected ? .white : Color.club.foreground)
+                                                .frame(maxWidth: .infinity)
+                                                .padding(.vertical, 10)
+                                                .background(
+                                                    isSelected ? Color.club.primary : Color.club.surfaceContainerLowest,
+                                                    in: RoundedRectangle(cornerRadius: 10)
+                                                )
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 10)
+                                                        .stroke(isSelected ? Color.clear : Color.club.outlineVariant.opacity(0.3), lineWidth: 1)
+                                                )
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Party size
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("PARTY SIZE")
+                            .font(.system(size: 11, weight: .bold))
+                            .tracking(1)
+                            .foregroundStyle(Color.club.outline)
+
+                        HStack(spacing: 16) {
+                            Button {
+                                if editPartySize > 1 { editPartySize -= 1 }
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .font(.system(size: 28))
+                                    .foregroundStyle(editPartySize > 1 ? Color.club.primary : Color.club.outlineVariant)
+                            }
+                            .disabled(editPartySize <= 1)
+
+                            Text("\(editPartySize)")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(Color.club.foreground)
+                                .frame(width: 40)
+                                .multilineTextAlignment(.center)
+
+                            Button {
+                                if editPartySize < 4 { editPartySize += 1 }
+                            } label: {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 28))
+                                    .foregroundStyle(editPartySize < 4 ? Color.club.primary : Color.club.outlineVariant)
+                            }
+                            .disabled(editPartySize >= 4)
+
+                            Spacer()
+
+                            Text(editPartySize == 1 ? "Player" : "Players")
+                                .font(.system(size: 14))
+                                .foregroundStyle(Color.club.onSurfaceVariant)
+                        }
+                        .padding(16)
+                        .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 14))
+                    }
+
+                    // Save button
+                    Button {
+                        Task { await saveBookingEdit(booking) }
+                    } label: {
+                        HStack {
+                            if editSaving {
+                                ProgressView().tint(.white)
+                            }
+                            Text("Save Changes")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(Color.club.primary, in: RoundedRectangle(cornerRadius: 14))
+                    }
+                    .disabled(editSaving)
+
+                    // Cancel reservation
+                    Button {
+                        showCancelFromEditAlert = true
+                    } label: {
+                        HStack {
+                            if cancellingFromEdit {
+                                ProgressView().tint(Color.club.destructive)
+                            }
+                            Text("Cancel Tee Time")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Color.club.destructive)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(Color.club.destructive.opacity(0.25), lineWidth: 1)
+                        )
+                    }
+                    .disabled(cancellingFromEdit)
+                }
+                .padding(20)
+            }
+            .background(Color.club.background)
+            .navigationTitle("Edit Tee Time")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { editingBooking = nil }
+                }
+            }
+        }
+        .presentationDetents([.large])
     }
 
     private func joinWaitlist(_ slot: TeeTimeSlot) async {

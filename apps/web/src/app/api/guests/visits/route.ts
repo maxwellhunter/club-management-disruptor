@@ -100,9 +100,15 @@ export async function POST(request: Request) {
       (p) => !p.facility_type || p.facility_type === input.facility_type
     ) ?? (policies ?? []).find((p) => !p.facility_type);
 
+    // Parse YYYY-MM-DD as a local calendar date. Using `new Date("2025-06-15")`
+    // parses as UTC midnight, which shifts to the previous calendar day in
+    // negative-offset timezones — so the server's day-of-week would differ
+    // from the intended booking day. Build from components instead.
+    const [vY, vM, vD] = input.visit_date.split("-").map(Number);
+    const visitDay = new Date(vY, vM - 1, vD).getDay();
+
     if (applicablePolicy) {
       // Check blackout days
-      const visitDay = new Date(input.visit_date).getDay();
       if (applicablePolicy.blackout_days?.includes(visitDay)) {
         return NextResponse.json(
           { error: "Guests are not allowed on this day" },
@@ -170,8 +176,7 @@ export async function POST(request: Request) {
 
       if (fee) {
         guestFee = Number(fee.guest_fee);
-        // Weekend surcharge
-        const visitDay = new Date(input.visit_date).getDay();
+        // Weekend surcharge — reuse `visitDay` from above (TZ-safe).
         if (visitDay === 0 || visitDay === 6) {
           guestFee += Number(fee.weekend_surcharge);
         }

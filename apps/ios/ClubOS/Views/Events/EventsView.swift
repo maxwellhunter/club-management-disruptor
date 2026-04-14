@@ -51,6 +51,7 @@ private func eventIcon(for title: String) -> (icon: String, colors: [Color]) {
 struct EventsView: View {
     @State private var events: [ClubEvent] = []
     @State private var loading = true
+    @State private var hasLoadedOnce = false
     @State private var selectedEvent: ClubEvent?
 
     // Hero image — nil = still loading, "" = no image, URL string = has image
@@ -147,10 +148,10 @@ struct EventsView: View {
                     .frame(height: 300)
                 }
 
-                if loading {
-                    ProgressView()
-                        .tint(Color.club.primary)
-                        .padding(.top, 40)
+                if loading && !hasLoadedOnce {
+                    eventsSkeleton
+                        .padding(.horizontal, 20)
+                        .transition(.opacity)
                 } else if events.isEmpty {
                     VStack(spacing: 12) {
                         Image(systemName: "calendar")
@@ -181,8 +182,64 @@ struct EventsView: View {
 
                 Spacer(minLength: 32)
             }
+            .animation(.easeInOut(duration: 0.25), value: loading)
         }
         .ignoresSafeArea(edges: hasHeroContent ? .top : [])
+    }
+
+    // MARK: - Skeleton
+
+    private var eventsSkeleton: some View {
+        VStack(spacing: 14) {
+            // Featured skeleton: hero image block + content
+            VStack(alignment: .leading, spacing: 0) {
+                RoundedRectangle(cornerRadius: 0)
+                    .fill(Color.club.surfaceContainerHigh)
+                    .frame(height: 160)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Text("FREE")
+                            .font(.system(size: 10, weight: .bold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.club.surfaceContainerHigh, in: Capsule())
+                    }
+                    Text("Placeholder event title goes here")
+                        .font(.custom("Georgia", size: 20).weight(.bold))
+                    Text("Placeholder description that mirrors the real event card layout.")
+                        .font(.system(size: 13))
+                    HStack(spacing: 16) {
+                        Text("0:00 AM – 0:00 PM").font(.system(size: 12))
+                        Text("Placeholder location").font(.system(size: 12))
+                    }
+                }
+                .padding(16)
+            }
+            .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 16))
+
+            // Regular card skeletons
+            ForEach(0..<2, id: \.self) { _ in
+                HStack(spacing: 14) {
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Color.club.surfaceContainerHigh)
+                        .frame(width: 56, height: 56)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Placeholder event title row")
+                            .font(.system(size: 15, weight: .semibold))
+                        Text("Placeholder date · 0:00 PM")
+                            .font(.system(size: 12))
+                        Text("Placeholder location")
+                            .font(.system(size: 11))
+                    }
+                    Spacer()
+                }
+                .padding(14)
+                .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 14))
+            }
+        }
+        .redacted(reason: .placeholder)
+        .allowsHitTesting(false)
     }
 
     private func featuredEventCard(_ event: ClubEvent) -> some View {
@@ -755,12 +812,16 @@ struct EventsView: View {
 
     private func fetchEvents() async {
         loading = true
-        defer { loading = false }
+        defer {
+            loading = false
+            hasLoadedOnce = true
+        }
 
         do {
             let response: EventsListResponse = try await APIClient.shared.get("/events")
             events = response.events
         } catch {
+            // Preserve cached events on failure — don't wipe the list.
             print("Failed to fetch events:", error)
         }
     }
