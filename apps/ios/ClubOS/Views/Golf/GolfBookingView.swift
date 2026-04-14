@@ -376,6 +376,10 @@ struct GolfBookingView: View {
     private var myBookingsView: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 20) {
+                // Shared hero banner — same URL/cache as Spaces, mirrors
+                // Dining/Events pattern.
+                BookingsHero()
+
                 // Primary CTA — "Book a Tee Time" (top of screen)
                 bookTeeTimeCTA
                     .padding(.horizontal, 20)

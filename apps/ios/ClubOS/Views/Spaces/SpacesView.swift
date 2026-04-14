@@ -162,6 +162,12 @@ struct SpacesView: View {
     private var spacesListView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                // Shared hero banner — same URL/cache as Golf, mirrors
+                // Dining/Events pattern.
+                BookingsHero()
+                    .padding(.horizontal, -16)
+                    .padding(.top, -16)
+
                 if let msg = successMessage {
                     banner(msg, color: .green)
                 }

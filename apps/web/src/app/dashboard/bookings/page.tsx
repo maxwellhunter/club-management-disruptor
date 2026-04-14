@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { CircleAlert } from "lucide-react";
+import { CalendarCheck, CircleAlert } from "lucide-react";
 import type { MemberRole } from "@club/shared";
+import { ImageUpload } from "@/components/image-upload";
 import TeeTimeBooking from "./tee-time-booking";
 import MyBookings from "./my-bookings";
 import ScheduleAdmin from "./schedule-admin";
@@ -27,6 +28,9 @@ export default function BookingsPage() {
   const [isEligible, setIsEligible] = useState<boolean | null>(null);
   const [role, setRole] = useState<MemberRole>("member");
   const [tab, setTab] = useState<BookingsTab>("bookings");
+  const [bookingsHeroUrl, setBookingsHeroUrl] = useState("");
+  const [heroLoaded, setHeroLoaded] = useState(false);
+  const [heroExpanded, setHeroExpanded] = useState(false);
 
   const fetchRole = useCallback(async () => {
     try {
@@ -44,6 +48,36 @@ export default function BookingsPage() {
     checkEligibility();
     fetchRole();
   }, [fetchRole]);
+
+  useEffect(() => {
+    async function fetchHero() {
+      try {
+        const res = await fetch("/api/club/bookings-image");
+        if (res.ok) {
+          const data = await res.json();
+          setBookingsHeroUrl(data.bookings_image_url ?? "");
+        }
+      } catch {
+        // ignore
+      } finally {
+        setHeroLoaded(true);
+      }
+    }
+    fetchHero();
+  }, []);
+
+  async function handleHeroChange(url: string) {
+    setBookingsHeroUrl(url);
+    try {
+      await fetch("/api/club/bookings-image", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookings_image_url: url || null }),
+      });
+    } catch {
+      // ignore
+    }
+  }
 
   async function checkEligibility() {
     try {
@@ -93,6 +127,54 @@ export default function BookingsPage() {
           </button>
         )}
       </div>
+
+      {/* Bookings Hero Image — admin only, collapsible */}
+      {isAdmin && heroLoaded && (
+        <div className="rounded-2xl bg-[var(--surface-lowest)] shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-[var(--outline-variant)]/30 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setHeroExpanded(!heroExpanded)}
+            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--muted)]/50 transition-colors"
+          >
+            {bookingsHeroUrl ? (
+              <img src={bookingsHeroUrl} alt="" className="h-8 w-14 rounded object-cover" />
+            ) : (
+              <div className="h-8 w-14 rounded bg-[var(--muted)] flex items-center justify-center">
+                <CalendarCheck className="h-3.5 w-3.5 text-[var(--muted-foreground)]" />
+              </div>
+            )}
+            <span className="text-xs font-semibold text-[var(--foreground)]">
+              Bookings Hero Image
+            </span>
+            <span className="text-xs text-[var(--muted-foreground)]">
+              {bookingsHeroUrl ? "Uploaded" : "Not set"} · shown in iOS app
+            </span>
+            <svg
+              className={`ml-auto h-4 w-4 text-[var(--muted-foreground)] transition-transform ${heroExpanded ? "rotate-180" : ""}`}
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+          {heroExpanded && (
+            <div className="px-4 pb-4">
+              <ImageUpload
+                value={bookingsHeroUrl}
+                onChange={handleHeroChange}
+                bucket="facility-images"
+                label=""
+                aspect="video"
+                placeholder="Upload a hero image for the bookings screen"
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Member tabs (Golf / Spaces) */}
       {!isAdmin && (
