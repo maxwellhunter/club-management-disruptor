@@ -643,7 +643,11 @@ function MenuTab() {
         body: JSON.stringify({
           name: editCatName.trim(),
           description: editCatDescription.trim() || undefined,
-          image_url: editCatImageUrl.trim() || undefined,
+          // Send `null` (not `undefined`) when the image is cleared so
+          // the PUT body explicitly nulls the column. `undefined` is
+          // dropped by JSON.stringify and the server leaves the old
+          // URL in place.
+          image_url: editCatImageUrl.trim() || null,
         }),
       });
       if (res.ok) {
@@ -726,7 +730,9 @@ function MenuTab() {
           name: editItemName.trim(),
           description: editItemDescription.trim() || undefined,
           price: parseFloat(editItemPrice),
-          image_url: editItemImageUrl.trim() || undefined,
+          // `null` (not `undefined`) so clearing the image actually
+          // nulls the column — see handleUpdateCategory for context.
+          image_url: editItemImageUrl.trim() || null,
           dietary_tags: editItemDietaryTags,
         }),
       });

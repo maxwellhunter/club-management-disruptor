@@ -186,7 +186,9 @@ export const createMenuItemSchema = z.object({
   name: z.string().min(1, "Item name is required").max(200),
   description: z.string().optional(),
   price: z.number().min(0, "Price must be non-negative"),
-  image_url: z.string().url().optional().or(z.literal("")),
+  // Nullable so the client can clear an existing image by sending
+  // `null`. Legacy empty-string and omitted are still accepted.
+  image_url: z.string().url().optional().nullable().or(z.literal("")),
   dietary_tags: z.array(dietaryTagEnum).default([]),
   is_available: z.boolean().default(true),
   sort_order: z.number().int().min(0).default(0),
@@ -197,7 +199,7 @@ export const updateMenuItemSchema = createMenuItemSchema.partial();
 export const updateMenuCategorySchema = z.object({
   name: z.string().min(1, "Category name is required").max(100).optional(),
   description: z.string().optional(),
-  image_url: z.string().url().optional().or(z.literal("")),
+  image_url: z.string().url().optional().nullable().or(z.literal("")),
   sort_order: z.number().int().min(0).optional(),
   is_active: z.boolean().optional(),
 });
