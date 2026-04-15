@@ -750,6 +750,52 @@ function MenuTab() {
     }
   }
 
+  // Auto-persist image changes in the edit row. The user shouldn't
+  // have to click Save just to attach or remove a photo — uploads
+  // already involve a network round-trip, and "upload then forget to
+  // save" silently loses the image. Fires the PUT immediately,
+  // optimistically updates the menu cache, and rolls back on failure.
+  async function handleEditItemImageChange(url: string) {
+    setEditItemImageUrl(url);
+    if (!editingItemId) return;
+
+    const itemId = editingItemId;
+    const newUrl = url || null;
+    // Snapshot for rollback.
+    let previousUrl: string | null | undefined = undefined;
+    setCategories((prev) =>
+      prev.map((cat) => ({
+        ...cat,
+        items: cat.items.map((item) => {
+          if (item.id !== itemId) return item;
+          previousUrl = item.image_url ?? null;
+          return { ...item, image_url: newUrl };
+        }),
+      }))
+    );
+
+    try {
+      const res = await fetch(`/api/dining/admin/items/${itemId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_url: newUrl }),
+      });
+      if (!res.ok) throw new Error("Failed to save image");
+    } catch {
+      // Rollback both the inline edit state and the list cache.
+      setEditItemImageUrl(previousUrl ?? "");
+      setCategories((prev) =>
+        prev.map((cat) => ({
+          ...cat,
+          items: cat.items.map((item) =>
+            item.id === itemId ? { ...item, image_url: previousUrl ?? null } : item
+          ),
+        }))
+      );
+      setError("Failed to save image");
+    }
+  }
+
   async function toggleItemAvailability(itemId: string, available: boolean) {
     // Optimistic update
     setCategories((prev) =>
@@ -1206,7 +1252,7 @@ function MenuTab() {
                           </div>
                           <ImageUpload
                             value={editItemImageUrl}
-                            onChange={setEditItemImageUrl}
+                            onChange={handleEditItemImageChange}
                             bucket="dining-images"
                             label="Food Photo"
                             aspect="square"
