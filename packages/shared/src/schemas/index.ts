@@ -93,7 +93,7 @@ export const updateEventSchema = createEventSchema.partial().extend({
 
 export const rsvpSchema = z.object({
   event_id: z.string().uuid(),
-  status: z.enum(["attending", "declined", "maybe"]),
+  status: z.enum(["attending", "declined"]),
   guest_count: z.number().int().min(0).max(10).default(0),
 });
 

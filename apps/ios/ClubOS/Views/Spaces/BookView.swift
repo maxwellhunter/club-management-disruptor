@@ -16,18 +16,24 @@ struct BookingsHero: View {
     @State private var heroUrl: String?
     @State private var heroLoaded = false
 
+    private static let heroHeight: CGFloat = 300
+
     var body: some View {
         Group {
             if !heroLoaded {
                 // API hasn't returned yet — show shimmer
                 ShimmerView()
-                    .frame(height: 300)
+                    .frame(height: Self.heroHeight)
             } else if let heroUrl, !heroUrl.isEmpty, let url = URL(string: heroUrl) {
+                // Parallax stretch — when pulled down (overscrolled past the
+                // natural top), the image grows with the pull instead of
+                // revealing a white gap under the status bar. Identical
+                // behavior to the Dining hero.
                 GeometryReader { geo in
                     let minY = geo.frame(in: .global).minY
-                    let heroHeight: CGFloat = 300
+                    let baseHeight = Self.heroHeight
                     let offset = minY > 0 ? -minY : 0
-                    let height = minY > 0 ? heroHeight + minY : heroHeight
+                    let height = minY > 0 ? baseHeight + minY : baseHeight
 
                     ZStack(alignment: .bottom) {
                         CachedAsyncImage(url: url) { phase in
@@ -62,7 +68,7 @@ struct BookingsHero: View {
                     .frame(width: geo.size.width, height: height)
                     .offset(y: offset)
                 }
-                .frame(height: 300)
+                .frame(height: Self.heroHeight)
             }
         }
         .task { await fetchHero() }
@@ -78,6 +84,7 @@ struct BookingsHero: View {
         do {
             let response: BookingsHeroResponse = try await APIClient.shared.get("/club/bookings-image")
             let url = response.bookingsImageUrl ?? ""
+            print("[BookingsHero] API returned url=\(url.isEmpty ? "<empty>" : url)")
             heroUrl = url
             heroLoaded = true
             await AppCacheService.shared.setString(url, forKey: "bookings_hero_url")
@@ -87,7 +94,7 @@ struct BookingsHero: View {
             if !heroLoaded {
                 heroLoaded = true
             }
-            print("Failed to fetch bookings hero:", error)
+            print("[BookingsHero] Failed to fetch bookings hero:", error)
         }
     }
 }
@@ -115,45 +122,123 @@ struct BookView: View {
     @State private var mode: Mode = .golf
     @State private var golfPath: [GolfRoute] = []
     @State private var spacesPath: [Space] = []
+    // Lives here (not on ModePicker) because switching modes tears down the
+    // NavigationStack and rebuilds the Picker from scratch. The shared
+    // namespace lets matchedGeometryEffect animate the indicator across
+    // the old/new instance boundary.
+    @Namespace private var toggleAnimation
 
     var body: some View {
-        // One NavigationStack per mode. Switching modes tears down and
-        // rebuilds the stack (acceptable — each mode's drill-down state is
-        // independent).
-        switch mode {
-        case .golf:
+        // Both NavigationStacks stay MOUNTED in a ZStack; we fade between
+        // them via opacity. Previously we used `switch mode` which tore
+        // down the entire NavigationStack on every toggle — that also
+        // destroyed the old ModePicker before the new one appeared, so
+        // matchedGeometryEffect had no source to animate from.
+        //
+        // Keeping both trees in the hierarchy means the indicator's
+        // `matchedGeometryEffect` source exists in the outgoing picker
+        // while the destination exists in the incoming one, allowing
+        // the spring animation to bridge them.
+        //
+        // Each child's data fetches happen once on first appear (cached
+        // thereafter), so the extra mount is inexpensive.
+        ZStack {
             NavigationStack(path: $golfPath) {
-                VStack(spacing: 0) {
-                    modePicker
-                    GolfBookingView(path: $golfPath)
-                }
-                .background(Color.club.background)
-                .navigationTitle("Book")
-                .navigationBarTitleDisplayMode(.inline)
+                GolfBookingView(path: $golfPath, modePicker: { ModePicker(mode: $mode, namespace: toggleAnimation) })
+                    .background(Color.club.background)
+                    .navigationTitle("")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbarBackground(.hidden, for: .navigationBar)
             }
-        case .spaces:
+            .opacity(mode == .golf ? 1 : 0)
+            .allowsHitTesting(mode == .golf)
+
             NavigationStack(path: $spacesPath) {
-                VStack(spacing: 0) {
-                    modePicker
-                    SpacesView(path: $spacesPath)
-                }
-                .background(Color.club.background)
-                .navigationTitle("Book")
-                .navigationBarTitleDisplayMode(.inline)
+                SpacesView(path: $spacesPath, modePicker: { ModePicker(mode: $mode, namespace: toggleAnimation) })
+                    .background(Color.club.background)
+                    .navigationTitle("")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbarBackground(.hidden, for: .navigationBar)
             }
+            .opacity(mode == .spaces ? 1 : 0)
+            .allowsHitTesting(mode == .spaces)
+        }
+    }
+}
+
+// Shared mode toggle rendered by both child views, just below the hero.
+// Matches Dining's `flowModeToggle` — a glass-pill with an animated
+// selection indicator (matchedGeometryEffect) and SF Symbol icons.
+struct ModePicker: View {
+    @Binding var mode: BookView.Mode
+    // Owned by BookView so the animation survives NavigationStack rebuilds
+    // when the mode changes.
+    let namespace: Namespace.ID
+
+    private func icon(for mode: BookView.Mode) -> String {
+        switch mode {
+        case .golf: return "figure.golf"
+        case .spaces: return "mappin.and.ellipse"
         }
     }
 
-    private var modePicker: some View {
-        Picker("", selection: $mode) {
-            ForEach(Mode.allCases) { m in
-                Text(m.rawValue).tag(m)
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(BookView.Mode.allCases) { m in
+                let isSelected = mode == m
+                Button {
+                    // Intentionally NOT wrapped in withAnimation. A global
+                    // withAnimation here propagates to every view that
+                    // depends on `mode` — including the NavigationStack
+                    // opacity flip in BookView — which made the hero
+                    // image fade (flash) on every tab switch. The spring
+                    // is scoped to just the picker below via
+                    // `.animation(_, value: mode)`.
+                    mode = m
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: icon(for: m))
+                            .font(.system(size: 13))
+                        Text(m.rawValue)
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .foregroundStyle(isSelected ? .white : Color.club.onSurfaceVariant)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.club.primary)
+                                .matchedGeometryEffect(id: "bookModeToggle", in: namespace)
+                        }
+                    }
+                    .contentShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
             }
         }
-        .pickerStyle(.segmented)
+        .padding(4)
+        .modifier(BookModeGlassToggleModifier())
+        // Scope the spring to the picker's subtree only. The indicator's
+        // matchedGeometryEffect picks up this animation when `mode`
+        // changes, but views OUTSIDE this modifier (e.g. NavigationStack
+        // opacities in BookView) are unaffected.
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: mode)
         .padding(.horizontal, 16)
-        .padding(.top, 8)
+        .padding(.top, 4)
         .padding(.bottom, 4)
-        .background(Color.club.background)
+    }
+}
+
+// Plain light-gray pill background. We originally used Liquid Glass here
+// (to match Dining), but the Book tab sits above the tab bar which has
+// a darker image peeking through — the glass material kept re-sampling
+// that content and flashing darker on every toggle animation. Using a
+// static surface color keeps the toggle visually stable.
+private struct BookModeGlassToggleModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background(Color.white, in: RoundedRectangle(cornerRadius: 14))
+            .contentShape(RoundedRectangle(cornerRadius: 14))
     }
 }

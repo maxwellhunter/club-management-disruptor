@@ -504,8 +504,6 @@ struct EventsView: View {
 
                             if currentStatus == "attending" {
                                 tagBadge("YOU'RE GOING", color: Color.club.primary)
-                            } else if currentStatus == "maybe" {
-                                tagBadge("MAYBE", color: Color(hex: "8b6914"))
                             }
                         }
 
@@ -647,7 +645,6 @@ struct EventsView: View {
 
         let options: [(label: String, icon: String, selectedIcon: String, status: String, disabled: Bool)] = [
             ("Going", "checkmark.circle", "checkmark.circle.fill", "attending", isFull && displayStatus != "attending"),
-            ("Maybe", "questionmark.circle", "questionmark.circle.fill", "maybe", false),
             ("Can't Go", "xmark.circle", "xmark.circle.fill", "declined", false),
         ]
 

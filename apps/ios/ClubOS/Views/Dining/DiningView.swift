@@ -165,12 +165,17 @@ private struct GlassToggleModifier: ViewModifier {
 // MARK: - Dining View
 
 struct DiningView: View {
-    enum Screen { case venues, menu, cart }
+    // Navigation destinations pushed onto our NavigationStack's path.
+    // Before this refactor we used a manual `switch screen` inside a
+    // ZStack which snapped instantly with no animation, no system back
+    // button, and no swipe-to-go-back. Routing through NavigationStack
+    // gives native iOS push/pop animations + gestures for free.
+    enum DiningRoute: Hashable { case menu, cart }
     enum ReserveStep: Int, CaseIterable { case date = 0, time = 1, confirm = 2 }
     enum FlowMode: String { case reserve = "Reserve", order = "Order" }
 
     @Namespace private var toggleAnimation
-    @State private var screen: Screen = .venues
+    @State private var path: [DiningRoute] = []
     @State private var flowMode: FlowMode = .reserve
 
     // Hero image — nil = still loading, "" = no image, URL string = has image
@@ -243,21 +248,31 @@ struct DiningView: View {
     ]
 
     var body: some View {
-        ZStack {
-            Color.club.background.ignoresSafeArea()
-
-            switch screen {
-            case .venues:
+        NavigationStack(path: $path) {
+            ZStack {
+                Color.club.background.ignoresSafeArea()
                 venueSelectionView
-            case .menu:
-                menuBrowsingView
-            case .cart:
-                cartView
+            }
+            .navigationTitle(hasHeroContent ? "" : "Dining")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(hasHeroContent ? .hidden : .visible, for: .navigationBar)
+            .navigationDestination(for: DiningRoute.self) { route in
+                // Each destination applies its own nav-bar config so the
+                // hero-transparent treatment doesn't leak into child views.
+                ZStack {
+                    Color.club.background.ignoresSafeArea()
+                    switch route {
+                    case .menu:
+                        menuBrowsingView
+                    case .cart:
+                        cartView
+                    }
+                }
+                .navigationTitle(route == .menu ? (selectedFacility?.name ?? "Menu") : "Your Order")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarBackground(.visible, for: .navigationBar)
             }
         }
-        .navigationTitle(screen == .venues && hasHeroContent ? "" : navTitle)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(screen == .venues && hasHeroContent ? .hidden : .visible, for: .navigationBar)
         .task {
             await fetchFacilities()
             async let heroTask: Void = fetchDiningHero()
@@ -267,7 +282,7 @@ struct DiningView: View {
         .alert("Order Placed!", isPresented: $showOrderSuccess) {
             Button("OK") {
                 resetFlow()
-                screen = .venues
+                path.removeAll()
             }
         } message: {
             Text("Your order has been submitted and charged to your member account.")
@@ -315,14 +330,6 @@ struct DiningView: View {
             Button("OK") { editError = nil }
         } message: {
             Text(editError ?? "")
-        }
-    }
-
-    private var navTitle: String {
-        switch screen {
-        case .venues: return "Dining"
-        case .menu: return selectedFacility?.name ?? "Menu"
-        case .cart: return "Your Order"
         }
     }
 
@@ -519,7 +526,7 @@ struct DiningView: View {
             selectedFacility = facility
             if flowMode == .order {
                 Task { await fetchMenu(facilityId: facility.id) }
-                screen = .menu
+                path.append(.menu)
             } else {
                 generateDates()
                 reserveStep = .date
@@ -1238,34 +1245,20 @@ struct DiningView: View {
     private var menuBrowsingView: some View {
         ZStack(alignment: .bottom) {
             VStack(spacing: 0) {
-                // Header
+                // In-content subtitle row (the nav bar shows the facility
+                // name + system back button; this line keeps the tagline
+                // context and a compact cart counter visible while scrolling
+                // the menu).
                 HStack(spacing: 12) {
-                    Button {
-                        screen = .venues
-                        categories = []
-                        cart = []
-                        selectedCategoryId = nil
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color.club.onSurfaceVariant)
-                            .frame(width: 32, height: 32)
-                            .background(Color.club.surfaceContainerHigh, in: Circle())
-                    }
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(selectedFacility?.name ?? "")
-                            .font(.custom("Georgia", size: 18).weight(.semibold))
-                            .foregroundStyle(Color.club.foreground)
-                        Text(venueInfo(for: selectedFacility?.name ?? "").tagline)
-                            .font(.system(size: 12))
-                            .foregroundStyle(Color.club.onSurfaceVariant)
-                    }
+                    Text(venueInfo(for: selectedFacility?.name ?? "").tagline)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.club.onSurfaceVariant)
+                        .lineLimit(1)
 
                     Spacer()
 
                     if cartCount > 0 {
-                        Button { screen = .cart } label: {
+                        Button { path.append(.cart) } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "basket.fill")
                                     .font(.system(size: 13))
@@ -1280,7 +1273,8 @@ struct DiningView: View {
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.vertical, 12)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
 
                 if loadingMenu {
                     Spacer()
@@ -1350,7 +1344,7 @@ struct DiningView: View {
 
             // Floating cart bar
             if cartCount > 0 {
-                Button { screen = .cart } label: {
+                Button { path.append(.cart) } label: {
                     HStack {
                         HStack(spacing: 6) {
                             Image(systemName: "basket.fill")
@@ -1513,11 +1507,16 @@ struct DiningView: View {
         ZStack(alignment: .bottom) {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 20) {
-                    screenHeader(
-                        title: "Your Order",
-                        subtitle: selectedFacility?.name ?? "",
-                        backAction: { screen = .menu }
-                    )
+                    // Facility context line under the nav title. The
+                    // native back button (upper-left) returns to menu.
+                    if let facilityName = selectedFacility?.name, !facilityName.isEmpty {
+                        Text(facilityName)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.club.onSurfaceVariant)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 8)
+                    }
 
                     // Cart items
                     VStack(spacing: 10) {

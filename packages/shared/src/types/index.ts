@@ -167,7 +167,7 @@ export interface BookingWithDetails extends Booking {
 
 // Event types
 export type EventStatus = "draft" | "published" | "cancelled" | "completed";
-export type RsvpStatus = "attending" | "declined" | "maybe" | "waitlisted";
+export type RsvpStatus = "attending" | "declined" | "waitlisted";
 
 export interface ClubEvent {
   id: string;

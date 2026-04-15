@@ -58,10 +58,11 @@ struct HomeView: View {
     // Skeletons should only appear on the very first load.
     @State private var hasLoadedOnce = false
 
-    // Avatar — read cached URL so it's instant (no flash)
-    private var avatarUrl: String? {
-        UserDefaults.standard.string(forKey: "clubos_cache_avatar_url")
-    }
+    // Avatar — seed synchronously from the UserDefaults cache so there's
+    // no flash on launch. Also refreshed from `/members` on every load
+    // (see `fetchAvatar`) so first-time users who haven't opened Profile
+    // yet still see their avatar here.
+    @State private var avatarUrl: String? = UserDefaults.standard.string(forKey: "clubos_cache_avatar_url")
 
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
@@ -307,8 +308,12 @@ struct HomeView: View {
         async let announcementsTask: AnnouncementsResponse? = try? await APIClient.shared.get("/announcements")
         async let eventsTask: EventsResponse? = try? await APIClient.shared.get("/events")
         async let bookingsTask: HomeBookingsResponse? = try? await APIClient.shared.get("/bookings/my")
+        // Fetched in parallel alongside the feed data. Non-critical —
+        // failures just leave the existing avatar (cached or initials)
+        // in place.
+        async let avatarTask: Void = fetchAvatar()
 
-        let (announcementsResult, eventsResult, bookingsResult) = await (announcementsTask, eventsTask, bookingsTask)
+        let (announcementsResult, eventsResult, bookingsResult, _) = await (announcementsTask, eventsTask, bookingsTask, avatarTask)
 
         // Only overwrite state on success — `try?` returns nil when a
         // request fails (expired token, network blip, etc.), and falling
@@ -372,6 +377,40 @@ struct HomeView: View {
         }
 
         upcomingItems = items.sorted { $0.date < $1.date }
+    }
+
+    // MARK: - Avatar fetch
+    //
+    // Mirrors ProfileView.fetchAvatar — queries `/members`, finds the
+    // current user by email, caches the URL to UserDefaults. Runs on
+    // every `loadData` (first launch + pull-to-refresh) so the Home
+    // screen avatar stays in sync whether or not the user has visited
+    // Profile in this session.
+    private func fetchAvatar() async {
+        struct MemberItem: Decodable {
+            let id: String
+            let email: String?
+            let avatarUrl: String?
+        }
+        struct MembersResponse: Decodable {
+            let members: [MemberItem]
+        }
+
+        do {
+            let response: MembersResponse = try await APIClient.shared.get("/members")
+            guard let userEmail = auth.user?.email,
+                  let me = response.members.first(where: { $0.email == userEmail }),
+                  let url = me.avatarUrl
+            else { return }
+
+            await MainActor.run {
+                avatarUrl = url
+                UserDefaults.standard.set(url, forKey: "clubos_cache_avatar_url")
+            }
+        } catch {
+            // Non-critical — keep whatever avatar (cached or initials) we
+            // were showing before.
+        }
     }
 
     // MARK: - Upcoming Row

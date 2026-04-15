@@ -296,7 +296,7 @@ describe("rsvpSchema", () => {
   });
 
   it("accepts all valid status values", () => {
-    for (const status of ["attending", "declined", "maybe"]) {
+    for (const status of ["attending", "declined"]) {
       const result = rsvpSchema.safeParse({ ...validRsvp, status });
       expect(result.success).toBe(true);
     }

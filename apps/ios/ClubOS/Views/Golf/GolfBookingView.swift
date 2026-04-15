@@ -8,6 +8,7 @@ struct GolfFacility: Decodable, Identifiable, Hashable {
     let type: String
     let description: String?
     let capacity: Int?
+    let imageUrl: String?
 }
 
 struct FacilitiesResponse: Decodable {
@@ -221,9 +222,38 @@ private func formatDate(_ dateStr: String) -> String {
     return formatter.string(from: date)
 }
 
+// MARK: - Request payloads
+// Lifted to file scope because nested types aren't allowed inside generic
+// functions, and GolfBookingView is now generic over its picker content.
+
+struct GolfBookRequest: Encodable {
+    let facilityId: String
+    let date: String
+    let startTime: String
+    let endTime: String
+    let partySize: Int
+    let players: [BookingPlayerPayload]?
+    // No CodingKeys needed — APIClient uses .convertToSnakeCase for encoding
+}
+
+struct GolfModifyRequest: Encodable {
+    var date: String?
+    var startTime: String?
+    var endTime: String?
+    var partySize: Int?
+}
+
+struct GolfWaitlistRequest: Encodable {
+    let facilityId: String
+    let date: String
+    let startTime: String
+    let endTime: String
+    let partySize: Int
+}
+
 // MARK: - Golf Booking View
 
-struct GolfBookingView: View {
+struct GolfBookingView<PickerContent: View>: View {
     // NavigationStack lives at the parent (BookView) so that a NavigationStack
     // isn't nested inside a VStack sibling of a Picker — that nesting causes
     // UIKit to install an invisible UINavigationBar gesture region at the top
@@ -232,11 +262,14 @@ struct GolfBookingView: View {
     // booking, push from Track Round, etc.).
     @Binding var path: [GolfRoute]
 
+    // Mode picker (Golf/Spaces) injected from BookView and rendered just below
+    // the BookingsHero — so the hero + picker scroll together (Dining pattern).
+    @ViewBuilder let modePicker: () -> PickerContent
+
     // My bookings
     @State private var bookings: [MyBooking] = []
     @State private var loadingBookings = true
     @State private var hasLoadedBookingsOnce = false
-    @State private var cancellingId: String?
 
     // Course selection
     @State private var facilities: [GolfFacility] = []
@@ -269,8 +302,12 @@ struct GolfBookingView: View {
 
     // Booking state
     @State private var isBooking = false
-    @State private var showConfirmation = false
     @State private var bookingError: String?
+    // When non-nil, a floating success toast is shown at the top of the
+    // bookings list. Used for both successful bookings ("Tee Time
+    // Booked") and successful cancellations ("Tee Time Cancelled") —
+    // same pill, different copy. Auto-dismisses after ~3.5s.
+    @State private var toastMessage: String?
 
     // Cancel
     @State private var showCancelAlert = false
@@ -290,7 +327,6 @@ struct GolfBookingView: View {
     @State private var editError: String?
     @State private var showEditSuccess = false
     @State private var showCancelFromEditAlert = false
-    @State private var cancellingFromEdit = false
 
     private let bookableDates = generateBookableDates()
 
@@ -325,15 +361,6 @@ struct GolfBookingView: View {
             .onChange(of: selectedSlot?.startTime) { _, _ in
                 Task { await fetchPricing() }
             }
-            .alert("Tee Time Confirmed!", isPresented: $showConfirmation) {
-                Button("OK") {
-                    resetBookingFlow()
-                    path.removeAll()
-                    Task { await fetchBookings() }
-                }
-            } message: {
-                Text("Your tee time has been booked. You'll receive a confirmation email shortly.")
-            }
             .alert("Booking Error", isPresented: .constant(bookingError != nil)) {
                 Button("OK") { bookingError = nil }
             } message: {
@@ -343,7 +370,7 @@ struct GolfBookingView: View {
                 Button("Keep", role: .cancel) { bookingToCancel = nil }
                 Button("Cancel Booking", role: .destructive) {
                     if let booking = bookingToCancel {
-                        Task { await cancelBooking(booking) }
+                        cancelBooking(booking)
                     }
                 }
             } message: {
@@ -358,7 +385,7 @@ struct GolfBookingView: View {
                 Button("Keep", role: .cancel) { }
                 Button("Cancel Tee Time", role: .destructive) {
                     if let booking = editingBooking {
-                        Task { await cancelBookingFromEdit(booking) }
+                        cancelBookingFromEdit(booking)
                     }
                 }
             } message: {
@@ -373,12 +400,64 @@ struct GolfBookingView: View {
     // MARK: - My Bookings List
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+    // Floating success toast shown at the top of the bookings list
+    // after a successful tee-time mutation (book or cancel). Slides in
+    // from the top and auto-hides after ~3.5s. Tappable to dismiss
+    // early.
+    private func successToast(_ message: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 20))
+                .foregroundStyle(.white)
+            Text(message)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Color.club.primary, in: RoundedRectangle(cornerRadius: 14))
+        .shadow(color: Color.black.opacity(0.15), radius: 12, y: 4)
+        .padding(.horizontal, 16)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .onTapGesture {
+            withAnimation(.easeOut(duration: 0.2)) {
+                toastMessage = nil
+            }
+        }
+    }
+
+    // Show a toast and schedule its auto-dismiss. Centralized so the
+    // book-success and cancel-success paths share the same timing.
+    private func showToast(_ message: String) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            toastMessage = message
+        }
+        Task {
+            try? await Task.sleep(nanoseconds: 3_500_000_000)
+            await MainActor.run {
+                // Only dismiss if this toast is still the one showing —
+                // prevents a newer toast from getting cut short by an
+                // older auto-dismiss timer.
+                if toastMessage == message {
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        toastMessage = nil
+                    }
+                }
+            }
+        }
+    }
+
     private var myBookingsView: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 20) {
                 // Shared hero banner — same URL/cache as Spaces, mirrors
-                // Dining/Events pattern.
-                BookingsHero()
+                // Dining/Events pattern. Picker sits below it so they
+                // scroll together.
+                VStack(spacing: 8) {
+                    BookingsHero()
+                    modePicker()
+                }
 
                 // Primary CTA — "Book a Tee Time" (top of screen)
                 bookTeeTimeCTA
@@ -413,7 +492,17 @@ struct GolfBookingView: View {
 
                 Spacer(minLength: 40)
             }
-            .padding(.top, 8)
+        }
+        .ignoresSafeArea(edges: .top)
+        .overlay(alignment: .top) {
+            // Banner sits above the status bar inset so it reads as a
+            // system toast rather than content. Only rendered when the
+            // flag flips so the `.transition` animation fires correctly.
+            if let message = toastMessage {
+                successToast(message)
+                    .padding(.top, 60) // clear the status bar / nav chrome
+                    .zIndex(1)
+            }
         }
     }
 
@@ -584,18 +673,14 @@ struct GolfBookingView: View {
                             bookingToCancel = booking
                             showCancelAlert = true
                         } label: {
-                            if cancellingId == booking.id {
-                                ProgressView()
-                                    .controlSize(.small)
-                                    .tint(Color.club.destructive)
-                            } else {
-                                Text("Cancel")
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundStyle(Color.club.outline)
-                            }
+                            // No spinner needed — cancelBooking() is
+                            // optimistic and the row animates out the
+                            // instant the user confirms.
+                            Text("Cancel")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Color.club.outline)
                         }
                         .buttonStyle(.plain)
-                        .disabled(cancellingId == booking.id)
                     }
                 }
             }
@@ -703,28 +788,61 @@ struct GolfBookingView: View {
         }
     }
 
+    // Gradient + glyph fallback for the courseCard image header —
+    // shown when a facility has no image_url or the async load hasn't
+    // resolved yet. Extracted so both branches of the if/else can
+    // share it without duplication.
+    private var courseHeaderFallback: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color.club.primaryContainer, Color.club.primary],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Image(systemName: "figure.golf")
+                        .font(.system(size: 80))
+                        .foregroundStyle(.white.opacity(0.1))
+                        .offset(x: 20, y: 20)
+                }
+            }
+        }
+        .frame(height: 140)
+    }
+
     private func courseCard(_ facility: GolfFacility, isPremier: Bool) -> some View {
         NavigationLink(value: GolfRoute.book(facility: facility)) {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .topLeading) {
-                    LinearGradient(
-                        colors: [Color.club.primaryContainer, Color.club.primary],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .frame(height: 140)
-
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Spacer()
-                            Image(systemName: "figure.golf")
-                                .font(.system(size: 80))
-                                .foregroundStyle(.white.opacity(0.1))
-                                .offset(x: 20, y: 20)
+                    // Image header — falls back to a green gradient with the
+                    // golfer glyph if the facility has no image_url or the
+                    // fetch is still loading/failed.
+                    if let imageUrl = facility.imageUrl, let url = URL(string: imageUrl) {
+                        CachedAsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(height: 140)
+                                    .clipped()
+                                    .overlay {
+                                        LinearGradient(
+                                            colors: [.clear, .black.opacity(0.25)],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                    }
+                            default:
+                                courseHeaderFallback
+                            }
                         }
+                    } else {
+                        courseHeaderFallback
                     }
-                    .frame(height: 140)
 
                     if isPremier {
                         Text("PREMIER")
@@ -737,7 +855,13 @@ struct GolfBookingView: View {
                             .padding(12)
                     }
                 }
+                .frame(height: 140)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                // HITTEST-FIX (see CLAUDE.md): .resizable() + .aspectRatio(.fill)
+                // + .clipped() clips visuals but not hit-test. Force the hit
+                // shape to match the visible rounded rect so taps/buttons
+                // above and below the card still work.
+                .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text(facility.name)
@@ -1669,17 +1793,6 @@ struct GolfBookingView: View {
         isBooking = true
         defer { isBooking = false }
 
-        struct BookRequest: Encodable {
-            let facilityId: String
-            let date: String
-            let startTime: String
-            let endTime: String
-            let partySize: Int
-            let players: [BookingPlayerPayload]?
-
-            // No CodingKeys needed — APIClient uses .convertToSnakeCase for encoding
-        }
-
         let playerPayloads: [BookingPlayerPayload]? = addedPlayers.isEmpty ? nil : addedPlayers.map { p in
             BookingPlayerPayload(
                 playerType: p.type.rawValue,
@@ -1689,7 +1802,7 @@ struct GolfBookingView: View {
         }
 
         do {
-            let _: BookingResponse = try await APIClient.shared.post("/bookings", body: BookRequest(
+            let _: BookingResponse = try await APIClient.shared.post("/bookings", body: GolfBookRequest(
                 facilityId: facility.id,
                 date: selectedDate,
                 startTime: slot.startTime,
@@ -1697,24 +1810,63 @@ struct GolfBookingView: View {
                 partySize: partySize,
                 players: playerPayloads
             ))
-            showConfirmation = true
+
+            // Success UX: instead of blocking with an alert on the slot
+            // screen, pop back to the bookings list, refresh it, and
+            // show a non-blocking success banner there. This matches
+            // platform patterns (Mail send, Calendar add, etc.) —
+            // confirmation lives on the destination you end up on.
+            await MainActor.run {
+                resetBookingFlow()
+                path.removeAll()
+                showToast("Tee Time Booked")
+            }
+
+            // Refresh the bookings list in the background so the new
+            // booking shows up under "Upcoming" by the time the user's
+            // eyes settle there.
+            Task { await fetchBookings() }
         } catch {
             bookingError = error.localizedDescription
         }
     }
 
-    private func cancelBooking(_ booking: MyBooking) async {
-        cancellingId = booking.id
-        defer {
-            cancellingId = nil
+    private func cancelBooking(_ booking: MyBooking) {
+        // Optimistic update — the SwiftUI-native pattern: remove the row
+        // immediately (with animation so we get the native list-removal
+        // transition) and fire the API call in the background. If the
+        // server rejects, reinsert the booking at its original index and
+        // surface the error. This avoids the "confirm → frozen UI →
+        // abrupt disappearance" sequence the old code produced while
+        // awaiting the network call.
+        guard let originalIndex = bookings.firstIndex(where: { $0.id == booking.id }) else {
             bookingToCancel = nil
+            return
         }
+        let removedBooking = bookings[originalIndex]
 
-        do {
-            try await APIClient.shared.patch("/bookings/\(booking.id)/cancel")
-            bookings.removeAll { $0.id == booking.id }
-        } catch {
-            bookingError = error.localizedDescription
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            bookings.remove(at: originalIndex)
+        }
+        bookingToCancel = nil
+        showToast("Tee Time Cancelled")
+
+        Task {
+            do {
+                try await APIClient.shared.patch("/bookings/\(booking.id)/cancel")
+            } catch {
+                await MainActor.run {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        // Clamp in case other state changed while we were waiting.
+                        let insertAt = min(originalIndex, bookings.count)
+                        bookings.insert(removedBooking, at: insertAt)
+                    }
+                    // Server rejected — clear the premature success toast
+                    // and surface the error.
+                    toastMessage = nil
+                    bookingError = error.localizedDescription
+                }
+            }
         }
     }
 
@@ -1752,14 +1904,7 @@ struct GolfBookingView: View {
         editSaving = true
         defer { editSaving = false }
 
-        struct ModifyRequest: Encodable {
-            var date: String?
-            var startTime: String?
-            var endTime: String?
-            var partySize: Int?
-        }
-
-        var changes = ModifyRequest()
+        var changes = GolfModifyRequest()
         var hasChanges = false
 
         if editDateStr != booking.date {
@@ -1797,16 +1942,36 @@ struct GolfBookingView: View {
         }
     }
 
-    private func cancelBookingFromEdit(_ booking: MyBooking) async {
-        cancellingFromEdit = true
-        defer { cancellingFromEdit = false }
+    private func cancelBookingFromEdit(_ booking: MyBooking) {
+        // Optimistic — same pattern as cancelBooking(). Dismiss the edit
+        // sheet immediately, animate the row out of the list, then fire
+        // the API call in the background. Reinsert on failure.
+        let originalIndex = bookings.firstIndex(where: { $0.id == booking.id })
+        let removedBooking = originalIndex.map { bookings[$0] }
 
-        do {
-            try await APIClient.shared.patch("/bookings/\(booking.id)/cancel")
-            editingBooking = nil
-            bookings.removeAll { $0.id == booking.id }
-        } catch {
-            editError = error.localizedDescription
+        editingBooking = nil
+        if let idx = originalIndex {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                bookings.remove(at: idx)
+            }
+        }
+        showToast("Tee Time Cancelled")
+
+        Task {
+            do {
+                try await APIClient.shared.patch("/bookings/\(booking.id)/cancel")
+            } catch {
+                await MainActor.run {
+                    if let idx = originalIndex, let restored = removedBooking {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            let insertAt = min(idx, bookings.count)
+                            bookings.insert(restored, at: insertAt)
+                        }
+                    }
+                    toastMessage = nil
+                    bookingError = error.localizedDescription
+                }
+            }
         }
     }
 
@@ -1988,26 +2153,22 @@ struct GolfBookingView: View {
                     }
                     .disabled(editSaving)
 
-                    // Cancel reservation
+                    // Cancel reservation — optimistic: the sheet
+                    // dismisses and the row animates out immediately on
+                    // confirmation, so no spinner/disabled state.
                     Button {
                         showCancelFromEditAlert = true
                     } label: {
-                        HStack {
-                            if cancellingFromEdit {
-                                ProgressView().tint(Color.club.destructive)
-                            }
-                            Text("Cancel Tee Time")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color.club.destructive)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(Color.club.destructive.opacity(0.25), lineWidth: 1)
-                        )
+                        Text("Cancel Tee Time")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.club.destructive)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Color.club.destructive.opacity(0.25), lineWidth: 1)
+                            )
                     }
-                    .disabled(cancellingFromEdit)
                 }
                 .padding(20)
             }
@@ -2028,16 +2189,8 @@ struct GolfBookingView: View {
         joiningWaitlist = slot.startTime
         defer { joiningWaitlist = nil }
 
-        struct WaitlistRequest: Encodable {
-            let facilityId: String
-            let date: String
-            let startTime: String
-            let endTime: String
-            let partySize: Int
-        }
-
         do {
-            try await APIClient.shared.post("/bookings/waitlist", body: WaitlistRequest(
+            try await APIClient.shared.post("/bookings/waitlist", body: GolfWaitlistRequest(
                 facilityId: facility.id,
                 date: selectedDate,
                 startTime: slot.startTime,

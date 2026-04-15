@@ -31,13 +31,14 @@ struct ContentView: View {
                 .tag(1)
 
             // Tab 2: Dining
-            NavigationStack {
-                DiningView()
-            }
-            .tabItem {
-                Label("Dining", systemImage: "fork.knife")
-            }
-            .tag(2)
+            // NOTE: no outer NavigationStack — DiningView owns its own
+            // path-bound NavigationStack so it can programmatically push
+            // Menu / Cart screens with native transitions + swipe-back.
+            DiningView()
+                .tabItem {
+                    Label("Dining", systemImage: "fork.knife")
+                }
+                .tag(2)
 
             // Tab 3: Events
             NavigationStack {

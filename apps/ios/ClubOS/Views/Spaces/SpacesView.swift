@@ -33,6 +33,22 @@ struct SpaceAvailabilityResponse: Decodable {
     let slots: [SpaceSlot]
 }
 
+// File-scope so they're usable inside SpacesView's generic context (nested
+// types in generic functions aren't allowed).
+struct SpaceBookRequest: Encodable {
+    let facilityId: String
+    let date: String
+    let startTime: String
+    let endTime: String
+    let partySize: Int
+    let notes: String?
+}
+
+struct SpaceBookResponse: Decodable {
+    struct BookedItem: Decodable { let id: String }
+    let booking: BookedItem
+}
+
 private struct SpaceBookingDate: Identifiable {
     let id = UUID()
     let iso: String
@@ -77,12 +93,7 @@ private func formatSpaceTime(_ t: String) -> String {
 
 // MARK: - Main View
 
-struct SpacesView: View {
-    @State private var spaces: [Space] = []
-    @State private var loadingSpaces = true
-    @State private var hasLoadedSpacesOnce = false
-    @State private var loadError: String?
-
+struct SpacesView<PickerContent: View>: View {
     // Navigation path drives the idiomatic NavigationStack. Pushing a Space
     // onto the path triggers `.navigationDestination(for: Space.self)` and
     // shows the detail view with a system-provided back chevron.
@@ -92,6 +103,15 @@ struct SpacesView: View {
     // unchanged. The destination sets it via `.onAppear` when pushed, and we
     // reset it when popped back to root (path.isEmpty).
     @Binding var path: [Space]
+
+    // Mode picker (Golf/Spaces) injected from BookView, rendered just below
+    // the BookingsHero so the hero + picker scroll together.
+    @ViewBuilder let modePicker: () -> PickerContent
+
+    @State private var spaces: [Space] = []
+    @State private var loadingSpaces = true
+    @State private var hasLoadedSpacesOnce = false
+    @State private var loadError: String?
     @State private var selectedSpace: Space?
     @State private var selectedDate: String = {
         let f = DateFormatter()
@@ -161,19 +181,23 @@ struct SpacesView: View {
 
     private var spacesListView: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                // Shared hero banner — same URL/cache as Golf, mirrors
-                // Dining/Events pattern.
-                BookingsHero()
-                    .padding(.horizontal, -16)
-                    .padding(.top, -16)
+            // Hero + picker are edge-to-edge / no horizontal padding, while the
+            // rest of the content gets the standard 16pt padding. Splitting
+            // them into their own VStack outside the padded one lets the hero
+            // match Golf's layout exactly.
+            VStack(spacing: 0) {
+                VStack(spacing: 8) {
+                    BookingsHero()
+                    modePicker()
+                }
 
-                if let msg = successMessage {
-                    banner(msg, color: .green)
-                }
-                if let msg = loadError {
-                    banner(msg, color: .red)
-                }
+                VStack(alignment: .leading, spacing: 16) {
+                    if let msg = successMessage {
+                        banner(msg, color: .green)
+                    }
+                    if let msg = loadError {
+                        banner(msg, color: .red)
+                    }
 
                 if loadingSpaces && !hasLoadedSpacesOnce {
                     spacesSkeleton
@@ -190,10 +214,12 @@ struct SpacesView: View {
                         }
                     }
                 }
+                }
+                .padding(16)
+                .animation(.easeInOut(duration: 0.25), value: loadingSpaces)
             }
-            .padding(16)
-            .animation(.easeInOut(duration: 0.25), value: loadingSpaces)
         }
+        .ignoresSafeArea(edges: .top)
     }
 
     private var spacesSkeleton: some View {
@@ -576,22 +602,8 @@ struct SpacesView: View {
         errorMessage = nil
         defer { submitting = false }
 
-        struct BookRequest: Encodable {
-            let facilityId: String
-            let date: String
-            let startTime: String
-            let endTime: String
-            let partySize: Int
-            let notes: String?
-        }
-
-        struct BookResponse: Decodable {
-            let booking: BookedItem
-            struct BookedItem: Decodable { let id: String }
-        }
-
         do {
-            let _: BookResponse = try await APIClient.shared.post("/bookings", body: BookRequest(
+            let _: SpaceBookResponse = try await APIClient.shared.post("/bookings", body: SpaceBookRequest(
                 facilityId: space.id,
                 date: selectedDate,
                 startTime: slot.startTime,

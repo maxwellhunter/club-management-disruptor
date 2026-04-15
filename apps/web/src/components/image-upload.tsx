@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Upload, Trash2 } from "lucide-react";
+import { Upload, Trash2, Loader2 } from "lucide-react";
 
 interface ImageUploadProps {
   value: string; // current image URL
@@ -99,9 +99,7 @@ export function ImageUpload({
           </button>
           {uploading && (
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-              <div className="text-white text-sm font-medium">
-                Compressing & uploading...
-              </div>
+              <Loader2 className="h-6 w-6 text-white animate-spin" />
             </div>
           )}
         </div>

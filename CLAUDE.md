@@ -218,5 +218,19 @@ When the user says **"commit and push"** (or similar), always perform ALL of the
 
 **Important**: Always confirm each step's result before moving to the next. If any step fails, stop and report the error rather than continuing.
 
+## Workflow: "Create a TestFlight build"
+When the user asks for a **TestFlight build**, **always** use the existing script:
+```bash
+./scripts/upload-testflight.sh
+```
+It handles archive → export → upload end-to-end and uses `destination: upload` in `apps/ios/ExportOptions.plist`, so the final `xcodebuild -exportArchive` ships the `.ipa` straight to App Store Connect via the user's signed-in Xcode credentials — **no App Store Connect API key needed**.
+
+**Do NOT**:
+- Manually run `xcodebuild archive` / `xcodebuild -exportArchive` piecemeal — the script already does it.
+- Bump `CURRENT_PROJECT_VERSION` in `project.yml` — `ExportOptions.plist` has `manageAppVersionAndBuildNumber: true`, so Apple auto-assigns the build number.
+- Ask the user for an ASC API key — the script doesn't need one.
+
+After the script prints `✅ Build uploaded to App Store Connect`, tell the user it'll appear in TestFlight in ~15 minutes at https://appstoreconnect.apple.com/apps.
+
 ## GitHub
 Repo: https://github.com/maxwellhunter/club-management-disruptor

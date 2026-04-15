@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Users, UserCheck, UserX, HelpCircle, Clock, Trash2 } from "lucide-react";
+import { X, Users, UserCheck, UserX, Clock, Trash2 } from "lucide-react";
 import type { EventAttendee, RsvpStatus } from "@club/shared";
 
 interface AttendeesModalProps {
@@ -19,11 +19,6 @@ const STATUS_CONFIG: Record<
     icon: UserCheck,
     classes: "bg-green-50 text-green-700 border-green-200",
   },
-  maybe: {
-    label: "Maybe",
-    icon: HelpCircle,
-    classes: "bg-yellow-50 text-yellow-700 border-yellow-200",
-  },
   waitlisted: {
     label: "Waitlisted",
     icon: Clock,
@@ -38,7 +33,6 @@ const STATUS_CONFIG: Record<
 
 const STATUS_ORDER: RsvpStatus[] = [
   "attending",
-  "maybe",
   "waitlisted",
   "declined",
 ];
