@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Plus, Pencil, Trash2, Clock, ImagePlus } from "lucide-react";
+import { ImageUpload } from "@/components/image-upload";
 
 type FacilityType = "tennis" | "pool" | "fitness" | "other";
 
@@ -355,35 +356,33 @@ function SpaceFormModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-[var(--muted-foreground)] mb-1 block">
-                Max Party Size
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={100}
-                value={maxPartySize}
-                onChange={(e) => setMaxPartySize(e.target.value)}
-                placeholder="optional"
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-[var(--muted-foreground)] mb-1 block">
-                Image URL
-              </label>
-              <input
-                type="url"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://..."
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
-              />
-            </div>
+          <div>
+            <label className="text-xs font-medium text-[var(--muted-foreground)] mb-1 block">
+              Max Party Size
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={maxPartySize}
+              onChange={(e) => setMaxPartySize(e.target.value)}
+              placeholder="optional"
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
+            />
           </div>
+
+          {/* Image picker — uploads go through /api/upload which runs
+              sharp (1200px width, mozjpeg q75) before writing to
+              Supabase Storage, so the URL stored here is already a
+              size-optimized JPEG. */}
+          <ImageUpload
+            value={imageUrl}
+            onChange={setImageUrl}
+            bucket="facility-images"
+            label="Photo"
+            aspect="video"
+            placeholder="Upload a photo of this space"
+          />
 
           {space && (
             <label className="flex items-center gap-2 text-sm">
