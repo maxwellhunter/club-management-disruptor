@@ -187,7 +187,7 @@ struct ProfileView: View {
                     .tint(.white)
                     .padding(.vertical, 12)
             } else {
-                Text("$\(String(format: "%.2f", sub?.amount ?? 0))")
+                Text(Formatters.currency(sub?.amount ?? 0))
                     .font(.custom("Georgia", size: 36).weight(.bold))
                     .foregroundStyle(.white)
                     .padding(.bottom, 20)
@@ -240,7 +240,7 @@ struct ProfileView: View {
                     .foregroundStyle(Color.club.outline)
                 Spacer()
                 HStack(spacing: 4) {
-                    Text("$\(String(format: "%.2f", sub?.amount ?? 0))")
+                    Text(Formatters.currency(sub?.amount ?? 0))
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Color.club.foreground)
                     Image(systemName: "info.circle")
@@ -599,7 +599,7 @@ struct ProfileView: View {
                     icon: iconForDescription(invoice.description),
                     title: invoice.description,
                     date: formatDate(invoice.dueDate ?? invoice.createdAt),
-                    amount: "-$\(String(format: "%.2f", invoice.amount))",
+                    amount: Formatters.currency(-invoice.amount),
                     type: invoice.status == "paid" ? .payment : invoice.status == "void" ? .credit : .charge,
                     status: invoice.status
                 )

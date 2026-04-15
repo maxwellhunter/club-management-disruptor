@@ -96,7 +96,7 @@ struct BillingView: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text("$\(String(format: "%.2f", invoice.amount))")
+                Text(Formatters.currency(invoice.amount))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.club.foreground)
                 Text(invoice.status.capitalized)

@@ -383,7 +383,7 @@ struct ChatView: View {
                     .foregroundStyle(Color.club.primary)
             } else {
                 let isFree = event.priceValue == nil || event.priceValue == 0
-                Text(isFree ? "Free" : String(format: "$%.0f", event.priceValue ?? 0))
+                Text(isFree ? "Free" : Formatters.currency(event.priceValue ?? 0, fractionDigits: 0))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(isFree ? Color.club.primary : Color.club.foreground)
             }

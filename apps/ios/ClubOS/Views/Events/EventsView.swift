@@ -781,7 +781,7 @@ struct EventsView: View {
     }
 
     private func formatPrice(_ price: Double) -> String {
-        String(format: "$%.0f", price)
+        Formatters.currency(price, fractionDigits: 0)
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

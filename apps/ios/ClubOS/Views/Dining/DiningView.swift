@@ -1759,7 +1759,7 @@ struct DiningView: View {
     }
 
     private func formatPrice(_ price: Double) -> String {
-        String(format: "$%.2f", price)
+        Formatters.currency(price)
     }
 
     private func resetFlow() {

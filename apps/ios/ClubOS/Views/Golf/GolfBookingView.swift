@@ -1406,7 +1406,7 @@ struct GolfBookingView: View {
         let displayTotal: String = {
             if let pricing = pricingResult {
                 if allIncludedOrNoRate { return "Included" }
-                return String(format: "$%.2f", pricing.total)
+                return Formatters.currency(pricing.total)
             }
             return "—"
         }()
@@ -1446,7 +1446,7 @@ struct GolfBookingView: View {
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundStyle(Color.club.primary)
                             } else {
-                                Text(String(format: "$%.2f", p.totalFee))
+                                Text(Formatters.currency(p.totalFee))
                                     .font(.system(size: 12, weight: .semibold))
                                     .foregroundStyle(Color.club.foreground)
                             }
