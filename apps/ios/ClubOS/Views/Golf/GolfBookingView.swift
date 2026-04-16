@@ -157,19 +157,6 @@ struct TimeCategory {
     let color: Color
 }
 
-private func timeCategory(for time: String) -> TimeCategory {
-    let hour = Int(time.prefix(2)) ?? 0
-    if hour < 8 {
-        return TimeCategory(label: "Early Bird", color: Color(hex: "7c3aed"))
-    } else if hour < 12 {
-        return TimeCategory(label: "Prime Time", color: Color(hex: "ea580c"))
-    } else if hour < 16 {
-        return TimeCategory(label: "Afternoon", color: Color(hex: "0369a1"))
-    } else {
-        return TimeCategory(label: "Twilight", color: Color(hex: "0284c7"))
-    }
-}
-
 // MARK: - Bookable Date
 
 struct BookableDate: Identifiable {
@@ -180,46 +167,24 @@ struct BookableDate: Identifiable {
     let monthName: String
 }
 
+// Note: timeCategory, generateBookableDates, formatTime, formatDate, and
+// isStartRoundEligible live in GolfBookingUtilities.swift so they're
+// unit-testable. Thin file-local shims keep call sites readable.
+
+private func timeCategory(for time: String) -> TimeCategory {
+    GolfBookingUtilities.timeCategory(for: time)
+}
+
 private func generateBookableDates() -> [BookableDate] {
-    let calendar = Calendar.current
-    let formatter = DateFormatter()
-    var dates: [BookableDate] = []
-
-    for offset in 1...14 {
-        guard let date = calendar.date(byAdding: .day, value: offset, to: Date()) else { continue }
-
-        formatter.dateFormat = "yyyy-MM-dd"
-        let dateString = formatter.string(from: date)
-
-        formatter.dateFormat = "EEE"
-        let dayName = formatter.string(from: date)
-
-        formatter.dateFormat = "d"
-        let dayNum = formatter.string(from: date)
-
-        formatter.dateFormat = "MMM"
-        let monthName = formatter.string(from: date)
-
-        dates.append(BookableDate(dateString: dateString, dayName: dayName, dayNum: dayNum, monthName: monthName))
-    }
-    return dates
+    GolfBookingUtilities.generateBookableDates()
 }
 
 private func formatTime(_ time: String) -> String {
-    let parts = time.split(separator: ":")
-    guard parts.count >= 2, let hour = Int(parts[0]) else { return time }
-    let minute = parts[1]
-    let ampm = hour >= 12 ? "PM" : "AM"
-    let display = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour)
-    return "\(display):\(minute) \(ampm)"
+    GolfBookingUtilities.formatTime(time)
 }
 
 private func formatDate(_ dateStr: String) -> String {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "yyyy-MM-dd"
-    guard let date = formatter.date(from: dateStr) else { return dateStr }
-    formatter.dateFormat = "EEE, MMM d"
-    return formatter.string(from: date)
+    GolfBookingUtilities.formatDate(dateStr)
 }
 
 // MARK: - Request payloads
@@ -1643,28 +1608,16 @@ struct GolfBookingView<PickerContent: View>: View {
     // MARK: - Helpers
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    /// Check if a booking is eligible for "Start Round" — same day, within 30 min before through 4 hours after tee time
+    /// Check if a booking is eligible for "Start Round" — same day, within 30 min before through 4 hours after tee time.
+    ///
+    /// Delegates to `GolfBookingUtilities.isStartRoundEligible` so the
+    /// eligibility window can be unit-tested with a pinned clock.
     private func isStartRoundEligible(_ booking: MyBooking) -> Bool {
-        guard booking.facilityType == "golf" else { return false }
-
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM-dd"
-        let today = df.string(from: Date())
-        guard booking.date == today else { return false }
-
-        let parts = booking.startTime.split(separator: ":").compactMap { Int($0) }
-        guard parts.count >= 2 else { return false }
-
-        let calendar = Calendar.current
-        var components = calendar.dateComponents([.year, .month, .day], from: Date())
-        components.hour = parts[0]
-        components.minute = parts[1]
-        guard let teeTime = calendar.date(from: components) else { return false }
-
-        let earliest = teeTime.addingTimeInterval(-30 * 60)       // 30 min before
-        let latest = teeTime.addingTimeInterval(4 * 60 * 60)      // 4 hours after
-        let now = Date()
-        return now >= earliest && now <= latest
+        GolfBookingUtilities.isStartRoundEligible(
+            facilityType: booking.facilityType,
+            date: booking.date,
+            startTime: booking.startTime
+        )
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
