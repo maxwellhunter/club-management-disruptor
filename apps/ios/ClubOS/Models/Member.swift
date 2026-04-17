@@ -36,8 +36,11 @@ struct Member: Codable, Identifiable, Sendable {
     // No CodingKeys needed — APIClient uses .convertFromSnakeCase / .convertToSnakeCase
 }
 
-enum MemberRole: String, Codable, Sendable {
+enum MemberRole: String, Codable, Sendable, CaseIterable, Identifiable {
     case admin, staff, member
+
+    var id: String { rawValue }
+    var label: String { rawValue.capitalized }
 }
 
 enum MemberStatus: String, Codable, Sendable {

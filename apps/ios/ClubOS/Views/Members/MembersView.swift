@@ -5,11 +5,18 @@ import SwiftUI
 struct MembersView: View {
     @State private var members: [DirectoryMember] = []
     @State private var tiers: [MemberTier] = []
+    @State private var callerRole: String?
+    @State private var statusFilter: MemberStatusFilter = .active
     @State private var searchText = ""
     @State private var selectedTierId: String? = nil
     @State private var isLoading = true
     @State private var searchTask: Task<Void, Never>?
     @State private var errorMessage: String?
+
+    @State private var showAddSheet = false
+    @State private var selectedMember: DirectoryMember?
+
+    private var isAdmin: Bool { callerRole == "admin" }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -59,6 +66,21 @@ struct MembersView: View {
                 .padding(.bottom, 12)
             }
 
+            // MARK: - Status Filter (admin only)
+            if isAdmin {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(MemberStatusFilter.allCases) { filter in
+                            tierChip(label: filter.label, isSelected: statusFilter == filter) {
+                                statusFilter = filter
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+                .padding(.bottom, 12)
+            }
+
             // MARK: - Content
             if isLoading && members.isEmpty {
                 Spacer()
@@ -73,7 +95,14 @@ struct MembersView: View {
                 ScrollView {
                     LazyVStack(spacing: 10) {
                         ForEach(members) { member in
-                            memberCard(member)
+                            if isAdmin {
+                                Button { selectedMember = member } label: {
+                                    memberCard(member)
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                memberCard(member)
+                            }
                         }
                     }
                     .padding(.horizontal, 20)
@@ -85,11 +114,37 @@ struct MembersView: View {
         .background(Color.club.background)
         .navigationTitle("Members")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if isAdmin {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showAddSheet = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .accessibilityLabel("Add member")
+                }
+            }
+        }
         .onChange(of: searchText) { _, _ in debouncedSearch() }
         .onChange(of: selectedTierId) { _, _ in
             Task { await fetchMembers() }
         }
+        .onChange(of: statusFilter) { _, _ in
+            Task { await fetchMembers() }
+        }
         .task { await fetchMembers() }
+        .sheet(isPresented: $showAddSheet) {
+            AddMemberSheet(tiers: tiers) {
+                Task { await fetchMembers() }
+            }
+        }
+        .sheet(item: $selectedMember) { member in
+            MemberDetailSheet(member: member) {
+                Task { await fetchMembers() }
+            }
+        }
     }
 
     // MARK: - Tier Chip
@@ -122,6 +177,7 @@ struct MembersView: View {
                             .aspectRatio(contentMode: .fill)
                             .frame(width: 44, height: 44)
                             .clipShape(Circle())
+                            .contentShape(Circle())
                     default:
                         memberInitialsCircle(member)
                     }
@@ -136,6 +192,16 @@ struct MembersView: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Color.club.foreground)
                         .lineLimit(1)
+
+                    if isAdmin, let status = member.status, status != "active" {
+                        Text(status.uppercased())
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(0.5)
+                            .foregroundStyle(statusTextColor(status))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(statusBgColor(status), in: Capsule())
+                    }
 
                     if let tierName = member.tierName {
                         Text(tierName.uppercased())
@@ -225,20 +291,23 @@ struct MembersView: View {
         if let tierId = selectedTierId {
             query["tier"] = tierId
         }
+        query["status"] = statusFilter.queryValue
 
         struct Response: Decodable {
             let members: [DirectoryMember]
             let tiers: [MemberTier]?
+            let role: String?
         }
 
         do {
-            let response: Response = try await APIClient.shared.get("/members", query: query.isEmpty ? nil : query)
+            let response: Response = try await APIClient.shared.get("/members", query: query)
             members = response.members
             if let fetchedTiers = response.tiers, !fetchedTiers.isEmpty {
                 tiers = fetchedTiers
             }
+            callerRole = response.role
         } catch {
-            // Keep existing data on error
+            ErrorBanner.shared.show(error)
         }
     }
 
@@ -287,11 +356,29 @@ struct MembersView: View {
         default: return Color(hex: "f3f4f6")
         }
     }
+
+    private func statusTextColor(_ status: String) -> Color {
+        switch status.lowercased() {
+        case "invited": return Color(hex: "d97706")
+        case "suspended": return Color(hex: "dc2626")
+        case "inactive": return Color(hex: "6b7280")
+        default: return Color(hex: "6b7280")
+        }
+    }
+
+    private func statusBgColor(_ status: String) -> Color {
+        switch status.lowercased() {
+        case "invited": return Color(hex: "fef3c7")
+        case "suspended": return Color(hex: "fee2e2")
+        case "inactive": return Color(hex: "f3f4f6")
+        default: return Color(hex: "f3f4f6")
+        }
+    }
 }
 
 // MARK: - Models
 
-private struct DirectoryMember: Decodable, Identifiable {
+struct DirectoryMember: Decodable, Identifiable, Hashable {
     let id: UUID
     let firstName: String
     let lastName: String
@@ -306,7 +393,15 @@ private struct DirectoryMember: Decodable, Identifiable {
     var fullName: String { "\(firstName) \(lastName)" }
 }
 
-private struct MemberTier: Decodable, Identifiable {
+struct MemberTier: Decodable, Identifiable, Hashable {
     let id: String
     let name: String
+}
+
+enum MemberStatusFilter: String, CaseIterable, Identifiable {
+    case active, invited, inactive, suspended
+
+    var id: String { rawValue }
+    var label: String { rawValue.capitalized }
+    var queryValue: String { rawValue }
 }

@@ -47,20 +47,25 @@ echo "✅ Archive succeeded"
 # Export and upload to App Store Connect
 echo ""
 echo "3/4  Exporting & uploading to App Store Connect..."
+# Disable -e around the capture so a non-zero exit doesn't kill the script
+# before we get a chance to surface the error output.
+set +e
 EXPORT_OUTPUT=$(xcodebuild -exportArchive \
   -archivePath "$ARCHIVE_DIR/$SCHEME.xcarchive" \
   -exportPath "$EXPORT_DIR" \
   -exportOptionsPlist "$EXPORT_OPTIONS" \
   -allowProvisioningUpdates 2>&1)
+EXPORT_EXIT=$?
+set -e
 
 # Check for success in output
 if echo "$EXPORT_OUTPUT" | grep -q "Upload succeeded"; then
   echo "✅ Upload succeeded"
-elif [ -f "$EXPORT_DIR/$SCHEME.ipa" ] || [ -f "$EXPORT_DIR/DistributionSummary.plist" ]; then
+elif [ $EXPORT_EXIT -eq 0 ] && { [ -f "$EXPORT_DIR/$SCHEME.ipa" ] || [ -f "$EXPORT_DIR/DistributionSummary.plist" ]; }; then
   echo "✅ Export & upload succeeded"
 else
-  echo "$EXPORT_OUTPUT" | grep -E "(error:|Upload|Export)" || true
-  echo "❌ Export/upload failed. Check output above."
+  echo "$EXPORT_OUTPUT" | grep -E "(error:|Upload|Export)" || echo "$EXPORT_OUTPUT" | tail -40
+  echo "❌ Export/upload failed (xcodebuild exit $EXPORT_EXIT)."
   exit 1
 fi
 

@@ -22,6 +22,7 @@ struct ClubOSApp: App {
                     }
                 }
             }
+            .errorBannerHost()
             .environment(auth)
             .task {
                 await auth.initialize()

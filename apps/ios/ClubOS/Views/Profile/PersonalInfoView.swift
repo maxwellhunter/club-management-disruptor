@@ -71,6 +71,7 @@ struct PersonalInfoView: View {
                             .aspectRatio(contentMode: .fill)
                             .frame(width: 88, height: 88)
                             .clipShape(Circle())
+                            .contentShape(Circle())
                     default:
                         personalInfoInitials
                     }

@@ -363,6 +363,7 @@ struct DiningView: View {
                                         .aspectRatio(contentMode: .fill)
                                         .frame(width: geo.size.width, height: height)
                                         .clipped()
+                                        .contentShape(Rectangle())
                                 case .failure:
                                     Color.club.surfaceContainer
                                         .frame(width: geo.size.width, height: height)
@@ -549,6 +550,7 @@ struct DiningView: View {
                                     .aspectRatio(contentMode: .fill)
                                     .frame(height: 120)
                                     .clipped()
+                                    .contentShape(Rectangle())
                             case .failure:
                                 LinearGradient(
                                     colors: [Color.club.primaryContainer, Color(hex: "012d1d")],
@@ -1411,6 +1413,7 @@ struct DiningView: View {
                 }
                 .frame(width: 64, height: 64)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
+                .contentShape(RoundedRectangle(cornerRadius: 10))
             } else {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10)

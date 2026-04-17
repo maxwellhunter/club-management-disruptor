@@ -598,28 +598,10 @@ struct ChatView: View {
                     let messages: [[String: String]]
                 }
 
-                let request = try APIClient.shared.buildRequest(
-                    path: "/chat",
-                    method: "POST",
+                let chatResponse: ChatAPIResponse = try await APIClient.shared.post(
+                    "/chat",
                     body: ChatRequest(messages: apiMessages)
                 )
-
-                let (data, response) = try await URLSession.shared.data(for: request)
-
-                guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode < 400 else {
-                    let errorMsg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["message"] as? String
-                        ?? "Something went wrong. Please try again."
-                    await MainActor.run {
-                        messages.append(ChatMessage(role: "assistant", content: errorMsg))
-                        isLoading = false
-                    }
-                    return
-                }
-
-                // Decode with snake_case conversion
-                let decoder = JSONDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                let chatResponse = try decoder.decode(ChatAPIResponse.self, from: data)
 
                 // Parse attachments
                 var attachments: [ChatAttachment] = []
@@ -655,9 +637,12 @@ struct ChatView: View {
                     isLoading = false
                 }
             } catch {
+                let fallback = (error as? APIError)?.errorDescription
+                    ?? "Sorry, I couldn't connect to the server. Please check your connection and try again."
                 await MainActor.run {
-                    messages.append(ChatMessage(role: "assistant", content: "Sorry, I couldn't connect to the server. Please check your connection and try again."))
+                    messages.append(ChatMessage(role: "assistant", content: fallback))
                     isLoading = false
+                    ErrorBanner.shared.show(error)
                 }
             }
         }

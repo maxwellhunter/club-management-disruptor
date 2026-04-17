@@ -18,6 +18,40 @@ struct AdminHubView: View {
                 // Primary CTA card — intentionally oversized so it's
                 // the obvious action when staff open this page mid-
                 // shift with one hand on a phone.
+                NavigationLink {
+                    GuestsView()
+                } label: {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.club.accent)
+                                .frame(width: 44, height: 44)
+                            Image(systemName: "person.2.badge.plus")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(Color.club.primary)
+                        }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Guests")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Color.club.foreground)
+                            Text("Register visits, check in, track fees")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.club.onSurfaceVariant)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.club.outline)
+                    }
+                    .padding(14)
+                    .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 16))
+                    .contentShape(RoundedRectangle(cornerRadius: 16))
+                }
+                .buttonStyle(.plain)
+
                 Button { showScanner = true } label: {
                     VStack(alignment: .leading, spacing: 14) {
                         ZStack {

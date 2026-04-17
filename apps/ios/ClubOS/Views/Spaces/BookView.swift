@@ -44,6 +44,7 @@ struct BookingsHero: View {
                                     .aspectRatio(contentMode: .fill)
                                     .frame(width: geo.size.width, height: height)
                                     .clipped()
+                                    .contentShape(Rectangle())
                             case .failure:
                                 Color.club.surfaceContainer
                                     .frame(width: geo.size.width, height: height)
@@ -84,7 +85,6 @@ struct BookingsHero: View {
         do {
             let response: BookingsHeroResponse = try await APIClient.shared.get("/club/bookings-image")
             let url = response.bookingsImageUrl ?? ""
-            print("[BookingsHero] API returned url=\(url.isEmpty ? "<empty>" : url)")
             heroUrl = url
             heroLoaded = true
             await AppCacheService.shared.setString(url, forKey: "bookings_hero_url")
@@ -94,7 +94,7 @@ struct BookingsHero: View {
             if !heroLoaded {
                 heroLoaded = true
             }
-            print("[BookingsHero] Failed to fetch bookings hero:", error)
+            ErrorBanner.shared.show(error)
         }
     }
 }
@@ -122,12 +122,6 @@ struct BookView: View {
     @State private var mode: Mode = .golf
     @State private var golfPath: [GolfRoute] = []
     @State private var spacesPath: [Space] = []
-    // Lives here (not on ModePicker) because switching modes tears down the
-    // NavigationStack and rebuilds the Picker from scratch. The shared
-    // namespace lets matchedGeometryEffect animate the indicator across
-    // the old/new instance boundary.
-    @Namespace private var toggleAnimation
-
     var body: some View {
         // Both NavigationStacks stay MOUNTED in a ZStack; we fade between
         // them via opacity. Previously we used `switch mode` which tore
@@ -144,7 +138,7 @@ struct BookView: View {
         // thereafter), so the extra mount is inexpensive.
         ZStack {
             NavigationStack(path: $golfPath) {
-                GolfBookingView(path: $golfPath, modePicker: { ModePicker(mode: $mode, namespace: toggleAnimation) })
+                GolfBookingView(path: $golfPath, modePicker: { ModePicker(mode: $mode) })
                     .background(Color.club.background)
                     .navigationTitle("")
                     .navigationBarTitleDisplayMode(.inline)
@@ -154,7 +148,7 @@ struct BookView: View {
             .allowsHitTesting(mode == .golf)
 
             NavigationStack(path: $spacesPath) {
-                SpacesView(path: $spacesPath, modePicker: { ModePicker(mode: $mode, namespace: toggleAnimation) })
+                SpacesView(path: $spacesPath, modePicker: { ModePicker(mode: $mode) })
                     .background(Color.club.background)
                     .navigationTitle("")
                     .navigationBarTitleDisplayMode(.inline)
@@ -171,9 +165,6 @@ struct BookView: View {
 // selection indicator (matchedGeometryEffect) and SF Symbol icons.
 struct ModePicker: View {
     @Binding var mode: BookView.Mode
-    // Owned by BookView so the animation survives NavigationStack rebuilds
-    // when the mode changes.
-    let namespace: Namespace.ID
 
     private func icon(for mode: BookView.Mode) -> String {
         switch mode {
@@ -182,18 +173,21 @@ struct ModePicker: View {
         }
     }
 
+    private var selectedIndex: Int {
+        BookView.Mode.allCases.firstIndex(of: mode) ?? 0
+    }
+
     var body: some View {
+        // Single animated pill positioned via offset over the button row.
+        // Previously used matchedGeometryEffect across per-button
+        // backgrounds, but `isSource` is baked in at insertion time — so
+        // flipping which button was the source on every mode change left
+        // multiple views claiming isSource:true inside the group and
+        // spammed the "Multiple inserted views…" runtime warning.
         HStack(spacing: 0) {
             ForEach(BookView.Mode.allCases) { m in
                 let isSelected = mode == m
                 Button {
-                    // Intentionally NOT wrapped in withAnimation. A global
-                    // withAnimation here propagates to every view that
-                    // depends on `mode` — including the NavigationStack
-                    // opacity flip in BookView — which made the hero
-                    // image fade (flash) on every tab switch. The spring
-                    // is scoped to just the picker below via
-                    // `.animation(_, value: mode)`.
                     mode = m
                 } label: {
                     HStack(spacing: 6) {
@@ -205,25 +199,24 @@ struct ModePicker: View {
                     .foregroundStyle(isSelected ? .white : Color.club.onSurfaceVariant)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background {
-                        if isSelected {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.club.primary)
-                                .matchedGeometryEffect(id: "bookModeToggle", in: namespace)
-                        }
-                    }
                     .contentShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
             }
         }
+        .background {
+            GeometryReader { geo in
+                let pillWidth = geo.size.width / CGFloat(BookView.Mode.allCases.count)
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.club.primary)
+                    .frame(width: pillWidth)
+                    .offset(x: CGFloat(selectedIndex) * pillWidth)
+                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: selectedIndex)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
         .padding(4)
         .modifier(BookModeGlassToggleModifier())
-        // Scope the spring to the picker's subtree only. The indicator's
-        // matchedGeometryEffect picks up this animation when `mode`
-        // changes, but views OUTSIDE this modifier (e.g. NavigationStack
-        // opacities in BookView) are unaffected.
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: mode)
         .padding(.horizontal, 16)
         .padding(.top, 4)
         .padding(.bottom, 4)

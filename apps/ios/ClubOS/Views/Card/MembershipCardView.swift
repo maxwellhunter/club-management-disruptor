@@ -32,6 +32,10 @@ private struct GeneratePassResponse: Decodable {
     let barcodePayload: String?
 }
 
+private struct NfcTapResponse: Decodable {
+    let memberName: String?
+}
+
 private struct MemberCardInfo: Decodable {
     let id: String
     let firstName: String
@@ -521,7 +525,9 @@ struct MembershipCardView: View {
             passes = response.passes
             recentTaps = response.recentTaps
         } catch {
-            // Wallet data optional
+            // Wallet data is optional on first load — surface for debuggability
+            // but don't block rendering the card.
+            ErrorBanner.shared.show(error)
         }
     }
 
@@ -535,25 +541,11 @@ struct MembershipCardView: View {
         }
 
         do {
-            let request = try APIClient.shared.buildRequest(
-                path: "/wallet/nfc",
-                method: "POST",
+            let tap: NfcTapResponse = try await APIClient.shared.post(
+                "/wallet/nfc",
                 body: TapRequest(tapType: "manual", location: "Mobile App")
             )
-            let (data, response) = try await URLSession.shared.data(for: request)
-
-            guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let err = json["error"] as? String {
-                    walletError = err
-                } else {
-                    walletError = "Check-in failed"
-                }
-                return
-            }
-
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let name = json["member_name"] as? String {
+            if let name = tap.memberName {
                 checkinResult = "Welcome, \(name)! You're checked in."
             }
             showCheckinSuccess = true
@@ -563,7 +555,8 @@ struct MembershipCardView: View {
                 recentTaps = updated.recentTaps
             }
         } catch {
-            walletError = error.localizedDescription
+            walletError = (error as? APIError)?.errorDescription ?? error.localizedDescription
+            ErrorBanner.shared.show(error)
         }
     }
 
@@ -577,27 +570,12 @@ struct MembershipCardView: View {
 
         do {
             // Step 1: Provision the pass on the server
-            let request = try APIClient.shared.buildRequest(
-                path: "/wallet/passes",
-                method: "POST",
+            let generated: GeneratePassResponse = try await APIClient.shared.post(
+                "/wallet/passes",
                 body: PassRequest(platform: platform)
             )
-            let (data, response) = try await URLSession.shared.data(for: request)
 
-            guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let err = json["error"] as? String {
-                    walletError = err
-                } else {
-                    walletError = "Failed to generate pass"
-                }
-                return
-            }
-
-            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-            let passUrl = json?["pass_url"] as? String
-
-            if platform == "apple", let passUrl, let downloadUrl = URL(string: passUrl) {
+            if platform == "apple", let passUrl = generated.passUrl, let downloadUrl = URL(string: passUrl) {
                 // Try to download the signed .pkpass and present the native sheet
                 do {
                     let (pkpassData, dlResponse) = try await URLSession.shared.data(from: downloadUrl)
@@ -620,7 +598,8 @@ struct MembershipCardView: View {
                 passes = updated.passes
             }
         } catch {
-            walletError = error.localizedDescription
+            walletError = (error as? APIError)?.errorDescription ?? error.localizedDescription
+            ErrorBanner.shared.show(error)
         }
     }
 

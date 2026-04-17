@@ -225,6 +225,7 @@ struct HomeView: View {
                                         .aspectRatio(contentMode: .fill)
                                         .frame(width: 40, height: 40)
                                         .clipShape(Circle())
+                                        .contentShape(Circle())
                                 default:
                                     homeInitialsCircle
                                 }
@@ -792,6 +793,7 @@ struct HomeView: View {
                 .frame(width: 92)
                 .frame(maxHeight: .infinity)
                 .clipped()
+                .contentShape(Rectangle())
 
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 4) {

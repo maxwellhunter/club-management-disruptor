@@ -10,6 +10,7 @@
 		0527E82B1919261F3C15B740 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D3B0A8D5DC712DAFC66EA1E /* HomeView.swift */; };
 		07B050D1CD8AD30BA96C155A /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F403413B0C5F628D9A8DDCDA /* AuthViewModel.swift */; };
 		0E31C6F60975F5940724856C /* EventsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CA1494AF2CFE5F291AA9D8E /* EventsView.swift */; };
+		B3C4D5E6F7A8B9C0D1E2F3A4 /* EventAdminSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4D5E6F7A8B9C0D1E2F3A4B5 /* EventAdminSheets.swift */; };
 		18C64989900827C42E2719FC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 40F0C278CA7DF2C1779DDD70 /* Assets.xcassets */; };
 		1A8C501BC7586DC0F3FD94E2 /* DateUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD9643E3C6B4EB3672FA0000 /* DateUtilities.swift */; };
 		1F9ED783AD8BB4FCF41B3DE4 /* Member.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDEA2A58F8BA32E02FF9B727 /* Member.swift */; };
@@ -26,16 +27,22 @@
 		7274545DBB1A3241E10049F6 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F47C2FE6DA0B81CFB18BE8 /* Theme.swift */; };
 		7668D83C7BB2BDCEFF53949F /* BillingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F1D809EF88A59F5CB73373A /* BillingView.swift */; };
 		83DE5CDCBD6988A9E5EB821D /* PersonalInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDD8290984EA056EA660983C /* PersonalInfoView.swift */; };
+		89B98E5F42920EA80BCBE56B /* AdminHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C62DA1C94AF4C42B744A949 /* AdminHubView.swift */; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* GuestsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2D3E4F5A6B7C8D9E0F1A2B3 /* GuestsView.swift */; };
+		A2B3C4D5E6F7A8B9C0D1E2F3 /* GuestActionSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3E4F5A6B7C8D9E0F1A2B3C4 /* GuestActionSheets.swift */; };
 		97064286620037EF3C38B5EA /* MembershipCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 735D860DA8DB5F1FA2543EB1 /* MembershipCardView.swift */; };
 		A43324B76D1F229E4CE41E53 /* SpacesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F576E4AAA55EEF6DC632DCB /* SpacesView.swift */; };
 		A49BDC6E3CF3088E3E48A8AA /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90EF7AFD6B9F29B0A0F065E /* SupabaseClient.swift */; };
 		BA30E3F3F7551C0DAA3643DE /* SignupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4E6462871241AAF28C9C9F2 /* SignupView.swift */; };
 		BE1C07ACDA2562BBF488E3C2 /* ImageCacheService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C939ED0EB874E122EF6A1AF5 /* ImageCacheService.swift */; };
+		E8F1A2B3C4D5E6F7A8B9C0D1 /* ErrorBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2C3B4A5968778695A4B3C2D /* ErrorBanner.swift */; };
 		C550771E6BBA3C6F4CD17968 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D63CC08A1B6CBF0C9197A7AC /* LoginView.swift */; };
 		C91682F34C495DEBAB354C13 /* GolfBookingViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D581BF7AB23EE22E2C635A61 /* GolfBookingViewTests.swift */; };
 		C93B044D0F2C6600521ACF1C /* MembersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A679D70EA159103C5700DB9B /* MembersView.swift */; };
+		F2A8B3C4D5E697A8B9C0D1E2 /* MemberAdminSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C8D9E01F2A3B4C5D6E7F80 /* MemberAdminSheets.swift */; };
 		CF9FCF058A15113FD7669DED /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 7EC08D8E8F8330AF1FFFBF48 /* Supabase */; };
 		CFA18EE4CCB453EAC4492B27 /* AnnouncementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3D5DF16D605BF502426C68E /* AnnouncementsView.swift */; };
+		E4F5A6B7C8D9E0F1A2B3C4D5 /* AnnouncementAdminSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A6B7C8D9E0F1A2B3C4D5E6 /* AnnouncementAdminSheets.swift */; };
 		D37F7028BD5D59C1685D5FC9 /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A6CF647777BDA87A8FF6F4D /* NotificationsView.swift */; };
 		D70AF87B0086AF9F92B10D7E /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 420D42E45CFFDAC741C7E36E /* Config.swift */; };
 		D7567A103918FC1353368223 /* ScorecardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCD034E8D104518FF23F42EE /* ScorecardView.swift */; };
@@ -57,7 +64,11 @@
 /* Begin PBXFileReference section */
 		0A6CF647777BDA87A8FF6F4D /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
 		14D34C604B042A45B6649DA4 /* ClubOSTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ClubOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		1C62DA1C94AF4C42B744A949 /* AdminHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminHubView.swift; sourceTree = "<group>"; };
+		C2D3E4F5A6B7C8D9E0F1A2B3 /* GuestsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestsView.swift; sourceTree = "<group>"; };
+		D3E4F5A6B7C8D9E0F1A2B3C4 /* GuestActionSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestActionSheets.swift; sourceTree = "<group>"; };
 		1CA1494AF2CFE5F291AA9D8E /* EventsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventsView.swift; sourceTree = "<group>"; };
+		C4D5E6F7A8B9C0D1E2F3A4B5 /* EventAdminSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventAdminSheets.swift; sourceTree = "<group>"; };
 		1CCEA1070E01D6A7CD81126A /* ClubOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ClubOS.entitlements; sourceTree = "<group>"; };
 		21BA90F1E9310E2B16D0089D /* DateUtilitiesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateUtilitiesTests.swift; sourceTree = "<group>"; };
 		2F1D809EF88A59F5CB73373A /* BillingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillingView.swift; sourceTree = "<group>"; };
@@ -77,6 +88,7 @@
 		987DF30AFFFD9B1D9158CF36 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		9A438C1A077D5830884ED34D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A679D70EA159103C5700DB9B /* MembersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MembersView.swift; sourceTree = "<group>"; };
+		B7C8D9E01F2A3B4C5D6E7F80 /* MemberAdminSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemberAdminSheets.swift; sourceTree = "<group>"; };
 		B90EF7AFD6B9F29B0A0F065E /* SupabaseClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseClient.swift; sourceTree = "<group>"; };
 		BBE811927B1AF2D7D3839556 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		BC2090F6E9C8C602603CC6CE /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
@@ -84,10 +96,12 @@
 		C939ED0EB874E122EF6A1AF5 /* ImageCacheService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheService.swift; sourceTree = "<group>"; };
 		CCD034E8D104518FF23F42EE /* ScorecardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScorecardView.swift; sourceTree = "<group>"; };
 		CD9643E3C6B4EB3672FA0000 /* DateUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateUtilities.swift; sourceTree = "<group>"; };
+		D2C3B4A5968778695A4B3C2D /* ErrorBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorBanner.swift; sourceTree = "<group>"; };
 		D2113B0FF55C8F05A75A73CA /* DiningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiningView.swift; sourceTree = "<group>"; };
 		D581BF7AB23EE22E2C635A61 /* GolfBookingViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GolfBookingViewTests.swift; sourceTree = "<group>"; };
 		D63CC08A1B6CBF0C9197A7AC /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		E3D5DF16D605BF502426C68E /* AnnouncementsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnouncementsView.swift; sourceTree = "<group>"; };
+		F5A6B7C8D9E0F1A2B3C4D5E6 /* AnnouncementAdminSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnouncementAdminSheets.swift; sourceTree = "<group>"; };
 		EDEA2A58F8BA32E02FF9B727 /* Member.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Member.swift; sourceTree = "<group>"; };
 		F1F2F49E1F662773D68358D6 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		F403413B0C5F628D9A8DDCDA /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
@@ -183,6 +197,7 @@
 				4C18688663021B86ABEE890A /* APIClient.swift */,
 				F403413B0C5F628D9A8DDCDA /* AuthViewModel.swift */,
 				CD9643E3C6B4EB3672FA0000 /* DateUtilities.swift */,
+				D2C3B4A5968778695A4B3C2D /* ErrorBanner.swift */,
 				C939ED0EB874E122EF6A1AF5 /* ImageCacheService.swift */,
 				B90EF7AFD6B9F29B0A0F065E /* SupabaseClient.swift */,
 			);
@@ -232,6 +247,9 @@
 		92795A4501F9D35EFBF30F72 /* Admin */ = {
 			isa = PBXGroup;
 			children = (
+				1C62DA1C94AF4C42B744A949 /* AdminHubView.swift */,
+				D3E4F5A6B7C8D9E0F1A2B3C4 /* GuestActionSheets.swift */,
+				C2D3E4F5A6B7C8D9E0F1A2B3 /* GuestsView.swift */,
 				7B99EB6B7F62F4D653D411B5 /* MemberScannerView.swift */,
 			);
 			path = Admin;
@@ -296,6 +314,7 @@
 		CA3DFC28BCDB6564C0FA2F9F /* Events */ = {
 			isa = PBXGroup;
 			children = (
+				C4D5E6F7A8B9C0D1E2F3A4B5 /* EventAdminSheets.swift */,
 				1CA1494AF2CFE5F291AA9D8E /* EventsView.swift */,
 			);
 			path = Events;
@@ -304,6 +323,7 @@
 		D9285FDA55E43100DA1FB79C /* Members */ = {
 			isa = PBXGroup;
 			children = (
+				B7C8D9E01F2A3B4C5D6E7F80 /* MemberAdminSheets.swift */,
 				A679D70EA159103C5700DB9B /* MembersView.swift */,
 			);
 			path = Members;
@@ -339,6 +359,7 @@
 		FFEA3606036A88B940232175 /* Home */ = {
 			isa = PBXGroup;
 			children = (
+				F5A6B7C8D9E0F1A2B3C4D5E6 /* AnnouncementAdminSheets.swift */,
 				E3D5DF16D605BF502426C68E /* AnnouncementsView.swift */,
 				5D3B0A8D5DC712DAFC66EA1E /* HomeView.swift */,
 			);
@@ -446,7 +467,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				2C1281ABDB7F1B4B2795EE51 /* APIClient.swift in Sources */,
+				89B98E5F42920EA80BCBE56B /* AdminHubView.swift in Sources */,
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* GuestsView.swift in Sources */,
+				A2B3C4D5E6F7A8B9C0D1E2F3 /* GuestActionSheets.swift in Sources */,
 				CFA18EE4CCB453EAC4492B27 /* AnnouncementsView.swift in Sources */,
+				E4F5A6B7C8D9E0F1A2B3C4D5 /* AnnouncementAdminSheets.swift in Sources */,
 				07B050D1CD8AD30BA96C155A /* AuthViewModel.swift in Sources */,
 				7668D83C7BB2BDCEFF53949F /* BillingView.swift in Sources */,
 				3865285D8B9934133BDB22E8 /* BookView.swift in Sources */,
@@ -457,6 +482,8 @@
 				1A8C501BC7586DC0F3FD94E2 /* DateUtilities.swift in Sources */,
 				33AFDE7356E81A406E19CC84 /* DiningView.swift in Sources */,
 				0E31C6F60975F5940724856C /* EventsView.swift in Sources */,
+				B3C4D5E6F7A8B9C0D1E2F3A4 /* EventAdminSheets.swift in Sources */,
+				E8F1A2B3C4D5E6F7A8B9C0D1 /* ErrorBanner.swift in Sources */,
 				3100AE9C45F8901669624481 /* GolfBookingView.swift in Sources */,
 				0527E82B1919261F3C15B740 /* HomeView.swift in Sources */,
 				BE1C07ACDA2562BBF488E3C2 /* ImageCacheService.swift in Sources */,
@@ -464,6 +491,7 @@
 				1F9ED783AD8BB4FCF41B3DE4 /* Member.swift in Sources */,
 				6C9275AD8A8DFC810D06AE1B /* MemberScannerView.swift in Sources */,
 				C93B044D0F2C6600521ACF1C /* MembersView.swift in Sources */,
+				F2A8B3C4D5E697A8B9C0D1E2 /* MemberAdminSheets.swift in Sources */,
 				97064286620037EF3C38B5EA /* MembershipCardView.swift in Sources */,
 				D37F7028BD5D59C1685D5FC9 /* NotificationsView.swift in Sources */,
 				83DE5CDCBD6988A9E5EB821D /* PersonalInfoView.swift in Sources */,

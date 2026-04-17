@@ -4,6 +4,7 @@ import SwiftUI
 
 struct EventsListResponse: Decodable {
     let events: [ClubEvent]
+    let role: String?
 }
 
 struct EventDetailResponse: Decodable {
@@ -57,7 +58,13 @@ struct EventsView: View {
     @State private var loading = true
     @State private var hasLoadedOnce = false
     @State private var selectedEvent: ClubEvent?
+    @State private var adminSelectedEvent: ClubEvent?
+    @State private var showComposer = false
+    @State private var adminTimeFilter: EventAdminTimeFilter = .upcoming
+    @State private var callerRole: String?
     @State private var didPresentInitial = false
+
+    private var isAdmin: Bool { callerRole == "admin" }
 
     // Hero image — nil = still loading, "" = no image, URL string = has image
     @State private var eventsHeroUrl: String?
@@ -84,6 +91,19 @@ struct EventsView: View {
         .navigationTitle(hasHeroContent ? "" : "Events")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(hasHeroContent ? .hidden : .visible, for: .navigationBar)
+        .toolbar {
+            if isAdmin {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showComposer = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .accessibilityLabel("New event")
+                }
+            }
+        }
         .task {
             await fetchEventsHero()
             await fetchEvents()
@@ -95,8 +115,21 @@ struct EventsView: View {
                 selectedEvent = events.first(where: { $0.id == initial.id }) ?? initial
             }
         }
+        .onChange(of: adminTimeFilter) { _, _ in
+            Task { await fetchEvents() }
+        }
         .sheet(item: $selectedEvent) { event in
             eventDetailSheet(event)
+        }
+        .sheet(item: $adminSelectedEvent) { event in
+            EventAdminDetailSheet(event: event) {
+                Task { await fetchEvents() }
+            }
+        }
+        .sheet(isPresented: $showComposer) {
+            EventComposerSheet(existing: nil) {
+                Task { await fetchEvents() }
+            }
         }
         .alert("RSVP Error", isPresented: .constant(rsvpError != nil)) {
             Button("OK") { rsvpError = nil }
@@ -133,6 +166,7 @@ struct EventsView: View {
                                         .aspectRatio(contentMode: .fill)
                                         .frame(width: geo.size.width, height: height)
                                         .clipped()
+                                        .contentShape(Rectangle())
                                 case .failure:
                                     Color.club.surfaceContainer
                                         .frame(width: geo.size.width, height: height)
@@ -158,6 +192,17 @@ struct EventsView: View {
                         .offset(y: offset)
                     }
                     .frame(height: 300)
+                }
+
+                if isAdmin {
+                    Picker("", selection: $adminTimeFilter) {
+                        ForEach(EventAdminTimeFilter.allCases) { f in
+                            Text(f.label).tag(f)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
                 }
 
                 if loading && !hasLoadedOnce {
@@ -258,7 +303,11 @@ struct EventsView: View {
         let (icon, gradientColors) = eventIcon(for: event.title)
 
         return Button {
-            selectedEvent = event
+            if isAdmin {
+                adminSelectedEvent = event
+            } else {
+                selectedEvent = event
+            }
         } label: {
             VStack(alignment: .leading, spacing: 0) {
                 // Hero image or gradient
@@ -285,6 +334,7 @@ struct EventsView: View {
                         }
                         .frame(height: 160)
                         .clipped()
+                        .contentShape(Rectangle())
                     } else {
                         LinearGradient(
                             colors: gradientColors,
@@ -319,6 +369,10 @@ struct EventsView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     // Tags row
                     HStack(spacing: 6) {
+                        if isAdmin, let status = event.status, status != "published" {
+                            eventStatusBadge(status)
+                        }
+
                         if event.priceValue == nil || event.priceValue == 0 {
                             tagBadge("FREE", color: Color.club.primary)
                         } else {
@@ -389,7 +443,11 @@ struct EventsView: View {
         let (icon, gradientColors) = eventIcon(for: event.title)
 
         return Button {
-            selectedEvent = event
+            if isAdmin {
+                adminSelectedEvent = event
+            } else {
+                selectedEvent = event
+            }
         } label: {
             HStack(spacing: 14) {
                 // Event image or icon gradient
@@ -411,6 +469,7 @@ struct EventsView: View {
                     }
                     .frame(width: 56, height: 56)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .contentShape(RoundedRectangle(cornerRadius: 14))
                 } else {
                     ZStack {
                         LinearGradient(
@@ -427,11 +486,15 @@ struct EventsView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack {
+                    HStack(spacing: 6) {
                         Text(event.title)
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(Color.club.foreground)
                             .lineLimit(1)
+
+                        if isAdmin, let status = event.status, status != "published" {
+                            eventStatusBadge(status)
+                        }
 
                         Spacer()
 
@@ -614,6 +677,7 @@ struct EventsView: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func eventGradientHero(icon: String, colors: [Color], height: CGFloat = 240) -> some View {
@@ -826,12 +890,16 @@ struct EventsView: View {
             hasLoadedOnce = true
         }
 
+        let query: [String: String]? = isAdmin ? ["time": adminTimeFilter.rawValue] : nil
+
         do {
-            let response: EventsListResponse = try await APIClient.shared.get("/events")
+            let response: EventsListResponse = try await APIClient.shared.get("/events", query: query)
             events = response.events
+            callerRole = response.role
         } catch {
-            // Preserve cached events on failure — don't wipe the list.
-            print("Failed to fetch events:", error)
+            // Preserve cached events on failure — don't wipe the list, but
+            // surface the error so the user knows data is stale.
+            ErrorBanner.shared.show(error)
         }
     }
 
@@ -852,32 +920,7 @@ struct EventsView: View {
         )
 
         do {
-            // Build request manually so we can handle the response ourselves
-            let urlRequest = try APIClient.shared.buildRequest(
-                path: "/events/rsvp",
-                method: "POST",
-                body: request
-            )
-            let (data, response) = try await URLSession.shared.data(for: urlRequest)
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                rsvpError = "Invalid response"
-                return
-            }
-
-            if httpResponse.statusCode >= 400 {
-                // Revert optimistic update on failure
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                    optimisticRsvp = nil
-                }
-                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let errorMsg = json["error"] as? String {
-                    rsvpError = errorMsg
-                } else {
-                    rsvpError = "RSVP failed (status \(httpResponse.statusCode))"
-                }
-                return
-            }
+            try await APIClient.shared.post("/events/rsvp", body: request)
 
             // Success — re-fetch events to get updated server state
             await fetchEvents()
@@ -887,11 +930,40 @@ struct EventsView: View {
             // Clear optimistic state now that server state is authoritative
             optimisticRsvp = nil
         } catch {
-            // Revert optimistic update on error
+            // Revert optimistic update on failure
             withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
                 optimisticRsvp = nil
             }
-            rsvpError = error.localizedDescription
+            rsvpError = (error as? APIError)?.errorDescription ?? error.localizedDescription
+            ErrorBanner.shared.show(error)
         }
     }
+
+    // MARK: - Admin status badge
+
+    fileprivate func eventStatusBadge(_ status: String) -> some View {
+        let cfg: (label: String, bg: Color, fg: Color) = {
+            switch status {
+            case "draft": return ("DRAFT", Color(hex: "f3f4f6"), Color(hex: "6b7280"))
+            case "cancelled": return ("CANCELLED", Color(hex: "fee2e2"), Color.club.destructive)
+            case "completed": return ("COMPLETED", Color(hex: "dbeafe"), Color(hex: "2563eb"))
+            default: return (status.uppercased(), Color.club.surfaceContainerHigh, Color.club.onSurfaceVariant)
+            }
+        }()
+        return Text(cfg.label)
+            .font(.system(size: 9, weight: .bold))
+            .tracking(0.5)
+            .foregroundStyle(cfg.fg)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(cfg.bg, in: Capsule())
+    }
+}
+
+// MARK: - Admin time filter
+
+enum EventAdminTimeFilter: String, CaseIterable, Identifiable {
+    case upcoming, past, all
+    var id: String { rawValue }
+    var label: String { rawValue.capitalized }
 }

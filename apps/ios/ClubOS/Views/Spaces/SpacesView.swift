@@ -241,9 +241,10 @@ struct SpacesView<PickerContent: View>: View {
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 12))
+                .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .strokeBorder(Color.club.outline.opacity(0.3), lineWidth: 1)
                 )
             }
@@ -299,9 +300,17 @@ struct SpacesView<PickerContent: View>: View {
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 12))
+        .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        // Clip the WHOLE card (including the image header) to the same
+        // rounded shape. Without this the AsyncImage rectangle paints
+        // over the top corners so only the bottom appears rounded.
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        // HITTEST-FIX (CLAUDE.md): .scaledToFill() + .clipped() on the
+        // AsyncImage clips visuals but not the hit-test region. Pin
+        // the hit shape to the visible card.
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(Color.club.outline.opacity(0.3), lineWidth: 1)
         )
     }
@@ -343,6 +352,7 @@ struct SpacesView<PickerContent: View>: View {
                         .frame(height: 160)
                         .frame(maxWidth: .infinity)
                         .clipped()
+                        .contentShape(Rectangle())
                     }
                     VStack(alignment: .leading, spacing: 6) {
                         Text(space.name).font(.system(size: 18, weight: .bold))

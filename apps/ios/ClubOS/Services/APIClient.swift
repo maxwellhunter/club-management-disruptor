@@ -34,14 +34,21 @@ actor APIClient {
         return try await execute(request)
     }
 
-    func patch<T: Decodable>(_ path: String, body: Encodable? = nil) async throws -> T {
-        let request = try buildRequest(path: path, method: "PATCH", body: body)
+    func patch<T: Decodable>(_ path: String, query: [String: String]? = nil, body: Encodable? = nil) async throws -> T {
+        let request = try buildRequest(path: path, method: "PATCH", query: query, body: body)
         return try await execute(request)
     }
 
     func put<T: Decodable>(_ path: String, body: Encodable? = nil) async throws -> T {
         let request = try buildRequest(path: path, method: "PUT", body: body)
         return try await execute(request)
+    }
+
+    // Fire-and-forget PUT (no response body needed).
+    func put(_ path: String, body: Encodable? = nil) async throws {
+        let request = try buildRequest(path: path, method: "PUT", body: body)
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data)
     }
 
     func delete<T: Decodable>(_ path: String) async throws -> T {
@@ -62,8 +69,8 @@ actor APIClient {
         try validateResponse(response, data: data)
     }
 
-    func delete(_ path: String) async throws {
-        let request = try buildRequest(path: path, method: "DELETE")
+    func delete(_ path: String, body: Encodable? = nil) async throws {
+        let request = try buildRequest(path: path, method: "DELETE", body: body)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data)
     }
