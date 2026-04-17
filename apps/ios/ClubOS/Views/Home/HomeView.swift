@@ -212,6 +212,9 @@ struct HomeView: View {
                         }
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(unreadCount > 0
+                        ? "Notifications, \(unreadCount) unread"
+                        : "Notifications")
 
                     NavigationLink {
                         ProfileView()
@@ -234,6 +237,7 @@ struct HomeView: View {
                             homeInitialsCircle
                         }
                     }
+                    .accessibilityLabel("Profile")
                 }
                 .padding(.trailing, 0)
 

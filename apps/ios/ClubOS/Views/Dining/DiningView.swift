@@ -1472,10 +1472,12 @@ struct DiningView: View {
                                     .frame(width: 28, height: 28)
                                     .background(Color.club.accent, in: Circle())
                             }
+                            .accessibilityLabel("Remove one \(item.name)")
 
                             Text("\(inCart.quantity)")
                                 .font(.system(size: 14, weight: .bold))
                                 .foregroundStyle(Color.club.foreground)
+                                .accessibilityLabel("\(inCart.quantity) in cart")
 
                             Button { updateQuantity(item.id, delta: 1) } label: {
                                 Image(systemName: "plus")
@@ -1484,6 +1486,7 @@ struct DiningView: View {
                                     .frame(width: 28, height: 28)
                                     .background(Color.club.primary, in: Circle())
                             }
+                            .accessibilityLabel("Add another \(item.name)")
                         }
                     } else {
                         Button { addToCart(item) } label: {
@@ -1493,6 +1496,7 @@ struct DiningView: View {
                                 .frame(width: 32, height: 32)
                                 .background(Color.club.primary, in: Circle())
                         }
+                        .accessibilityLabel("Add \(item.name) to cart")
                     }
                 }
             }
@@ -1644,11 +1648,13 @@ struct DiningView: View {
                         .frame(width: 24, height: 24)
                         .background(Color.club.accent, in: Circle())
                 }
+                .accessibilityLabel("Remove one \(item.name)")
 
                 Text("\(item.quantity)")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(Color.club.foreground)
                     .frame(width: 20)
+                    .accessibilityLabel("Quantity \(item.quantity)")
 
                 Button { updateQuantity(item.menuItemId, delta: 1) } label: {
                     Image(systemName: "plus")
@@ -1657,6 +1663,7 @@ struct DiningView: View {
                         .frame(width: 24, height: 24)
                         .background(Color.club.accent, in: Circle())
                 }
+                .accessibilityLabel("Add another \(item.name)")
             }
 
             Text(formatPrice(item.price * Double(item.quantity)))

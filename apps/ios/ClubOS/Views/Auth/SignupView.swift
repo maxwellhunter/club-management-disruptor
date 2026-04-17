@@ -108,6 +108,7 @@ struct SignupView: View {
                     Image(systemName: "arrow.left")
                         .foregroundStyle(Color.club.foreground)
                 }
+                .accessibilityLabel("Back")
             }
         }
     }

@@ -366,6 +366,7 @@ struct GuestsView: View {
                                 .font(.system(size: 15))
                                 .foregroundStyle(Color.club.onSurfaceVariant)
                         }
+                        .accessibilityLabel("Clear search")
                     }
                 }
                 .padding(12)

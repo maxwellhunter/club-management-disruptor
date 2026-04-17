@@ -40,6 +40,7 @@ struct MembersView: View {
                             .font(.system(size: 16))
                             .foregroundStyle(Color.club.onSurfaceVariant)
                     }
+                    .accessibilityLabel("Clear search")
                 }
             }
             .padding(12)

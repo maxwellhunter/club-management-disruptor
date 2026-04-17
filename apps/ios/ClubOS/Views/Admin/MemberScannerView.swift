@@ -100,6 +100,7 @@ struct MemberScannerView: View {
                             .frame(width: 36, height: 36)
                             .background(.black.opacity(0.45), in: Circle())
                     }
+                    .accessibilityLabel("Close scanner")
                     Spacer()
                     Text("Scan Member")
                         .font(.system(size: 15, weight: .semibold))
