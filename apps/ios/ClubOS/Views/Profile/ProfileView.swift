@@ -52,6 +52,8 @@ private struct Transaction: Identifiable {
 struct ProfileView: View {
     @Environment(AuthViewModel.self) private var auth
     @State private var billing: BillingStatusResponse?
+    @State private var showMemberScanner = false
+    @State private var lastScannedMemberName: String?
     @State private var transactions: [Transaction] = Transaction.mockActivity
     @State private var isLoading = true
     @State private var showSignOutAlert = false
@@ -83,6 +85,10 @@ struct ProfileView: View {
 
     private var sub: SubscriptionInfo? { billing?.subscription }
 
+    private var isAdmin: Bool {
+        (billing?.role ?? "").lowercased() == "admin"
+    }
+
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
@@ -90,6 +96,7 @@ struct ProfileView: View {
                 balanceCard
                 if sub != nil { accountDetails }
                 membershipCardLink
+                if isAdmin { adminToolsSection }
                 recentActivity
                 accountSettings
                 signOutButton
@@ -289,6 +296,65 @@ struct ProfileView: View {
         .shadow(color: Color.club.foreground.opacity(0.03), radius: 12, y: 4)
         .padding(.horizontal, 24)
         .padding(.bottom, 20)
+    }
+
+    // MARK: - Admin Tools
+
+    private var adminToolsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("STAFF TOOLS")
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(1.2)
+                .foregroundStyle(Color.club.onSurfaceVariant)
+                .padding(.horizontal, 28)
+                .padding(.top, 4)
+
+            Button { showMemberScanner = true } label: {
+                HStack(spacing: 14) {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(hex: "1b4332"))
+                        .frame(width: 40, height: 40)
+                        .overlay {
+                            Image(systemName: "qrcode.viewfinder")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Scan Member Card")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.club.foreground)
+                        if let lastName = lastScannedMemberName {
+                            Text("Last scan: \(lastName)")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.club.onSurfaceVariant)
+                        } else {
+                            Text("Verify a member at any contact point")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.club.onSurfaceVariant)
+                        }
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.club.onSurfaceVariant)
+                }
+                .padding(16)
+                .background(Color.club.surfaceContainerLowest, in: RoundedRectangle(cornerRadius: 16))
+                .shadow(color: Color.club.foreground.opacity(0.04), radius: 12, y: 4)
+                .contentShape(RoundedRectangle(cornerRadius: 16))
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 24)
+        }
+        .padding(.bottom, 24)
+        .fullScreenCover(isPresented: $showMemberScanner) {
+            MemberScannerView(tapType: "check_in", location: "Staff Device") { scanned in
+                lastScannedMemberName = scanned.memberName
+            }
+        }
     }
 
     // MARK: - Membership Card Link

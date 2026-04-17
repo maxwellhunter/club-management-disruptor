@@ -22,6 +22,7 @@
 		5F9A0E227F83510681FDD69F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A438C1A077D5830884ED34D /* ContentView.swift */; };
 		65388E829E6F6EE76251D64B /* DateUtilitiesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21BA90F1E9310E2B16D0089D /* DateUtilitiesTests.swift */; };
 		65FC13A8849BA926954D83DB /* ViewInspector in Frameworks */ = {isa = PBXBuildFile; productRef = A0B422E0C3E90B8999F4D9F3 /* ViewInspector */; };
+		6C9275AD8A8DFC810D06AE1B /* MemberScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B99EB6B7F62F4D653D411B5 /* MemberScannerView.swift */; };
 		7274545DBB1A3241E10049F6 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F47C2FE6DA0B81CFB18BE8 /* Theme.swift */; };
 		7668D83C7BB2BDCEFF53949F /* BillingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F1D809EF88A59F5CB73373A /* BillingView.swift */; };
 		83DE5CDCBD6988A9E5EB821D /* PersonalInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDD8290984EA056EA660983C /* PersonalInfoView.swift */; };
@@ -71,6 +72,7 @@
 		6B78B5A08E883ADB3802BFA0 /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
 		735D860DA8DB5F1FA2543EB1 /* MembershipCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MembershipCardView.swift; sourceTree = "<group>"; };
 		767B7CA99E26BE47DEEE3B4E /* BookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookView.swift; sourceTree = "<group>"; };
+		7B99EB6B7F62F4D653D411B5 /* MemberScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemberScannerView.swift; sourceTree = "<group>"; };
 		97F47C2FE6DA0B81CFB18BE8 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		987DF30AFFFD9B1D9158CF36 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		9A438C1A077D5830884ED34D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -127,6 +129,7 @@
 		0D6C693C999C892DC3776FD1 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				92795A4501F9D35EFBF30F72 /* Admin */,
 				852C89C970F0EF8647589AC4 /* Auth */,
 				F6204E087BFA035D652183B6 /* Card */,
 				33B81CE582E5EC63657765E1 /* Chat */,
@@ -224,6 +227,14 @@
 				EDEA2A58F8BA32E02FF9B727 /* Member.swift */,
 			);
 			path = Models;
+			sourceTree = "<group>";
+		};
+		92795A4501F9D35EFBF30F72 /* Admin */ = {
+			isa = PBXGroup;
+			children = (
+				7B99EB6B7F62F4D653D411B5 /* MemberScannerView.swift */,
+			);
+			path = Admin;
 			sourceTree = "<group>";
 		};
 		A003BBC1D1A31A23CDEE749C /* ClubOS */ = {
@@ -451,6 +462,7 @@
 				BE1C07ACDA2562BBF488E3C2 /* ImageCacheService.swift in Sources */,
 				C550771E6BBA3C6F4CD17968 /* LoginView.swift in Sources */,
 				1F9ED783AD8BB4FCF41B3DE4 /* Member.swift in Sources */,
+				6C9275AD8A8DFC810D06AE1B /* MemberScannerView.swift in Sources */,
 				C93B044D0F2C6600521ACF1C /* MembersView.swift in Sources */,
 				97064286620037EF3C38B5EA /* MembershipCardView.swift in Sources */,
 				D37F7028BD5D59C1685D5FC9 /* NotificationsView.swift in Sources */,

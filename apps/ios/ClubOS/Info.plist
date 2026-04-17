@@ -37,6 +37,8 @@
 	<string>$(API_BASE_URL)</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>ClubOS uses Face ID for quick and secure sign-in to your account.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>ClubOS uses the camera to scan member QR codes for check-in and verification at club facilities.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSAppTransportSecurity</key>
