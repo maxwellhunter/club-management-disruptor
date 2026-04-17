@@ -8,12 +8,23 @@ actor APIClient {
     private let baseURL: URL
     private let session: URLSession
     private var accessToken: String?
+    let maxRetries: Int
+    let retryBaseDelay: TimeInterval
 
     private init() {
         self.baseURL = AppConfig.apiBaseURL
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         self.session = URLSession(configuration: config)
+        self.maxRetries = 3
+        self.retryBaseDelay = 1.0
+    }
+
+    init(baseURL: URL, session: URLSession, maxRetries: Int = 3, retryBaseDelay: TimeInterval = 1.0) {
+        self.baseURL = baseURL
+        self.session = session
+        self.maxRetries = maxRetries
+        self.retryBaseDelay = retryBaseDelay
     }
 
     // MARK: - Token Management
@@ -52,19 +63,19 @@ actor APIClient {
     // Fire-and-forget variants (no response body needed)
     func post(_ path: String, body: Encodable? = nil) async throws {
         let request = try buildRequest(path: path, method: "POST", body: body)
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await executeWithRetry(request)
         try validateResponse(response, data: data)
     }
 
     func patch(_ path: String, body: Encodable? = nil) async throws {
         let request = try buildRequest(path: path, method: "PATCH", body: body)
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await executeWithRetry(request)
         try validateResponse(response, data: data)
     }
 
     func delete(_ path: String) async throws {
         let request = try buildRequest(path: path, method: "DELETE")
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await executeWithRetry(request)
         try validateResponse(response, data: data)
     }
 
@@ -144,12 +155,47 @@ actor APIClient {
     }
 
     private func execute<T: Decodable>(_ request: URLRequest) async throws -> T {
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await executeWithRetry(request)
         try validateResponse(response, data: data)
 
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return try decoder.decode(T.self, from: data)
+    }
+
+    private func executeWithRetry(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        var lastError: Error?
+        for attempt in 0...maxRetries {
+            do {
+                let (data, response) = try await session.data(for: request)
+                if let http = response as? HTTPURLResponse, isRetryable(statusCode: http.statusCode) && attempt < maxRetries {
+                    let delay = retryBaseDelay * pow(2.0, Double(attempt))
+                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    continue
+                }
+                return (data, response)
+            } catch let error as URLError where isRetryableURLError(error) && attempt < maxRetries {
+                lastError = error
+                let delay = retryBaseDelay * pow(2.0, Double(attempt))
+                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            } catch {
+                throw error
+            }
+        }
+        throw lastError ?? APIError.invalidResponse
+    }
+
+    func isRetryable(statusCode: Int) -> Bool {
+        statusCode == 429 || statusCode == 502 || statusCode == 503 || statusCode == 504
+    }
+
+    func isRetryableURLError(_ error: URLError) -> Bool {
+        switch error.code {
+        case .timedOut, .networkConnectionLost, .notConnectedToInternet, .cannotConnectToHost:
+            return true
+        default:
+            return false
+        }
     }
 
     /// Try to extract the "error" field from an API JSON error response.
