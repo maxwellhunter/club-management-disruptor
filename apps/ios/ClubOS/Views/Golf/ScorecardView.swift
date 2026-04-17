@@ -1467,7 +1467,9 @@ struct ScorecardView: View {
                 setupFacilityId = facilities.first?.id ?? ""
             }
         } catch {
+            #if DEBUG
             print("Failed to fetch rounds:", error)
+            #endif
         }
     }
 
@@ -1481,7 +1483,9 @@ struct ScorecardView: View {
             // Filter to today's golf bookings only
             todayBookings = response.bookings.filter { $0.date == today && $0.facilityType == "golf" }
         } catch {
+            #if DEBUG
             print("Failed to fetch today's bookings:", error)
+            #endif
         }
     }
 
@@ -1511,7 +1515,9 @@ struct ScorecardView: View {
             await fetchTodayBookings()
             await loadRoundForScoring(response.round.id)
         } catch {
+            #if DEBUG
             print("Failed to start round from booking:", error)
+            #endif
         }
     }
 
@@ -1535,7 +1541,9 @@ struct ScorecardView: View {
             pendingBookingId = nil
             await loadRoundForScoring(response.round.id)
         } catch {
+            #if DEBUG
             print("Failed to create round:", error)
+            #endif
         }
     }
 
@@ -1566,7 +1574,9 @@ struct ScorecardView: View {
             activeHole = 1
             screen = .scoring
         } catch {
+            #if DEBUG
             print("Failed to load round detail:", error)
+            #endif
         }
     }
 
@@ -1604,7 +1614,9 @@ struct ScorecardView: View {
         do {
             try await APIClient.shared.patch("/scorecards/\(roundId)", body: ScoresPayload(scores: toSave))
         } catch {
+            #if DEBUG
             print("Failed to save scores:", error)
+            #endif
         }
     }
 
@@ -1621,7 +1633,9 @@ struct ScorecardView: View {
             screen = .history
             await fetchRounds()
         } catch {
+            #if DEBUG
             print("Failed to complete round:", error)
+            #endif
         }
     }
 
@@ -1659,7 +1673,9 @@ struct ScorecardView: View {
                 }
             }
         } catch {
+            #if DEBUG
             print("Failed to load course:", error)
+            #endif
             // Seed defaults on error
             setupHoles = (1...9).map { num in
                 EditableCourseHole(
