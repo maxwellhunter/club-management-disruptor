@@ -428,7 +428,9 @@ struct HomeView: View {
             NavigationLink { DiningView() } label: { upcomingRow(item) }
                 .buttonStyle(.plain)
         case .event:
-            NavigationLink { EventsView() } label: { upcomingRow(item) }
+            NavigationLink {
+                EventsView(initialEvent: item.eventRef)
+            } label: { upcomingRow(item) }
                 .buttonStyle(.plain)
         }
     }

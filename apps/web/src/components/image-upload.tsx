@@ -3,6 +3,48 @@
 import { useState, useRef, useEffect } from "react";
 import { Upload, Trash2, Loader2 } from "lucide-react";
 
+// Best-effort client-side downscale + JPEG re-encode. Uses createImageBitmap
+// (supported in all evergreen browsers + Safari 15+) so we don't pull in a
+// dependency. On any failure we fall through to uploading the original file.
+async function downscaleImage(file: File, maxEdge: number, quality: number): Promise<Blob> {
+  if (typeof createImageBitmap !== "function" || typeof document === "undefined") {
+    return file;
+  }
+  const bitmap = await createImageBitmap(file);
+  const { width, height } = bitmap;
+  const scale = Math.min(1, maxEdge / Math.max(width, height));
+  const w = Math.max(1, Math.round(width * scale));
+  const h = Math.max(1, Math.round(height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return file;
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close?.();
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", quality)
+  );
+  return blob ?? file;
+}
+
+async function safeJson(res: Response): Promise<any | null> {
+  try {
+    const text = await res.text();
+    if (!text) return null;
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+async function extractErrorMessage(res: Response, fallback: string): Promise<string> {
+  const data = await safeJson(res);
+  if (data?.error) return String(data.error);
+  if (res.status === 413) return "Image is too large — please choose a smaller file";
+  return `${fallback} (status ${res.status})`;
+}
+
 interface ImageUploadProps {
   value: string; // current image URL
   onChange: (url: string) => void;
@@ -41,8 +83,20 @@ export function ImageUpload({
       const localUrl = URL.createObjectURL(file);
       setPreview(localUrl);
 
+      // Downscale on the client before uploading. Vercel's serverless body
+      // limit is ~4.5MB, and modern phone cameras easily produce 5–12MB
+      // JPEGs/HEICs — those get rejected before the route handler runs,
+      // returning a non-JSON response that Safari surfaces as the cryptic
+      // "The string did not match the expected pattern." We cap the long
+      // edge at 2000px and re-encode as JPEG at 0.85 quality, which keeps
+      // us comfortably under the limit while still looking great after the
+      // server's sharp() re-encode.
+      const uploadBlob = await downscaleImage(file, 2000, 0.85).catch(() => file);
+
       const formData = new FormData();
-      formData.append("file", file);
+      // Always send a .jpg filename when we re-encoded; otherwise keep original.
+      const filename = uploadBlob === file ? file.name : file.name.replace(/\.[^.]+$/, "") + ".jpg";
+      formData.append("file", uploadBlob, filename);
       formData.append("bucket", bucket);
 
       const res = await fetch("/api/upload", {
@@ -51,11 +105,11 @@ export function ImageUpload({
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Upload failed");
+        throw new Error(await extractErrorMessage(res, "Upload failed"));
       }
 
-      const data = await res.json();
+      const data = await safeJson(res);
+      if (!data?.url) throw new Error("Upload succeeded but no URL returned");
       setPreview(data.url);
       onChange(data.url);
     } catch (err) {

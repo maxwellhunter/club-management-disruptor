@@ -49,10 +49,15 @@ private func eventIcon(for title: String) -> (icon: String, colors: [Color]) {
 // MARK: - Events View
 
 struct EventsView: View {
+    /// Optional event to auto-present on first appearance (e.g. when navigated
+    /// from Home's "Upcoming" list). Consumed once, then cleared.
+    var initialEvent: ClubEvent? = nil
+
     @State private var events: [ClubEvent] = []
     @State private var loading = true
     @State private var hasLoadedOnce = false
     @State private var selectedEvent: ClubEvent?
+    @State private var didPresentInitial = false
 
     // Hero image — nil = still loading, "" = no image, URL string = has image
     @State private var eventsHeroUrl: String?
@@ -82,6 +87,13 @@ struct EventsView: View {
         .task {
             await fetchEventsHero()
             await fetchEvents()
+            // If navigated here with a preselected event (from Home's
+            // Upcoming list), auto-present its detail sheet once events
+            // have loaded so the user lands directly on the RSVP view.
+            if !didPresentInitial, let initial = initialEvent {
+                didPresentInitial = true
+                selectedEvent = events.first(where: { $0.id == initial.id }) ?? initial
+            }
         }
         .sheet(item: $selectedEvent) { event in
             eventDetailSheet(event)
