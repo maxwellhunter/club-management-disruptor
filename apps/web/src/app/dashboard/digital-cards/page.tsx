@@ -73,6 +73,13 @@ export default function DigitalCardsPage() {
             Apple Wallet, Google Wallet, and NFC tap-to-check-in management.
           </p>
         </div>
+        <a
+          href="/dashboard/digital-cards/test"
+          className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--muted)] transition-colors px-3 py-2 text-sm font-medium"
+        >
+          <Eye className="h-4 w-4" />
+          Scanner Test QRs
+        </a>
       </div>
 
       {/* Stats */}

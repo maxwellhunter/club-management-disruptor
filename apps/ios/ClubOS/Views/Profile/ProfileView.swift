@@ -52,8 +52,6 @@ private struct Transaction: Identifiable {
 struct ProfileView: View {
     @Environment(AuthViewModel.self) private var auth
     @State private var billing: BillingStatusResponse?
-    @State private var showMemberScanner = false
-    @State private var lastScannedMemberName: String?
     @State private var transactions: [Transaction] = Transaction.mockActivity
     @State private var isLoading = true
     @State private var showSignOutAlert = false
@@ -309,7 +307,9 @@ struct ProfileView: View {
                 .padding(.horizontal, 28)
                 .padding(.top, 4)
 
-            Button { showMemberScanner = true } label: {
+            NavigationLink {
+                AdminHubView()
+            } label: {
                 HStack(spacing: 14) {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color(hex: "1b4332"))
@@ -321,18 +321,12 @@ struct ProfileView: View {
                         }
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Scan Member Card")
+                        Text("Staff Tools")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(Color.club.foreground)
-                        if let lastName = lastScannedMemberName {
-                            Text("Last scan: \(lastName)")
-                                .font(.system(size: 12))
-                                .foregroundStyle(Color.club.onSurfaceVariant)
-                        } else {
-                            Text("Verify a member at any contact point")
-                                .font(.system(size: 12))
-                                .foregroundStyle(Color.club.onSurfaceVariant)
-                        }
+                        Text("Scan a member card, verify guests, more")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.club.onSurfaceVariant)
                     }
 
                     Spacer()
@@ -350,11 +344,6 @@ struct ProfileView: View {
             .padding(.horizontal, 24)
         }
         .padding(.bottom, 24)
-        .fullScreenCover(isPresented: $showMemberScanner) {
-            MemberScannerView(tapType: "check_in", location: "Staff Device") { scanned in
-                lastScannedMemberName = scanned.memberName
-            }
-        }
     }
 
     // MARK: - Membership Card Link
