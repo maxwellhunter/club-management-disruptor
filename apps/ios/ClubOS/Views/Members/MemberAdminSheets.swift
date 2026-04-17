@@ -289,15 +289,18 @@ struct AddMemberSheet: View {
 
 struct MemberDetailSheet: View {
     let member: DirectoryMember
+    let tiers: [MemberTier]
     let onChange: () -> Void
 
     @Environment(\.dismiss) private var dismiss
 
+    @State private var currentMember: DirectoryMember
     @State private var currentStatus: String
     @State private var working: ActionKind?
     @State private var errorMessage: String?
     @State private var resendResult: String?
     @State private var confirmStatusChange: ProposedStatusChange?
+    @State private var showEditSheet = false
 
     private enum ActionKind: Equatable { case resend, status(String) }
 
@@ -326,9 +329,11 @@ struct MemberDetailSheet: View {
         }
     }
 
-    init(member: DirectoryMember, onChange: @escaping () -> Void) {
+    init(member: DirectoryMember, tiers: [MemberTier], onChange: @escaping () -> Void) {
         self.member = member
+        self.tiers = tiers
         self.onChange = onChange
+        _currentMember = State(initialValue: member)
         _currentStatus = State(initialValue: member.status ?? "active")
     }
 
@@ -336,15 +341,24 @@ struct MemberDetailSheet: View {
         NavigationStack {
             Form {
                 Section("Member") {
-                    LabeledContent("Name", value: member.fullName)
-                    if let email = member.email { LabeledContent("Email", value: email) }
-                    if let phone = member.phone { LabeledContent("Phone", value: phone) }
-                    if let number = member.memberNumber { LabeledContent("Member #", value: number) }
-                    if let tier = member.tierName { LabeledContent("Tier", value: tier) }
+                    LabeledContent("Name", value: currentMember.fullName)
+                    if let email = currentMember.email { LabeledContent("Email", value: email) }
+                    if let phone = currentMember.phone { LabeledContent("Phone", value: phone) }
+                    if let number = currentMember.memberNumber { LabeledContent("Member #", value: number) }
+                    if let tier = currentMember.tierName { LabeledContent("Tier", value: tier) }
                     LabeledContent("Status", value: currentStatus.capitalized)
-                    if let role = member.role, role != "member" {
+                    if let role = currentMember.role, role != "member" {
                         LabeledContent("Role", value: role.capitalized)
                     }
+                }
+
+                Section {
+                    Button {
+                        showEditSheet = true
+                    } label: {
+                        Label("Edit profile", systemImage: "pencil")
+                    }
+                    .disabled(working != nil)
                 }
 
                 if let errorMessage {
@@ -395,7 +409,7 @@ struct MemberDetailSheet: View {
                     }
                 }
 
-                if let phone = member.phone {
+                if let phone = currentMember.phone {
                     Section {
                         Button {
                             if let url = URL(string: "tel:\(phone.replacingOccurrences(of: " ", with: ""))") {
@@ -404,7 +418,7 @@ struct MemberDetailSheet: View {
                         } label: {
                             Label("Call \(phone)", systemImage: "phone.fill")
                         }
-                        if let email = member.email {
+                        if let email = currentMember.email {
                             Button {
                                 if let url = URL(string: "mailto:\(email)") {
                                     UIApplication.shared.open(url)
@@ -416,7 +430,7 @@ struct MemberDetailSheet: View {
                     }
                 }
             }
-            .navigationTitle(member.fullName)
+            .navigationTitle(currentMember.fullName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -439,6 +453,12 @@ struct MemberDetailSheet: View {
                 Button("Cancel", role: .cancel) { confirmStatusChange = nil }
             } message: { change in
                 Text(change.message)
+            }
+            .sheet(isPresented: $showEditSheet) {
+                MemberEditSheet(member: currentMember, tiers: tiers) { updated in
+                    currentMember = updated
+                    onChange()
+                }
             }
         }
     }
@@ -493,6 +513,252 @@ struct MemberDetailSheet: View {
             )
             currentStatus = response.member.status
             onChange()
+        } catch {
+            errorMessage = (error as? APIError)?.errorDescription ?? error.localizedDescription
+            ErrorBanner.shared.show(error)
+        }
+    }
+}
+
+// MARK: - Member Edit Sheet
+
+/// Admin-only edit form. Pulls the member's full profile (notes +
+/// membership_tier_id) on appear, then PATCHes /members/{id} on save.
+struct MemberEditSheet: View {
+    let member: DirectoryMember
+    let tiers: [MemberTier]
+    let onSaved: (DirectoryMember) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var firstName: String
+    @State private var lastName: String
+    @State private var email: String
+    @State private var phone: String
+    @State private var role: MemberRole
+    @State private var tierId: String
+    @State private var memberNumber: String
+    @State private var notes: String
+
+    @State private var loadingDetail = true
+    @State private var submitting = false
+    @State private var errorMessage: String?
+
+    init(member: DirectoryMember, tiers: [MemberTier], onSaved: @escaping (DirectoryMember) -> Void) {
+        self.member = member
+        self.tiers = tiers
+        self.onSaved = onSaved
+
+        _firstName = State(initialValue: member.firstName)
+        _lastName = State(initialValue: member.lastName)
+        _email = State(initialValue: member.email ?? "")
+        _phone = State(initialValue: member.phone ?? "")
+        _role = State(initialValue: MemberRole(rawValue: member.role ?? "member") ?? .member)
+        // Prefer exact tier_id from detail fetch; fall back to a name match.
+        let fallbackTierId = tiers.first(where: { $0.name == member.tierName })?.id ?? ""
+        _tierId = State(initialValue: fallbackTierId)
+        _memberNumber = State(initialValue: member.memberNumber ?? "")
+        _notes = State(initialValue: "")
+    }
+
+    private var canSubmit: Bool {
+        !submitting
+            && !firstName.trimmingCharacters(in: .whitespaces).isEmpty
+            && !lastName.trimmingCharacters(in: .whitespaces).isEmpty
+            && email.contains("@")
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if let errorMessage {
+                    Section {
+                        Text(errorMessage)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.club.destructive)
+                    }
+                }
+
+                Section("Name") {
+                    TextField("First name", text: $firstName)
+                        .textContentType(.givenName)
+                    TextField("Last name", text: $lastName)
+                        .textContentType(.familyName)
+                }
+
+                Section("Contact") {
+                    TextField("Email", text: $email)
+                        .textContentType(.emailAddress)
+                        .keyboardType(.emailAddress)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                    TextField("Phone", text: $phone)
+                        .textContentType(.telephoneNumber)
+                        .keyboardType(.phonePad)
+                }
+
+                Section("Membership") {
+                    Picker("Role", selection: $role) {
+                        ForEach(MemberRole.allCases) { r in
+                            Text(r.label).tag(r)
+                        }
+                    }
+
+                    Picker("Tier", selection: $tierId) {
+                        Text("No tier").tag("")
+                        ForEach(tiers) { tier in
+                            Text(tier.name).tag(tier.id)
+                        }
+                    }
+
+                    TextField("Member number", text: $memberNumber)
+                        .autocorrectionDisabled()
+                }
+
+                Section("Notes") {
+                    if loadingDetail {
+                        HStack {
+                            ProgressView().scaleEffect(0.7)
+                            Text("Loading notes…")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Color.club.onSurfaceVariant)
+                        }
+                    } else {
+                        TextField("Notes (admin only)", text: $notes, axis: .vertical)
+                            .lineLimit(2...6)
+                    }
+                }
+
+                Section {
+                    Button {
+                        Task { await save() }
+                    } label: {
+                        HStack {
+                            if submitting {
+                                ProgressView().tint(.white)
+                            } else {
+                                Image(systemName: "checkmark")
+                            }
+                            Text(submitting ? "Saving…" : "Save Changes")
+                                .font(.system(size: 15, weight: .semibold))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .foregroundStyle(.white)
+                    }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(canSubmit ? Color.club.primary : Color.club.primary.opacity(0.5))
+                    .disabled(!canSubmit)
+                }
+            }
+            .navigationTitle("Edit Member")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+            .task { await loadDetail() }
+        }
+    }
+
+    // MARK: - Fetch
+
+    private func loadDetail() async {
+        struct DetailResponse: Decodable {
+            struct MemberDetail: Decodable {
+                let notes: String?
+                let membershipTierId: String?
+            }
+            let member: MemberDetail
+        }
+
+        defer { loadingDetail = false }
+
+        do {
+            let response: DetailResponse = try await APIClient.shared.get(
+                "/members/\(member.id.uuidString.lowercased())"
+            )
+            notes = response.member.notes ?? ""
+            if let tid = response.member.membershipTierId {
+                tierId = tid
+            }
+        } catch {
+            // Don't block editing the rest of the profile on notes-fetch
+            // failure — just leave notes empty and surface the error.
+            ErrorBanner.shared.show(error)
+        }
+    }
+
+    // MARK: - Save
+
+    private func save() async {
+        submitting = true
+        errorMessage = nil
+        defer { submitting = false }
+
+        struct UpdateBody: Encodable {
+            let firstName: String
+            let lastName: String
+            let email: String
+            let phone: String?
+            let role: String
+            let membershipTierId: String?
+            let memberNumber: String?
+            let notes: String?
+        }
+
+        struct UpdateResponse: Decodable {
+            struct UpdatedMember: Decodable {
+                let id: UUID
+                let firstName: String
+                let lastName: String
+                let email: String?
+                let phone: String?
+                let memberNumber: String?
+                let role: String?
+                let status: String?
+                let avatarUrl: String?
+                let membershipTiers: TierInfo?
+
+                struct TierInfo: Decodable {
+                    let name: String?
+                }
+            }
+            let member: UpdatedMember
+        }
+
+        let body = UpdateBody(
+            firstName: firstName.trimmingCharacters(in: .whitespaces),
+            lastName: lastName.trimmingCharacters(in: .whitespaces),
+            email: email.trimmingCharacters(in: .whitespaces),
+            phone: phone.trimmingCharacters(in: .whitespaces).isEmpty ? nil : phone,
+            role: role.rawValue,
+            membershipTierId: tierId.isEmpty ? nil : tierId,
+            memberNumber: memberNumber.trimmingCharacters(in: .whitespaces).isEmpty ? nil : memberNumber,
+            notes: notes.trimmingCharacters(in: .whitespaces).isEmpty ? nil : notes
+        )
+
+        do {
+            let response: UpdateResponse = try await APIClient.shared.patch(
+                "/members/\(member.id.uuidString.lowercased())",
+                body: body
+            )
+            let m = response.member
+            let updated = DirectoryMember(
+                id: m.id,
+                firstName: m.firstName,
+                lastName: m.lastName,
+                email: m.email,
+                phone: m.phone,
+                memberNumber: m.memberNumber,
+                tierName: m.membershipTiers?.name,
+                status: m.status,
+                avatarUrl: m.avatarUrl,
+                role: m.role
+            )
+            onSaved(updated)
+            dismiss()
         } catch {
             errorMessage = (error as? APIError)?.errorDescription ?? error.localizedDescription
             ErrorBanner.shared.show(error)

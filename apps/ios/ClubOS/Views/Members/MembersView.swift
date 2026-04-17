@@ -141,7 +141,7 @@ struct MembersView: View {
             }
         }
         .sheet(item: $selectedMember) { member in
-            MemberDetailSheet(member: member) {
+            MemberDetailSheet(member: member, tiers: tiers) {
                 Task { await fetchMembers() }
             }
         }
