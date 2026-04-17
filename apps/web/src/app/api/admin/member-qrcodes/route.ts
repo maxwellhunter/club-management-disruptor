@@ -91,9 +91,12 @@ export async function GET(request: Request) {
     }
 
     if (missingInserts.length > 0) {
+      // Unique index is on (member_id, platform). Since we always
+      // use platform "staff_qr" here, re-running this endpoint
+      // updates the existing staff row in place instead of erroring.
       const { error: insertError } = await adminClient
         .from("digital_passes")
-        .upsert(missingInserts, { onConflict: "pass_serial" });
+        .upsert(missingInserts, { onConflict: "member_id,platform" });
       if (insertError) {
         console.error("Staff QR provisioning error:", insertError);
       } else {
