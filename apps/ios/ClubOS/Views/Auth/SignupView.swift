@@ -8,6 +8,9 @@ struct SignupView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var isLoading = false
+    @State private var hasEditedName = false
+    @State private var hasEditedEmail = false
+    @State private var hasEditedPassword = false
 
     var body: some View {
         ScrollView {
@@ -46,22 +49,68 @@ struct SignupView: View {
 
                 // Form
                 VStack(spacing: 20) {
-                    fieldGroup(label: "FULL NAME", icon: "person", placeholder: "John Smith") {
-                        TextField("John Smith", text: $fullName)
-                            .textContentType(.name)
+                    VStack(alignment: .leading, spacing: 0) {
+                        fieldGroup(label: "FULL NAME", icon: "person", placeholder: "John Smith") {
+                            TextField("John Smith", text: $fullName)
+                                .textContentType(.name)
+                                .onChange(of: fullName) { _, _ in hasEditedName = true }
+                        }
+                        if hasEditedName, let msg = nameValidation.message {
+                            Text(msg)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.red.opacity(0.8))
+                                .padding(.leading, 4)
+                                .padding(.top, 4)
+                        }
                     }
 
-                    fieldGroup(label: "EMAIL ADDRESS", icon: "envelope", placeholder: "name@example.com") {
-                        TextField("name@example.com", text: $email)
-                            .textContentType(.emailAddress)
-                            .keyboardType(.emailAddress)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
+                    VStack(alignment: .leading, spacing: 0) {
+                        fieldGroup(label: "EMAIL ADDRESS", icon: "envelope", placeholder: "name@example.com") {
+                            TextField("name@example.com", text: $email)
+                                .textContentType(.emailAddress)
+                                .keyboardType(.emailAddress)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .onChange(of: email) { _, _ in hasEditedEmail = true }
+                        }
+                        if hasEditedEmail, let msg = emailValidation.message {
+                            Text(msg)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.red.opacity(0.8))
+                                .padding(.leading, 4)
+                                .padding(.top, 4)
+                        }
                     }
 
-                    fieldGroup(label: "PASSWORD", icon: "lock", placeholder: "••••••••") {
-                        SecureField("••••••••", text: $password)
-                            .textContentType(.newPassword)
+                    VStack(alignment: .leading, spacing: 0) {
+                        fieldGroup(label: "PASSWORD", icon: "lock", placeholder: "••••••••") {
+                            SecureField("••••••••", text: $password)
+                                .textContentType(.newPassword)
+                                .onChange(of: password) { _, _ in hasEditedPassword = true }
+                        }
+                        if hasEditedPassword {
+                            if let msg = passwordValidation.message {
+                                Text(msg)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.red.opacity(0.8))
+                                    .padding(.leading, 4)
+                                    .padding(.top, 4)
+                            }
+                            if passwordValidation.strength > .none {
+                                HStack(spacing: 4) {
+                                    ForEach(1...3, id: \.self) { level in
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(level <= passwordValidation.strength.rawValue
+                                                  ? strengthColor : Color.club.outlineVariant)
+                                            .frame(height: 3)
+                                    }
+                                    Text(passwordValidation.strength.label)
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(strengthColor)
+                                }
+                                .padding(.top, 6)
+                            }
+                        }
                     }
 
                     // Sign Up Button
@@ -82,8 +131,8 @@ struct SignupView: View {
                         .padding(.vertical, 16)
                         .background(Color.club.primaryContainer, in: RoundedRectangle(cornerRadius: 16))
                     }
-                    .disabled(isLoading || fullName.isEmpty || email.isEmpty || password.isEmpty)
-                    .opacity(fullName.isEmpty || email.isEmpty || password.isEmpty ? 0.5 : 1)
+                    .disabled(isLoading || !isFormValid)
+                    .opacity(isFormValid ? 1 : 0.5)
                 }
 
                 // Back to Login
@@ -144,9 +193,37 @@ struct SignupView: View {
         }
     }
 
+    private var nameValidation: InputValidation.NameResult {
+        InputValidation.validateName(fullName)
+    }
+
+    private var emailValidation: InputValidation.EmailResult {
+        InputValidation.validateEmail(email)
+    }
+
+    private var passwordValidation: InputValidation.PasswordResult {
+        InputValidation.validatePassword(password, requireStrength: true)
+    }
+
+    private var isFormValid: Bool {
+        nameValidation.isValid && emailValidation.isValid && passwordValidation.isValid
+    }
+
+    private var strengthColor: Color {
+        switch passwordValidation.strength {
+        case .none: return .clear
+        case .weak: return .red
+        case .fair: return .orange
+        case .strong: return Color.club.primary
+        }
+    }
+
     private func handleSignUp() async {
+        guard isFormValid else { return }
         isLoading = true
-        await auth.signUp(email: email, password: password, fullName: fullName)
+        let trimmed = InputValidation.trimmedEmail(email)
+        let trimmedName = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
+        await auth.signUp(email: trimmed, password: password, fullName: trimmedName)
         isLoading = false
     }
 }

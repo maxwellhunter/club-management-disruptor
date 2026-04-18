@@ -6,6 +6,7 @@ struct LoginView: View {
     @State private var password = ""
     @State private var rememberMe = false
     @State private var isLoading = false
+    @State private var hasEditedEmail = false
 
     var body: some View {
         ScrollView {
@@ -70,6 +71,7 @@ struct LoginView: View {
                                 .keyboardType(.emailAddress)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
+                                .onChange(of: email) { _, _ in hasEditedEmail = true }
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 14)
@@ -78,6 +80,14 @@ struct LoginView: View {
                             Rectangle()
                                 .fill(Color.club.outlineVariant)
                                 .frame(height: 1)
+                        }
+
+                        if hasEditedEmail, let msg = emailValidation.message {
+                            Text(msg)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.red.opacity(0.8))
+                                .padding(.leading, 4)
+                                .padding(.top, 2)
                         }
                     }
 
@@ -158,8 +168,8 @@ struct LoginView: View {
                         .padding(.vertical, 16)
                         .background(Color.club.primaryContainer, in: RoundedRectangle(cornerRadius: 16))
                     }
-                    .disabled(isLoading || email.isEmpty || password.isEmpty)
-                    .opacity(email.isEmpty || password.isEmpty ? 0.5 : 1)
+                    .disabled(isLoading || !isFormValid)
+                    .opacity(isFormValid ? 1 : 0.5)
                 }
 
                 // MARK: - Footer
@@ -273,10 +283,19 @@ struct LoginView: View {
 
     // MARK: - Actions
 
+    private var emailValidation: InputValidation.EmailResult {
+        InputValidation.validateEmail(email)
+    }
+
+    private var isFormValid: Bool {
+        emailValidation.isValid && !password.isEmpty
+    }
+
     private func handleLogin() async {
-        guard !email.isEmpty, !password.isEmpty else { return }
+        guard isFormValid else { return }
         isLoading = true
-        await auth.signIn(email: email, password: password)
+        let trimmed = InputValidation.trimmedEmail(email)
+        await auth.signIn(email: trimmed, password: password)
         isLoading = false
     }
 }
