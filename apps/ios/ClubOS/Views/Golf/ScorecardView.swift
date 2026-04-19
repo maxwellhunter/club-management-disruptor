@@ -383,7 +383,7 @@ struct ScorecardView: View {
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Color.club.foreground)
 
-                Text("Today at \(formatTime(booking.startTime)) \u{00B7} \(booking.partySize) \(booking.partySize == 1 ? "player" : "players")")
+                Text("Today at \(DateUtilities.formatTime(booking.startTime)) \u{00B7} \(booking.partySize) \(booking.partySize == 1 ? "player" : "players")")
                     .font(.system(size: 12))
                     .foregroundStyle(Color.club.onSurfaceVariant)
             }
@@ -1431,20 +1431,7 @@ struct ScorecardView: View {
     }
 
     private func formatDate(_ dateStr: String) -> String {
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM-dd"
-        guard let date = df.date(from: dateStr) else { return dateStr }
-        df.dateFormat = "MMM d, yyyy"
-        return df.string(from: date)
-    }
-
-    private func formatTime(_ time: String) -> String {
-        let parts = time.split(separator: ":")
-        guard parts.count >= 2, let hour = Int(parts[0]) else { return time }
-        let minute = parts[1]
-        let ampm = hour >= 12 ? "PM" : "AM"
-        let display = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour)
-        return "\(display):\(minute) \(ampm)"
+        DateUtilities.longDateFromPlain(dateStr)
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

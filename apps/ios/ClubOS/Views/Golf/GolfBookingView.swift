@@ -206,20 +206,11 @@ private func generateBookableDates() -> [BookableDate] {
 }
 
 private func formatTime(_ time: String) -> String {
-    let parts = time.split(separator: ":")
-    guard parts.count >= 2, let hour = Int(parts[0]) else { return time }
-    let minute = parts[1]
-    let ampm = hour >= 12 ? "PM" : "AM"
-    let display = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour)
-    return "\(display):\(minute) \(ampm)"
+    DateUtilities.formatTime(time)
 }
 
 private func formatDate(_ dateStr: String) -> String {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "yyyy-MM-dd"
-    guard let date = formatter.date(from: dateStr) else { return dateStr }
-    formatter.dateFormat = "EEE, MMM d"
-    return formatter.string(from: date)
+    DateUtilities.formatShortDate(dateStr)
 }
 
 // MARK: - Request payloads

@@ -464,7 +464,7 @@ struct HomeView: View {
             let unpaid = invoices.filter { $0.status == "sent" || $0.status == "overdue" }
             outstandingBalance = unpaid.reduce(0) { $0 + $1.amount }
             nextDueDate = unpaid
-                .compactMap { parseDueDate($0.dueDate) }
+                .compactMap { DateUtilities.parseDueDate($0.dueDate) }
                 .min()
         }
 
@@ -491,15 +491,15 @@ struct HomeView: View {
             let icon = isGolf ? "figure.golf" : "fork.knife"
             let iconColor = isGolf ? Color(hex: "16a34a") : Color(hex: "ea580c")
 
-            if let date = parseBookingDate(b.date, time: b.startTime) {
+            if let date = DateUtilities.parseBookingDate(b.date, time: b.startTime) {
                 items.append(UpcomingItem(
                     id: "booking-\(b.id)",
                     kind: kind,
                     title: b.facilityName ?? (isGolf ? "Tee Time" : "Dining"),
                     subtitle: "Party of \(b.partySize)",
                     date: date,
-                    dateLabel: formatUpcomingDate(date),
-                    timeLabel: formatTime(b.startTime),
+                    dateLabel: DateUtilities.formatUpcomingDate(date),
+                    timeLabel: DateUtilities.formatTime(b.startTime),
                     icon: icon,
                     iconColor: iconColor,
                     imageUrl: b.facilityImageUrl,
@@ -510,7 +510,7 @@ struct HomeView: View {
 
         // Events
         for e in events {
-            if let date = parseEventDate(e.startDate) {
+            if let date = DateUtilities.parseISODate(e.startDate) {
                 // Only include future events
                 guard date > Date().addingTimeInterval(-3600) else { continue }
                 items.append(UpcomingItem(
@@ -519,8 +519,8 @@ struct HomeView: View {
                     title: e.title,
                     subtitle: e.location ?? "TBD",
                     date: date,
-                    dateLabel: formatUpcomingDate(date),
-                    timeLabel: formatEventTime(e.startDate),
+                    dateLabel: DateUtilities.formatUpcomingDate(date),
+                    timeLabel: DateUtilities.formatEventTime(e.startDate),
                     icon: "calendar",
                     iconColor: Color(hex: "7c3aed"),
                     imageUrl: e.imageUrl,
@@ -877,50 +877,6 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Date Parsing Helpers
-
-    private func parseBookingDate(_ dateStr: String, time: String) -> Date? {
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM-dd HH:mm"
-        return df.date(from: "\(dateStr) \(time)")
-    }
-
-    private func parseDueDate(_ dateStr: String?) -> Date? {
-        guard let dateStr else { return nil }
-        // Due dates come back as either yyyy-MM-dd or full ISO — try both.
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM-dd"
-        if let d = df.date(from: dateStr) { return d }
-        return DateUtilities.parseISODate(dateStr)
-    }
-
-    private func parseEventDate(_ iso: String) -> Date? {
-        DateUtilities.parseISODate(iso)
-    }
-
-    private func formatUpcomingDate(_ date: Date) -> String {
-        let cal = Calendar.current
-        if cal.isDateInToday(date) { return "Today" }
-        if cal.isDateInTomorrow(date) { return "Tomorrow" }
-        let df = DateFormatter()
-        df.dateFormat = "EEE, MMM d"
-        return df.string(from: date)
-    }
-
-    private func formatTime(_ time: String) -> String {
-        let parts = time.split(separator: ":")
-        guard parts.count >= 2, let hour = Int(parts[0]), let min = Int(parts[1]) else { return time }
-        let period = hour >= 12 ? "PM" : "AM"
-        let h = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour)
-        return min == 0 ? "\(h) \(period)" : "\(h):\(String(format: "%02d", min)) \(period)"
-    }
-
-    private func formatEventTime(_ iso: String) -> String {
-        guard let date = parseEventDate(iso) else { return "" }
-        let df = DateFormatter()
-        df.dateFormat = "h:mm a"
-        return df.string(from: date)
-    }
 }
 
 // MARK: - Response Types

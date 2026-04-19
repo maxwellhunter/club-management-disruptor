@@ -235,7 +235,7 @@ struct EventAdminDetailSheet: View {
                     HStack {
                         statusPill(currentStatus)
                         Spacer()
-                        Text(eventDateLabel(event.startDate))
+                        Text(DateUtilities.eventDateShortLabel(event.startDate))
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(Color.club.onSurfaceVariant)
                     }
@@ -413,13 +413,6 @@ struct EventAdminDetailSheet: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
         .background(cfg.bg, in: RoundedRectangle(cornerRadius: 8))
-    }
-
-    private func eventDateLabel(_ iso: String) -> String {
-        guard let date = DateUtilities.parseISODate(iso) else { return iso }
-        let df = DateFormatter()
-        df.dateFormat = "MMM d"
-        return df.string(from: date)
     }
 
     private func eventDateTimeLabel(_ iso: String) -> String {

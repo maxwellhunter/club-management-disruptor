@@ -118,4 +118,120 @@ enum DateUtilities {
         formatter.dateFormat = "MMM d, yyyy"
         return formatter.string(from: date)
     }
+
+    /// "MMM d, yyyy" from a "yyyy-MM-dd" plain date string.
+    static func longDateFromPlain(_ dateStr: String) -> String {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "yyyy-MM-dd"
+        guard let date = df.date(from: dateStr) else { return dateStr }
+        df.dateFormat = "MMM d, yyyy"
+        return df.string(from: date)
+    }
+
+    // MARK: - Booking / Schedule Dates
+
+    /// Parse a date string ("yyyy-MM-dd") combined with a time string ("HH:mm") into a Date.
+    static func parseBookingDate(_ dateStr: String, time: String) -> Date? {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "yyyy-MM-dd HH:mm"
+        return df.date(from: "\(dateStr) \(time)")
+    }
+
+    /// Parse a due date that may arrive as "yyyy-MM-dd" or full ISO-8601.
+    static func parseDueDate(_ dateStr: String?) -> Date? {
+        guard let dateStr else { return nil }
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "yyyy-MM-dd"
+        if let d = df.date(from: dateStr) { return d }
+        return parseISODate(dateStr)
+    }
+
+    /// Format a Date as a contextual upcoming label: "Today", "Tomorrow", or "EEE, MMM d".
+    static func formatUpcomingDate(_ date: Date, calendar: Calendar = .current) -> String {
+        if calendar.isDateInToday(date) { return "Today" }
+        if calendar.isDateInTomorrow(date) { return "Tomorrow" }
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "EEE, MMM d"
+        return df.string(from: date)
+    }
+
+    /// Format an "HH:mm" (or "HH:mm:ss") time string into 12-hour format (e.g. "2:30 PM").
+    static func formatTime(_ time: String) -> String {
+        let parts = time.split(separator: ":")
+        guard parts.count >= 2, let hour = Int(parts[0]), let min = Int(parts[1]) else { return time }
+        let period = hour >= 12 ? "PM" : "AM"
+        let h = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour)
+        return min == 0 ? "\(h) \(period)" : "\(h):\(String(format: "%02d", min)) \(period)"
+    }
+
+    /// Format an ISO-8601 date string as a time-only label (e.g. "2:30 PM").
+    static func formatEventTime(_ iso: String) -> String {
+        guard let date = parseISODate(iso) else { return "" }
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "h:mm a"
+        return df.string(from: date)
+    }
+
+    // MARK: - Event Date Components
+
+    /// Uppercased month abbreviation from an ISO string (e.g. "JUN").
+    static func eventMonthLabel(_ iso: String) -> String {
+        guard let date = parseISODate(iso) else { return "" }
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "MMM"
+        return df.string(from: date).uppercased()
+    }
+
+    /// Day-of-month number from an ISO string (e.g. "15").
+    static func eventDayLabel(_ iso: String) -> String {
+        guard let date = parseISODate(iso) else { return "" }
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "d"
+        return df.string(from: date)
+    }
+
+    /// Full event date from an ISO string (e.g. "Sunday, June 15").
+    static func eventDateLabel(_ iso: String) -> String {
+        guard let date = parseISODate(iso) else { return "" }
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "EEEE, MMMM d"
+        return df.string(from: date)
+    }
+
+    /// Short event date from an ISO string (e.g. "Jun 15").
+    static func eventDateShortLabel(_ iso: String) -> String {
+        guard let date = parseISODate(iso) else { return iso }
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "MMM d"
+        return df.string(from: date)
+    }
+
+    /// Time range string for an event with start and optional end ISO dates (e.g. "2:00 PM – 5:00 PM").
+    static func eventTimeRange(start: String, end: String?) -> String {
+        let startStr = formatEventTime(start)
+        if let end {
+            let endStr = formatEventTime(end)
+            return "\(startStr) – \(endStr)"
+        }
+        return startStr
+    }
+
+    /// Format a "yyyy-MM-dd" date string into "EEE, MMM d" (e.g. "Sun, Jun 15").
+    static func formatShortDate(_ dateStr: String) -> String {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "yyyy-MM-dd"
+        guard let date = df.date(from: dateStr) else { return dateStr }
+        df.dateFormat = "EEE, MMM d"
+        return df.string(from: date)
+    }
 }

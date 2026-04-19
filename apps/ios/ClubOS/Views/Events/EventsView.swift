@@ -351,11 +351,11 @@ struct EventsView: View {
 
                     // Date badge
                     VStack(spacing: 0) {
-                        Text(eventMonthLabel(event.startDate))
+                        Text(DateUtilities.eventMonthLabel(event.startDate))
                             .font(.system(size: 9, weight: .bold))
                             .tracking(0.5)
                             .foregroundStyle(Color.club.primary)
-                        Text(eventDayLabel(event.startDate))
+                        Text(DateUtilities.eventDayLabel(event.startDate))
                             .font(.system(size: 22, weight: .bold))
                             .foregroundStyle(Color.club.foreground)
                     }
@@ -409,7 +409,7 @@ struct EventsView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "clock")
                                 .font(.system(size: 11))
-                            Text(eventTimeRange(event))
+                            Text(DateUtilities.eventTimeRange(start: event.startDate, end: event.endDate))
                                 .font(.system(size: 12))
                         }
                         .foregroundStyle(Color.club.onSurfaceVariant)
@@ -505,7 +505,7 @@ struct EventsView: View {
                         }
                     }
 
-                    Text(eventDateLabel(event.startDate) + " · " + eventTimeLabel(event.startDate))
+                    Text(DateUtilities.eventDateLabel(event.startDate) + " · " + DateUtilities.formatEventTime(event.startDate))
                         .font(.system(size: 12))
                         .foregroundStyle(Color.club.onSurfaceVariant)
 
@@ -584,8 +584,8 @@ struct EventsView: View {
 
                         // Details card
                         VStack(spacing: 14) {
-                            infoRow(icon: "calendar", label: "Date", value: eventDateLabel(event.startDate))
-                            infoRow(icon: "clock", label: "Time", value: eventTimeRange(event))
+                            infoRow(icon: "calendar", label: "Date", value: DateUtilities.eventDateLabel(event.startDate))
+                            infoRow(icon: "clock", label: "Time", value: DateUtilities.eventTimeRange(start: event.startDate, end: event.endDate))
                             if let loc = event.location, !loc.isEmpty {
                                 infoRow(icon: "mappin.and.ellipse", label: "Location", value: loc)
                             }
@@ -802,55 +802,6 @@ struct EventsView: View {
                     .foregroundStyle(Color.club.outline)
             }
         }
-    }
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // MARK: - Date Formatting
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-    private func parseDate(_ iso: String) -> Date? {
-        let fmt = ISO8601DateFormatter()
-        fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = fmt.date(from: iso) { return d }
-        fmt.formatOptions = [.withInternetDateTime]
-        return fmt.date(from: iso)
-    }
-
-    private func eventMonthLabel(_ iso: String) -> String {
-        guard let date = parseDate(iso) else { return "" }
-        let df = DateFormatter()
-        df.dateFormat = "MMM"
-        return df.string(from: date).uppercased()
-    }
-
-    private func eventDayLabel(_ iso: String) -> String {
-        guard let date = parseDate(iso) else { return "" }
-        let df = DateFormatter()
-        df.dateFormat = "d"
-        return df.string(from: date)
-    }
-
-    private func eventDateLabel(_ iso: String) -> String {
-        guard let date = parseDate(iso) else { return "" }
-        let df = DateFormatter()
-        df.dateFormat = "EEEE, MMMM d"
-        return df.string(from: date)
-    }
-
-    private func eventTimeLabel(_ iso: String) -> String {
-        guard let date = parseDate(iso) else { return "" }
-        let df = DateFormatter()
-        df.dateFormat = "h:mm a"
-        return df.string(from: date)
-    }
-
-    private func eventTimeRange(_ event: ClubEvent) -> String {
-        let start = eventTimeLabel(event.startDate)
-        if let end = event.endDate {
-            let endStr = eventTimeLabel(end)
-            return "\(start) – \(endStr)"
-        }
-        return start
     }
 
     private func formatPrice(_ price: Double) -> String {
