@@ -6,6 +6,8 @@ struct LoginView: View {
     @State private var password = ""
     @State private var rememberMe = false
     @State private var isLoading = false
+    @State private var emailError: String?
+    @State private var showValidation = false
 
     var body: some View {
         ScrollView {
@@ -76,8 +78,15 @@ struct LoginView: View {
                         .background(Color.club.surfaceContainerLowest)
                         .overlay(alignment: .bottom) {
                             Rectangle()
-                                .fill(Color.club.outlineVariant)
+                                .fill(showValidation && emailError != nil ? .red.opacity(0.5) : Color.club.outlineVariant)
                                 .frame(height: 1)
+                        }
+
+                        if showValidation, let emailError {
+                            Text(emailError)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.red)
+                                .padding(.leading, 4)
                         }
                     }
 
@@ -274,9 +283,13 @@ struct LoginView: View {
     // MARK: - Actions
 
     private func handleLogin() async {
-        guard !email.isEmpty, !password.isEmpty else { return }
+        showValidation = true
+        let errors = FormValidation.validateEmail(email)
+        emailError = errors.first?.message
+
+        guard emailError == nil, !password.isEmpty else { return }
         isLoading = true
-        await auth.signIn(email: email, password: password)
+        await auth.signIn(email: email.trimmingCharacters(in: .whitespaces), password: password)
         isLoading = false
     }
 }

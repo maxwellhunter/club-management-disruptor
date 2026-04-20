@@ -7,7 +7,13 @@ struct SignupView: View {
     @State private var fullName = ""
     @State private var email = ""
     @State private var password = ""
+    @State private var confirmPassword = ""
     @State private var isLoading = false
+    @State private var showValidation = false
+    @State private var nameError: String?
+    @State private var emailError: String?
+    @State private var passwordErrors: [String] = []
+    @State private var confirmError: String?
 
     var body: some View {
         ScrollView {
@@ -51,6 +57,14 @@ struct SignupView: View {
                             .textContentType(.name)
                     }
 
+                    if showValidation, let nameError {
+                        Text(nameError)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.red)
+                            .padding(.horizontal, 4)
+                            .padding(.top, -12)
+                    }
+
                     fieldGroup(label: "EMAIL ADDRESS", icon: "envelope", placeholder: "name@example.com") {
                         TextField("name@example.com", text: $email)
                             .textContentType(.emailAddress)
@@ -59,9 +73,46 @@ struct SignupView: View {
                             .autocorrectionDisabled()
                     }
 
+                    if showValidation, let emailError {
+                        Text(emailError)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.red)
+                            .padding(.horizontal, 4)
+                            .padding(.top, -12)
+                    }
+
                     fieldGroup(label: "PASSWORD", icon: "lock", placeholder: "••••••••") {
                         SecureField("••••••••", text: $password)
                             .textContentType(.newPassword)
+                    }
+
+                    if showValidation && !passwordErrors.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(passwordErrors, id: \.self) { error in
+                                HStack(spacing: 6) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 11))
+                                    Text(error)
+                                        .font(.system(size: 12))
+                                }
+                                .foregroundStyle(.red)
+                            }
+                        }
+                        .padding(.horizontal, 4)
+                        .padding(.top, -12)
+                    }
+
+                    fieldGroup(label: "CONFIRM PASSWORD", icon: "lock", placeholder: "••••••••") {
+                        SecureField("••••••••", text: $confirmPassword)
+                            .textContentType(.newPassword)
+                    }
+
+                    if showValidation, let confirmError {
+                        Text(confirmError)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.red)
+                            .padding(.horizontal, 4)
+                            .padding(.top, -12)
                     }
 
                     // Sign Up Button
@@ -82,8 +133,8 @@ struct SignupView: View {
                         .padding(.vertical, 16)
                         .background(Color.club.primaryContainer, in: RoundedRectangle(cornerRadius: 16))
                     }
-                    .disabled(isLoading || fullName.isEmpty || email.isEmpty || password.isEmpty)
-                    .opacity(fullName.isEmpty || email.isEmpty || password.isEmpty ? 0.5 : 1)
+                    .disabled(isLoading || fullName.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty)
+                    .opacity(fullName.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty ? 0.5 : 1)
                 }
 
                 // Back to Login
@@ -145,8 +196,28 @@ struct SignupView: View {
     }
 
     private func handleSignUp() async {
+        showValidation = true
+
+        let nameErrors = FormValidation.validateName(fullName, field: "Name")
+        nameError = nameErrors.first?.message
+
+        let emailErrors = FormValidation.validateEmail(email)
+        emailError = emailErrors.first?.message
+
+        let pwErrors = FormValidation.validatePassword(password)
+        passwordErrors = pwErrors.map(\.message)
+
+        if password != confirmPassword {
+            confirmError = "Passwords do not match."
+        } else {
+            confirmError = nil
+        }
+
+        guard nameError == nil, emailError == nil, passwordErrors.isEmpty, confirmError == nil else { return }
+
         isLoading = true
-        await auth.signUp(email: email, password: password, fullName: fullName)
+        let trimmedName = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
+        await auth.signUp(email: email.trimmingCharacters(in: .whitespaces), password: password, fullName: trimmedName)
         isLoading = false
     }
 }

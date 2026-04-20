@@ -316,9 +316,24 @@ struct PersonalInfoView: View {
 
     private func saveProfile() async {
         guard let memberId else { return }
+
+        var validationErrors: [String] = []
+        validationErrors += FormValidation.validateName(firstName, field: "First name").map(\.message)
+        validationErrors += FormValidation.validateName(lastName, field: "Last name").map(\.message)
+        validationErrors += FormValidation.validatePhone(phone).map(\.message)
+
+        guard validationErrors.isEmpty else {
+            errorMessage = validationErrors.first
+            return
+        }
+
         isSaving = true
         errorMessage = nil
         defer { isSaving = false }
+
+        let trimmedFirst = firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedLast = lastName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPhone = FormValidation.trimmedOrNil(phone)
 
         struct UpdateBody: Encodable {
             let firstName: String
@@ -330,11 +345,14 @@ struct PersonalInfoView: View {
             try await APIClient.shared.patch(
                 "/members/\(memberId)",
                 body: UpdateBody(
-                    firstName: firstName,
-                    lastName: lastName,
-                    phone: phone.isEmpty ? nil : phone
+                    firstName: trimmedFirst,
+                    lastName: trimmedLast,
+                    phone: trimmedPhone
                 )
             )
+            firstName = trimmedFirst
+            lastName = trimmedLast
+            phone = trimmedPhone ?? ""
             originalFirstName = firstName
             originalLastName = lastName
             originalPhone = phone
