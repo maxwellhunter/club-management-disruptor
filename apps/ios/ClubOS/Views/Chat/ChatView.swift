@@ -33,7 +33,7 @@ struct ChatEventItem: Decodable, Identifiable {
     let capacity: Int?
     let price: FlexibleDouble?
     let rsvpCount: Int
-    let userRsvpStatus: String?
+    let userRsvpStatus: RsvpStatus?
 
     var priceValue: Double? { price?.value }
 }
@@ -56,7 +56,7 @@ struct ChatBookingItem: Decodable, Identifiable {
     let startTime: String
     let endTime: String
     let partySize: Int
-    let status: String
+    let status: BookingStatus
 }
 
 // Raw API response
@@ -377,7 +377,7 @@ struct ChatView: View {
 
             Spacer()
 
-            if event.userRsvpStatus == "attending" {
+            if event.userRsvpStatus == .attending {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 16))
                     .foregroundStyle(Color.club.primary)
@@ -471,7 +471,7 @@ struct ChatView: View {
 
             Spacer()
 
-            Text(booking.status.capitalized)
+            Text(booking.status.label)
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(Color.club.primary)
                 .padding(.horizontal, 8)

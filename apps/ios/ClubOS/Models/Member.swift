@@ -33,6 +33,9 @@ struct Member: Codable, Identifiable, Sendable {
         return "\(f)\(l)"
     }
 
+    var isActive: Bool { status == .active }
+    var isAdmin: Bool { role == .admin }
+
     // No CodingKeys needed — APIClient uses .convertFromSnakeCase / .convertToSnakeCase
 }
 
@@ -49,6 +52,21 @@ enum MemberStatus: String, Codable, Sendable {
 
 // MARK: - Booking
 
+enum BookingStatus: String, Codable, Sendable {
+    case confirmed
+    case pending
+    case cancelled
+    case completed
+    case noShow = "no_show"
+
+    var label: String {
+        switch self {
+        case .noShow: return "No Show"
+        default: return rawValue.capitalized
+        }
+    }
+}
+
 struct Booking: Codable, Identifiable, Sendable {
     let id: UUID
     let memberId: UUID
@@ -58,14 +76,35 @@ struct Booking: Codable, Identifiable, Sendable {
     let startTime: String
     let endTime: String?
     let partySize: Int
-    let status: String
+    let status: BookingStatus
     let notes: String?
     let facilityName: String?
+
+    var isUpcoming: Bool {
+        guard let d = DateUtilities.parseISODate(date) else { return false }
+        return d >= Calendar.current.startOfDay(for: Date()) && status == .confirmed
+    }
+
+    var isCancellable: Bool {
+        status == .confirmed || status == .pending
+    }
 
     // No CodingKeys needed — APIClient uses .convertFromSnakeCase / .convertToSnakeCase
 }
 
 // MARK: - Event
+
+enum EventStatus: String, Codable, Sendable {
+    case draft, published, cancelled, completed
+
+    var label: String { rawValue.capitalized }
+}
+
+enum RsvpStatus: String, Codable, Sendable {
+    case attending, declined, waitlisted
+
+    var label: String { rawValue.capitalized }
+}
 
 struct ClubEvent: Codable, Identifiable, Sendable {
     let id: String
@@ -78,12 +117,25 @@ struct ClubEvent: Codable, Identifiable, Sendable {
     let capacity: Int?
     let price: FlexibleDouble?
     let imageUrl: String?
-    let status: String?
+    let status: EventStatus?
     let createdAt: String?
     let rsvpCount: Int
-    let userRsvpStatus: String?
+    let userRsvpStatus: RsvpStatus?
 
     var priceValue: Double? { price?.value }
+
+    var isFull: Bool {
+        guard let capacity else { return false }
+        return rsvpCount >= capacity
+    }
+
+    var spotsRemaining: Int? {
+        guard let capacity else { return nil }
+        return max(0, capacity - rsvpCount)
+    }
+
+    var isPublished: Bool { status == .published }
+    var isCancelled: Bool { status == .cancelled }
 }
 
 /// Decodes a value that may be a JSON number or a JSON string (e.g. Supabase `numeric` columns)
@@ -109,27 +161,46 @@ struct FlexibleDouble: Codable, Sendable {
 
 // MARK: - Invoice
 
+enum InvoiceStatus: String, Codable, Sendable {
+    case draft, sent, paid, overdue, cancelled, void
+
+    var label: String { rawValue.capitalized }
+
+    var isPaid: Bool { self == .paid }
+    var isOutstanding: Bool { self == .sent || self == .overdue }
+}
+
 struct Invoice: Codable, Identifiable, Sendable {
     let id: UUID
     let memberId: UUID
     let amount: Double
-    let status: String
+    let status: InvoiceStatus
     let description: String
     let dueDate: String
     let paidAt: String?
     let createdAt: String?
+
+    var isPaid: Bool { status.isPaid }
+    var isOutstanding: Bool { status.isOutstanding }
 
     // No CodingKeys needed — APIClient uses .convertFromSnakeCase / .convertToSnakeCase
 }
 
 // MARK: - Announcement
 
+enum AnnouncementPriority: String, Codable, Sendable, CaseIterable, Identifiable {
+    case low, normal, high, urgent
+
+    var id: String { rawValue }
+    var label: String { rawValue.capitalized }
+}
+
 struct Announcement: Codable, Identifiable, Sendable {
     let id: UUID
     let clubId: UUID?
     let title: String
     let content: String
-    let priority: String
+    let priority: AnnouncementPriority
     let status: String?
     let createdAt: String?
 

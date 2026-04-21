@@ -151,15 +151,15 @@ struct AnnouncementsView: View {
 
     // MARK: - Priority Badge
 
-    private func priorityBadge(_ priority: String) -> some View {
+    private func priorityBadge(_ priority: AnnouncementPriority) -> some View {
         let config: (label: String, bg: Color, fg: Color) = switch priority {
-        case "urgent":
+        case .urgent:
             ("URGENT", Color(hex: "fef2f2"), Color(hex: "dc2626"))
-        case "high", "important":
+        case .high:
             ("IMPORTANT", Color(hex: "fffbeb"), Color(hex: "d97706"))
-        case "low":
+        case .low:
             ("LOW", Color(hex: "f3f4f6"), Color(hex: "6b7280"))
-        default:
+        case .normal:
             ("ANNOUNCEMENT", Color.club.accent, Color.club.primary)
         }
 
@@ -258,7 +258,7 @@ struct AnnouncementDetail: Decodable, Identifiable, Hashable {
     let id: UUID
     let title: String
     let content: String
-    let priority: String
+    let priority: AnnouncementPriority
     let publishedAt: String?
     let createdAt: String?
     let targetTierIds: [UUID]?
@@ -272,12 +272,7 @@ struct AnnouncementTier: Decodable, Identifiable, Hashable {
     let level: String?
 }
 
-enum AnnouncementPriority: String, CaseIterable, Identifiable {
-    case low, normal, high, urgent
-
-    var id: String { rawValue }
-    var label: String { rawValue.capitalized }
-
+extension AnnouncementPriority {
     var color: Color {
         switch self {
         case .urgent: return Color(hex: "dc2626")

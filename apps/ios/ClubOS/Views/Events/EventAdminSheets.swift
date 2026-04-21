@@ -209,7 +209,7 @@ struct EventAdminDetailSheet: View {
 
     @Environment(\.dismiss) private var dismiss
 
-    @State private var currentStatus: String
+    @State private var currentStatus: EventStatus
     @State private var showEditor = false
     @State private var showAttendees = false
     @State private var working: ActionKind?
@@ -222,11 +222,11 @@ struct EventAdminDetailSheet: View {
     init(event: ClubEvent, onChange: @escaping () -> Void) {
         self.event = event
         self.onChange = onChange
-        _currentStatus = State(initialValue: event.status ?? "draft")
+        _currentStatus = State(initialValue: event.status ?? .draft)
     }
 
-    private var isPublished: Bool { currentStatus == "published" }
-    private var isCancelled: Bool { currentStatus == "cancelled" }
+    private var isPublished: Bool { currentStatus == .published }
+    private var isCancelled: Bool { currentStatus == .cancelled }
 
     var body: some View {
         NavigationStack {
@@ -298,7 +298,7 @@ struct EventAdminDetailSheet: View {
 
                     if !isPublished && !isCancelled {
                         Button {
-                            Task { await update(status: "published", kind: .publish) }
+                            Task { await update(status: .published, kind: .publish) }
                         } label: {
                             HStack {
                                 Label("Publish", systemImage: "paperplane.fill")
@@ -310,7 +310,7 @@ struct EventAdminDetailSheet: View {
                         .disabled(working != nil)
                     } else if isPublished {
                         Button {
-                            Task { await update(status: "draft", kind: .unpublish) }
+                            Task { await update(status: .draft, kind: .unpublish) }
                         } label: {
                             HStack {
                                 Label("Revert to draft", systemImage: "arrow.uturn.backward")
@@ -370,7 +370,7 @@ struct EventAdminDetailSheet: View {
                 titleVisibility: .visible
             ) {
                 Button("Cancel Event", role: .destructive) {
-                    Task { await update(status: "cancelled", kind: .cancel) }
+                    Task { await update(status: .cancelled, kind: .cancel) }
                 }
                 Button("Keep", role: .cancel) {}
             } message: {
@@ -393,14 +393,13 @@ struct EventAdminDetailSheet: View {
 
     // MARK: - Helpers
 
-    private func statusPill(_ status: String) -> some View {
+    private func statusPill(_ status: EventStatus) -> some View {
         let cfg: (label: String, bg: Color, fg: Color) = {
             switch status {
-            case "draft": return ("DRAFT", Color(hex: "f3f4f6"), Color(hex: "6b7280"))
-            case "published": return ("PUBLISHED", Color.club.accent, Color.club.primary)
-            case "cancelled": return ("CANCELLED", Color(hex: "fee2e2"), Color.club.destructive)
-            case "completed": return ("COMPLETED", Color(hex: "dbeafe"), Color(hex: "2563eb"))
-            default: return (status.uppercased(), Color.club.surfaceContainerHigh, Color.club.onSurfaceVariant)
+            case .draft: return ("DRAFT", Color(hex: "f3f4f6"), Color(hex: "6b7280"))
+            case .published: return ("PUBLISHED", Color.club.accent, Color.club.primary)
+            case .cancelled: return ("CANCELLED", Color(hex: "fee2e2"), Color.club.destructive)
+            case .completed: return ("COMPLETED", Color(hex: "dbeafe"), Color(hex: "2563eb"))
             }
         }()
         return HStack(spacing: 6) {
@@ -439,12 +438,12 @@ struct EventAdminDetailSheet: View {
 
     // MARK: - Actions
 
-    private func update(status: String, kind: ActionKind) async {
+    private func update(status: EventStatus, kind: ActionKind) async {
         working = kind
         errorMessage = nil
         defer { working = nil }
 
-        struct StatusBody: Encodable { let status: String }
+        struct StatusBody: Encodable { let status: EventStatus }
 
         do {
             let _: EventResponse = try await APIClient.shared.put(
@@ -507,7 +506,7 @@ struct EventAttendeesSheet: View {
                                     .font(.system(size: 13, weight: .semibold))
                                     .foregroundStyle(Color.club.primary)
                                 Spacer()
-                                Text("\(attendees.filter { $0.status == "attending" }.count) attending")
+                                Text("\(attendees.filter { $0.status == .attending }.count) attending")
                                     .font(.system(size: 12))
                                     .foregroundStyle(Color.club.onSurfaceVariant)
                             }
@@ -577,14 +576,13 @@ struct EventAttendeesSheet: View {
         }
     }
 
-    private func statusDot(_ status: String) -> some View {
+    private func statusDot(_ status: RsvpStatus) -> some View {
         let color: Color = switch status {
-        case "attending": Color.club.primary
-        case "declined": Color.club.destructive
-        case "waitlisted": Color(hex: "d97706")
-        default: Color.club.outline
+        case .attending: Color.club.primary
+        case .declined: Color.club.destructive
+        case .waitlisted: Color(hex: "d97706")
         }
-        return Text(status.capitalized)
+        return Text(status.label)
             .font(.system(size: 9, weight: .bold))
             .tracking(0.5)
             .foregroundStyle(color)
@@ -659,7 +657,7 @@ struct EventAttendee: Decodable, Identifiable, Hashable {
     let firstName: String
     let lastName: String
     let email: String
-    let status: String
+    let status: RsvpStatus
     let guestCount: Int
     let rsvpCreatedAt: String?
 

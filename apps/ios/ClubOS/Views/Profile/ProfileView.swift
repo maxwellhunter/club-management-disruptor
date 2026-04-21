@@ -25,7 +25,7 @@ private struct InvoicesResponse: Decodable {
 private struct InvoiceItem: Decodable, Identifiable {
     let id: UUID
     let amount: Double
-    let status: String
+    let status: InvoiceStatus
     let description: String
     let dueDate: String?
     let createdAt: String?
@@ -656,8 +656,8 @@ struct ProfileView: View {
                     title: invoice.description,
                     date: formatDate(invoice.dueDate ?? invoice.createdAt),
                     amount: "-$\(String(format: "%.2f", invoice.amount))",
-                    type: invoice.status == "paid" ? .payment : invoice.status == "void" ? .credit : .charge,
-                    status: invoice.status
+                    type: invoice.status == .paid ? .payment : invoice.status == .void ? .credit : .charge,
+                    status: invoice.status.label
                 )
             }
         }

@@ -89,11 +89,11 @@ actor APIClient {
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
 
         var body = Data()
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"\(fieldName)\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+        body.append(Data("--\(boundary)\r\n".utf8))
+        body.append(Data("Content-Disposition: form-data; name=\"\(fieldName)\"; filename=\"\(fileName)\"\r\n".utf8))
+        body.append(Data("Content-Type: \(mimeType)\r\n\r\n".utf8))
         body.append(fileData)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
         request.httpBody = body
 
         let (data, response) = try await session.data(for: request)
@@ -123,7 +123,9 @@ actor APIClient {
         query: [String: String]? = nil,
         body: Encodable? = nil
     ) throws -> URLRequest {
-        var components = URLComponents(url: baseURL.appendingPathComponent("/api\(path)"), resolvingAgainstBaseURL: true)!
+        guard var components = URLComponents(url: baseURL.appendingPathComponent("/api\(path)"), resolvingAgainstBaseURL: true) else {
+            throw APIError.invalidURL(path)
+        }
 
         if let query {
             components.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) }

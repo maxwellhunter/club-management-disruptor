@@ -46,7 +46,7 @@ private struct HomeBookingsResponse: Decodable {
 // local shape here.
 private struct HomeInvoice: Decodable {
     let amount: Double
-    let status: String
+    let status: InvoiceStatus
     let dueDate: String?
 }
 
@@ -461,7 +461,7 @@ struct HomeView: View {
 
         // Compute outstanding balance from unpaid invoices.
         if let invoices = invoicesResult?.invoices {
-            let unpaid = invoices.filter { $0.status == "sent" || $0.status == "overdue" }
+            let unpaid = invoices.filter { $0.status.isOutstanding }
             outstandingBalance = unpaid.reduce(0) { $0 + $1.amount }
             nextDueDate = unpaid
                 .compactMap { parseDueDate($0.dueDate) }
@@ -962,8 +962,8 @@ private struct AnnouncementRow: View {
 
     private var priorityColor: Color {
         switch announcement.priority {
-        case "urgent": return Color.club.destructive
-        case "high": return Color(hex: "f59e0b")
+        case .urgent: return Color.club.destructive
+        case .high: return Color(hex: "f59e0b")
         default: return Color.club.primary
         }
     }

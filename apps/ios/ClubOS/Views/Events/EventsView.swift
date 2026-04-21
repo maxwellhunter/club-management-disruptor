@@ -17,7 +17,7 @@ struct RsvpResponse: Decodable {
 
 struct RsvpResult: Decodable {
     let id: String
-    let status: String
+    let status: RsvpStatus
 }
 
 struct EventsHeroResponse: Decodable {
@@ -77,8 +77,8 @@ struct EventsView: View {
 
     // RSVP
     @Namespace private var rsvpAnimation
-    @State private var rsvpInProgress: String? = nil
-    @State private var optimisticRsvp: String? = nil  // instant UI update before API responds
+    @State private var rsvpInProgress: RsvpStatus? = nil
+    @State private var optimisticRsvp: RsvpStatus? = nil
     @State private var showRsvpSuccess = false
     @State private var rsvpSuccessMessage = ""
     @State private var rsvpError: String?
@@ -369,7 +369,7 @@ struct EventsView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     // Tags row
                     HStack(spacing: 6) {
-                        if isAdmin, let status = event.status, status != "published" {
+                        if isAdmin, let status = event.status, status != .published {
                             eventStatusBadge(status)
                         }
 
@@ -388,7 +388,7 @@ struct EventsView: View {
                             }
                         }
 
-                        if event.userRsvpStatus == "attending" {
+                        if event.userRsvpStatus == .attending {
                             tagBadge("GOING", color: Color.club.primary)
                         }
                     }
@@ -492,13 +492,13 @@ struct EventsView: View {
                             .foregroundStyle(Color.club.foreground)
                             .lineLimit(1)
 
-                        if isAdmin, let status = event.status, status != "published" {
+                        if isAdmin, let status = event.status, status != .published {
                             eventStatusBadge(status)
                         }
 
                         Spacer()
 
-                        if event.userRsvpStatus == "attending" {
+                        if event.userRsvpStatus == .attending {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 14))
                                 .foregroundStyle(Color.club.primary)
@@ -577,7 +577,7 @@ struct EventsView: View {
                                 }
                             }
 
-                            if currentStatus == "attending" {
+                            if currentStatus == .attending {
                                 tagBadge("YOU'RE GOING", color: Color.club.primary)
                             }
                         }
@@ -719,13 +719,13 @@ struct EventsView: View {
         let displayStatus = optimisticRsvp ?? event.userRsvpStatus
         let isFull = event.capacity != nil && event.rsvpCount >= (event.capacity ?? 0)
 
-        let options: [(label: String, icon: String, selectedIcon: String, status: String, disabled: Bool)] = [
-            ("Going", "checkmark.circle", "checkmark.circle.fill", "attending", isFull && displayStatus != "attending"),
-            ("Can't Go", "xmark.circle", "xmark.circle.fill", "declined", false),
+        let options: [(label: String, icon: String, selectedIcon: String, status: RsvpStatus, disabled: Bool)] = [
+            ("Going", "checkmark.circle", "checkmark.circle.fill", .attending, isFull && displayStatus != .attending),
+            ("Can't Go", "xmark.circle", "xmark.circle.fill", .declined, false),
         ]
 
         return HStack(spacing: 4) {
-            ForEach(options, id: \.status) { option in
+            ForEach(options, id: \.status.rawValue) { option in
                 let isSelected = displayStatus == option.status
 
                 Button {
@@ -903,13 +903,13 @@ struct EventsView: View {
         }
     }
 
-    private func submitRsvp(eventId: String, status: String) async {
+    private func submitRsvp(eventId: String, status: RsvpStatus) async {
         rsvpInProgress = status
         defer { rsvpInProgress = nil }
 
         struct RsvpRequest: Encodable {
             let eventId: String
-            let status: String
+            let status: RsvpStatus
             let guestCount: Int
         }
 
@@ -941,13 +941,13 @@ struct EventsView: View {
 
     // MARK: - Admin status badge
 
-    fileprivate func eventStatusBadge(_ status: String) -> some View {
+    fileprivate func eventStatusBadge(_ status: EventStatus) -> some View {
         let cfg: (label: String, bg: Color, fg: Color) = {
             switch status {
-            case "draft": return ("DRAFT", Color(hex: "f3f4f6"), Color(hex: "6b7280"))
-            case "cancelled": return ("CANCELLED", Color(hex: "fee2e2"), Color.club.destructive)
-            case "completed": return ("COMPLETED", Color(hex: "dbeafe"), Color(hex: "2563eb"))
-            default: return (status.uppercased(), Color.club.surfaceContainerHigh, Color.club.onSurfaceVariant)
+            case .draft: return ("DRAFT", Color(hex: "f3f4f6"), Color(hex: "6b7280"))
+            case .cancelled: return ("CANCELLED", Color(hex: "fee2e2"), Color.club.destructive)
+            case .completed: return ("COMPLETED", Color(hex: "dbeafe"), Color(hex: "2563eb"))
+            case .published: return ("PUBLISHED", Color.club.surfaceContainerHigh, Color.club.onSurfaceVariant)
             }
         }()
         return Text(cfg.label)

@@ -28,7 +28,7 @@ struct AnnouncementComposerSheet: View {
 
         _title = State(initialValue: existing?.title ?? "")
         _content = State(initialValue: existing?.content ?? "")
-        _priority = State(initialValue: AnnouncementPriority(rawValue: existing?.priority ?? "normal") ?? .normal)
+        _priority = State(initialValue: existing?.priority ?? .normal)
 
         let tierIds = existing?.targetTierIds?.map { $0.uuidString.lowercased() } ?? []
         _targetedTierIds = State(initialValue: Set(tierIds))
@@ -212,7 +212,7 @@ struct AnnouncementComposerSheet: View {
         struct CreateBody: Encodable {
             let title: String
             let content: String
-            let priority: String
+            let priority: AnnouncementPriority
             let targetTierIds: [String]?
             let publish: Bool
         }
@@ -221,7 +221,7 @@ struct AnnouncementComposerSheet: View {
         let body = CreateBody(
             title: title.trimmingCharacters(in: .whitespaces),
             content: content.trimmingCharacters(in: .whitespaces),
-            priority: priority.rawValue,
+            priority: priority,
             targetTierIds: tierIds,
             publish: publishChoice == .publishNow
         )
@@ -232,7 +232,7 @@ struct AnnouncementComposerSheet: View {
         struct UpdateBody: Encodable {
             let title: String
             let content: String
-            let priority: String
+            let priority: AnnouncementPriority
             let targetTierIds: [String]?
         }
         struct UpdateResponse: Decodable { let announcement: AnnouncementDetail }
@@ -240,7 +240,7 @@ struct AnnouncementComposerSheet: View {
         let body = UpdateBody(
             title: title.trimmingCharacters(in: .whitespaces),
             content: content.trimmingCharacters(in: .whitespaces),
-            priority: priority.rawValue,
+            priority: priority,
             targetTierIds: tierIds
         )
         let _: UpdateResponse = try await APIClient.shared.patch(
@@ -403,14 +403,13 @@ struct AnnouncementDetailSheet: View {
         }
     }
 
-    private func priorityBadge(_ priority: String) -> some View {
-        let p = AnnouncementPriority(rawValue: priority) ?? .normal
+    private func priorityBadge(_ priority: AnnouncementPriority) -> some View {
         return HStack(spacing: 6) {
-            Circle().fill(p.color).frame(width: 6, height: 6)
-            Text(p.label.uppercased())
+            Circle().fill(priority.color).frame(width: 6, height: 6)
+            Text(priority.label.uppercased())
                 .font(.system(size: 10, weight: .bold))
                 .tracking(0.8)
-                .foregroundStyle(p.color)
+                .foregroundStyle(priority.color)
         }
     }
 

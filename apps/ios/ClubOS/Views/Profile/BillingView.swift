@@ -70,8 +70,8 @@ struct BillingView: View {
     private var filteredInvoices: [BillingInvoice] {
         switch filter {
         case .all: return invoices
-        case .paid: return invoices.filter { $0.status == "paid" }
-        case .outstanding: return invoices.filter { $0.status == "sent" || $0.status == "overdue" }
+        case .paid: return invoices.filter { $0.status == .paid }
+        case .outstanding: return invoices.filter { $0.status.isOutstanding }
         }
     }
 
@@ -99,7 +99,7 @@ struct BillingView: View {
                 Text("$\(String(format: "%.2f", invoice.amount))")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.club.foreground)
-                Text(invoice.status.capitalized)
+                Text(invoice.status.label)
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(statusColor(invoice.status))
             }
@@ -129,11 +129,11 @@ struct BillingView: View {
         return "doc.text"
     }
 
-    private func statusColor(_ status: String) -> Color {
+    private func statusColor(_ status: InvoiceStatus) -> Color {
         switch status {
-        case "paid": return Color(hex: "16a34a")
-        case "overdue": return Color(hex: "dc2626")
-        case "sent": return Color(hex: "d97706")
+        case .paid: return Color(hex: "16a34a")
+        case .overdue: return Color(hex: "dc2626")
+        case .sent: return Color(hex: "d97706")
         default: return Color(hex: "6b7280")
         }
     }
@@ -142,7 +142,7 @@ struct BillingView: View {
 private struct BillingInvoice: Decodable, Identifiable {
     let id: UUID
     let amount: Double
-    let status: String
+    let status: InvoiceStatus
     let description: String
     let dueDate: String?
     let createdAt: String?
