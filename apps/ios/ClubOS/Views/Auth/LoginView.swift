@@ -6,6 +6,11 @@ struct LoginView: View {
     @State private var password = ""
     @State private var rememberMe = false
     @State private var isLoading = false
+    @State private var hasAttemptedSubmit = false
+
+    private var emailValidation: ValidationService.EmailValidation {
+        ValidationService.validateEmail(email)
+    }
 
     var body: some View {
         ScrollView {
@@ -139,9 +144,20 @@ struct LoginView: View {
                             .foregroundStyle(Color.club.primary)
                     }
 
+                    if hasAttemptedSubmit, let error = emailValidation.error {
+                        Text(error)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.club.destructive)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.leading, 4)
+                    }
+
                     // Sign In Button
                     Button {
-                        Task { await handleLogin() }
+                        hasAttemptedSubmit = true
+                        if emailValidation.isValid && !password.isEmpty {
+                            Task { await handleLogin() }
+                        }
                     } label: {
                         HStack(spacing: 8) {
                             if isLoading {
@@ -158,8 +174,8 @@ struct LoginView: View {
                         .padding(.vertical, 16)
                         .background(Color.club.primaryContainer, in: RoundedRectangle(cornerRadius: 16))
                     }
-                    .disabled(isLoading || email.isEmpty || password.isEmpty)
-                    .opacity(email.isEmpty || password.isEmpty ? 0.5 : 1)
+                    .disabled(isLoading)
+                    .opacity(emailValidation.isValid && !password.isEmpty ? 1 : 0.5)
                 }
 
                 // MARK: - Footer
@@ -274,9 +290,9 @@ struct LoginView: View {
     // MARK: - Actions
 
     private func handleLogin() async {
-        guard !email.isEmpty, !password.isEmpty else { return }
+        guard emailValidation.isValid, !password.isEmpty else { return }
         isLoading = true
-        await auth.signIn(email: email, password: password)
+        await auth.signIn(email: email.trimmingCharacters(in: .whitespaces), password: password)
         isLoading = false
     }
 }

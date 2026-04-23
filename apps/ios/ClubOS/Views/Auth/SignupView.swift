@@ -8,6 +8,23 @@ struct SignupView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var isLoading = false
+    @State private var hasAttemptedSubmit = false
+
+    private var nameValidation: ValidationService.NameValidation {
+        ValidationService.validateName(fullName, fieldName: "Full name")
+    }
+
+    private var emailValidation: ValidationService.EmailValidation {
+        ValidationService.validateEmail(email)
+    }
+
+    private var passwordValidation: ValidationService.PasswordValidation {
+        ValidationService.validatePassword(password)
+    }
+
+    private var canSubmit: Bool {
+        !isLoading && nameValidation.isValid && emailValidation.isValid && passwordValidation.isValid
+    }
 
     var body: some View {
         ScrollView {
@@ -46,12 +63,22 @@ struct SignupView: View {
 
                 // Form
                 VStack(spacing: 20) {
-                    fieldGroup(label: "FULL NAME", icon: "person", placeholder: "John Smith") {
+                    fieldGroup(
+                        label: "FULL NAME",
+                        icon: "person",
+                        placeholder: "John Smith",
+                        error: hasAttemptedSubmit ? nameValidation.error : nil
+                    ) {
                         TextField("John Smith", text: $fullName)
                             .textContentType(.name)
                     }
 
-                    fieldGroup(label: "EMAIL ADDRESS", icon: "envelope", placeholder: "name@example.com") {
+                    fieldGroup(
+                        label: "EMAIL ADDRESS",
+                        icon: "envelope",
+                        placeholder: "name@example.com",
+                        error: hasAttemptedSubmit ? emailValidation.error : nil
+                    ) {
                         TextField("name@example.com", text: $email)
                             .textContentType(.emailAddress)
                             .keyboardType(.emailAddress)
@@ -59,14 +86,39 @@ struct SignupView: View {
                             .autocorrectionDisabled()
                     }
 
-                    fieldGroup(label: "PASSWORD", icon: "lock", placeholder: "••••••••") {
+                    fieldGroup(
+                        label: "PASSWORD",
+                        icon: "lock",
+                        placeholder: "••••••••",
+                        error: nil
+                    ) {
                         SecureField("••••••••", text: $password)
                             .textContentType(.newPassword)
                     }
 
+                    if hasAttemptedSubmit || !password.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(passwordValidation.requirements) { req in
+                                HStack(spacing: 6) {
+                                    Image(systemName: req.met ? "checkmark.circle.fill" : "circle")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(req.met ? Color.club.primary : Color.club.outlineVariant)
+                                    Text(req.label)
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(req.met ? Color.club.foreground : Color.club.onSurfaceVariant)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.leading, 4)
+                    }
+
                     // Sign Up Button
                     Button {
-                        Task { await handleSignUp() }
+                        hasAttemptedSubmit = true
+                        if canSubmit {
+                            Task { await handleSignUp() }
+                        }
                     } label: {
                         HStack(spacing: 8) {
                             if isLoading {
@@ -82,8 +134,8 @@ struct SignupView: View {
                         .padding(.vertical, 16)
                         .background(Color.club.primaryContainer, in: RoundedRectangle(cornerRadius: 16))
                     }
-                    .disabled(isLoading || fullName.isEmpty || email.isEmpty || password.isEmpty)
-                    .opacity(fullName.isEmpty || email.isEmpty || password.isEmpty ? 0.5 : 1)
+                    .disabled(isLoading)
+                    .opacity(canSubmit ? 1 : 0.5)
                 }
 
                 // Back to Login
@@ -118,6 +170,7 @@ struct SignupView: View {
         label: String,
         icon: String,
         placeholder: String,
+        error: String?,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -130,7 +183,7 @@ struct SignupView: View {
             HStack(spacing: 10) {
                 Image(systemName: icon)
                     .font(.system(size: 16))
-                    .foregroundStyle(Color.club.onSurfaceVariant)
+                    .foregroundStyle(error != nil ? Color.club.destructive : Color.club.onSurfaceVariant)
                 content()
             }
             .padding(.horizontal, 12)
@@ -138,15 +191,22 @@ struct SignupView: View {
             .background(Color.club.surfaceContainerLowest)
             .overlay(alignment: .bottom) {
                 Rectangle()
-                    .fill(Color.club.outlineVariant)
+                    .fill(error != nil ? Color.club.destructive : Color.club.outlineVariant)
                     .frame(height: 1)
+            }
+
+            if let error {
+                Text(error)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.club.destructive)
+                    .padding(.leading, 4)
             }
         }
     }
 
     private func handleSignUp() async {
         isLoading = true
-        await auth.signUp(email: email, password: password, fullName: fullName)
+        await auth.signUp(email: email.trimmingCharacters(in: .whitespaces), password: password, fullName: fullName.trimmingCharacters(in: .whitespaces))
         isLoading = false
     }
 }

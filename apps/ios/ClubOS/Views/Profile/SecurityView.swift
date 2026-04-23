@@ -135,11 +135,20 @@ struct SecurityView: View {
         }
     }
 
+    private var passwordValidation: ValidationService.PasswordValidation {
+        ValidationService.validatePassword(newPassword)
+    }
+
+    private var passwordsMatch: Bool {
+        ValidationService.validatePasswordMatch(newPassword, confirmPassword)
+    }
+
     private var passwordRequirements: some View {
         VStack(alignment: .leading, spacing: 4) {
-            requirementRow("At least 8 characters", met: newPassword.count >= 8)
-            requirementRow("Contains a number", met: newPassword.contains(where: \.isNumber))
-            requirementRow("Passwords match", met: !confirmPassword.isEmpty && newPassword == confirmPassword)
+            ForEach(passwordValidation.requirements) { req in
+                requirementRow(req.label, met: req.met)
+            }
+            requirementRow("Passwords match", met: passwordsMatch)
         }
         .padding(.horizontal, 24)
         .padding(.top, 8)
@@ -157,10 +166,7 @@ struct SecurityView: View {
     }
 
     private var canSubmitPassword: Bool {
-        !currentPassword.isEmpty &&
-        newPassword.count >= 8 &&
-        newPassword.contains(where: \.isNumber) &&
-        newPassword == confirmPassword
+        !currentPassword.isEmpty && passwordValidation.isValid && passwordsMatch
     }
 
     // MARK: - Biometrics
