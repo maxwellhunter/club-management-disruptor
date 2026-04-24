@@ -164,4 +164,196 @@ final class DateUtilitiesTests: XCTestCase {
         XCTAssertEqual(DateUtilities.longDateString(nil), "—")
         XCTAssertEqual(DateUtilities.longDateString("nope"), "—")
     }
+
+    // MARK: - formatTime24to12
+
+    func test_formatTime_midnight() {
+        XCTAssertEqual(DateUtilities.formatTime24to12("00:00"), "12:00 AM")
+    }
+
+    func test_formatTime_earlyMorning() {
+        XCTAssertEqual(DateUtilities.formatTime24to12("06:30"), "6:30 AM")
+    }
+
+    func test_formatTime_noon() {
+        XCTAssertEqual(DateUtilities.formatTime24to12("12:00"), "12:00 PM")
+    }
+
+    func test_formatTime_afternoon() {
+        XCTAssertEqual(DateUtilities.formatTime24to12("14:45"), "2:45 PM")
+    }
+
+    func test_formatTime_endOfDay() {
+        XCTAssertEqual(DateUtilities.formatTime24to12("23:59"), "11:59 PM")
+    }
+
+    func test_formatTime_withSeconds_ignoresSeconds() {
+        XCTAssertEqual(DateUtilities.formatTime24to12("09:15:30"), "9:15 AM")
+    }
+
+    func test_formatTime_singleDigitMinute() {
+        XCTAssertEqual(DateUtilities.formatTime24to12("8:05"), "8:05 AM")
+    }
+
+    func test_formatTime_invalidHour_returnsOriginal() {
+        XCTAssertEqual(DateUtilities.formatTime24to12("25:00"), "25:00")
+    }
+
+    func test_formatTime_invalidMinute_returnsOriginal() {
+        XCTAssertEqual(DateUtilities.formatTime24to12("12:61"), "12:61")
+    }
+
+    func test_formatTime_garbage_returnsOriginal() {
+        XCTAssertEqual(DateUtilities.formatTime24to12("not-a-time"), "not-a-time")
+    }
+
+    func test_formatTime_emptyString_returnsOriginal() {
+        XCTAssertEqual(DateUtilities.formatTime24to12(""), "")
+    }
+
+    func test_formatTime_onlyHour_returnsOriginal() {
+        XCTAssertEqual(DateUtilities.formatTime24to12("14"), "14")
+    }
+
+    func test_formatTime_negativeHour_returnsOriginal() {
+        XCTAssertEqual(DateUtilities.formatTime24to12("-1:00"), "-1:00")
+    }
+
+    func test_formatTime_1am() {
+        XCTAssertEqual(DateUtilities.formatTime24to12("01:00"), "1:00 AM")
+    }
+
+    func test_formatTime_11am() {
+        XCTAssertEqual(DateUtilities.formatTime24to12("11:59"), "11:59 AM")
+    }
+
+    func test_formatTime_1pm() {
+        XCTAssertEqual(DateUtilities.formatTime24to12("13:00"), "1:00 PM")
+    }
+
+    // MARK: - formatShortWeekdayDate
+
+    func test_formatShortWeekdayDate_validInput() {
+        // 2025-06-15 is a Sunday
+        XCTAssertEqual(DateUtilities.formatShortWeekdayDate("2025-06-15"), "Sun, Jun 15")
+    }
+
+    func test_formatShortWeekdayDate_monday() {
+        // 2025-06-16 is a Monday
+        XCTAssertEqual(DateUtilities.formatShortWeekdayDate("2025-06-16"), "Mon, Jun 16")
+    }
+
+    func test_formatShortWeekdayDate_invalidInput_returnsOriginal() {
+        XCTAssertEqual(DateUtilities.formatShortWeekdayDate("bad-date"), "bad-date")
+    }
+
+    func test_formatShortWeekdayDate_differentMonth() {
+        // 2025-12-25 is a Thursday
+        XCTAssertEqual(DateUtilities.formatShortWeekdayDate("2025-12-25"), "Thu, Dec 25")
+    }
+
+    // MARK: - formatLongWeekdayDate
+
+    func test_formatLongWeekdayDate_validInput() {
+        // 2025-06-15 is a Sunday
+        XCTAssertEqual(DateUtilities.formatLongWeekdayDate("2025-06-15"), "Sunday, Jun 15")
+    }
+
+    func test_formatLongWeekdayDate_monday() {
+        XCTAssertEqual(DateUtilities.formatLongWeekdayDate("2025-06-16"), "Monday, Jun 16")
+    }
+
+    func test_formatLongWeekdayDate_invalidInput_returnsOriginal() {
+        XCTAssertEqual(DateUtilities.formatLongWeekdayDate("nope"), "nope")
+    }
+
+    func test_formatLongWeekdayDate_wednesday() {
+        // 2025-06-18 is a Wednesday
+        XCTAssertEqual(DateUtilities.formatLongWeekdayDate("2025-06-18"), "Wednesday, Jun 18")
+    }
+
+    // MARK: - generateBookableDates
+
+    func test_generateBookableDates_defaultsTo14Days() {
+        let dates = DateUtilities.generateBookableDates(referenceDate: now)
+        XCTAssertEqual(dates.count, 14)
+    }
+
+    func test_generateBookableDates_defaultStartsAtTomorrow() {
+        let cal = Calendar.current
+        let tomorrow = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: now))!
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+
+        let dates = DateUtilities.generateBookableDates(referenceDate: now)
+        XCTAssertEqual(dates.first?.dateString, formatter.string(from: tomorrow))
+    }
+
+    func test_generateBookableDates_customCount() {
+        let dates = DateUtilities.generateBookableDates(count: 7, referenceDate: now)
+        XCTAssertEqual(dates.count, 7)
+    }
+
+    func test_generateBookableDates_startOffsetZero_includesReferenceDay() {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        let todayStr = formatter.string(from: Calendar.current.startOfDay(for: now))
+
+        let dates = DateUtilities.generateBookableDates(startOffset: 0, count: 3, referenceDate: now)
+        XCTAssertEqual(dates.first?.dateString, todayStr)
+    }
+
+    func test_generateBookableDates_includeRelative_todayAndTomorrow() {
+        let dates = DateUtilities.generateBookableDates(
+            startOffset: 0, count: 3, includeRelative: true, referenceDate: now
+        )
+        XCTAssertEqual(dates[0].dayName, "Today")
+        XCTAssertEqual(dates[1].dayName, "Tomorrow")
+        // Third day should be a weekday name, not "Today"/"Tomorrow"
+        XCTAssertFalse(dates[2].dayName == "Today" || dates[2].dayName == "Tomorrow")
+    }
+
+    func test_generateBookableDates_withoutRelative_usesWeekdayNames() {
+        let dates = DateUtilities.generateBookableDates(
+            startOffset: 0, count: 2, includeRelative: false, referenceDate: now
+        )
+        XCTAssertNotEqual(dates[0].dayName, "Today")
+        XCTAssertNotEqual(dates[1].dayName, "Tomorrow")
+    }
+
+    func test_generateBookableDates_dateStringsAreSequential() {
+        let dates = DateUtilities.generateBookableDates(startOffset: 1, count: 5, referenceDate: now)
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        let cal = Calendar.current
+        let base = cal.startOfDay(for: now)
+
+        for (i, bd) in dates.enumerated() {
+            let expected = cal.date(byAdding: .day, value: i + 1, to: base)!
+            XCTAssertEqual(bd.dateString, formatter.string(from: expected), "Date at index \(i) should be offset \(i + 1)")
+        }
+    }
+
+    func test_generateBookableDates_dayNumAndMonthNameAreConsistent() {
+        let dates = DateUtilities.generateBookableDates(referenceDate: now)
+        for bd in dates {
+            XCTAssertFalse(bd.dayNum.isEmpty, "dayNum should not be empty")
+            XCTAssertFalse(bd.monthName.isEmpty, "monthName should not be empty")
+            XCTAssertFalse(bd.dayName.isEmpty, "dayName should not be empty")
+        }
+    }
+
+    func test_generateBookableDates_idsAreUnique() {
+        let dates = DateUtilities.generateBookableDates(referenceDate: now)
+        let ids = Set(dates.map(\.id))
+        XCTAssertEqual(ids.count, dates.count, "All date IDs should be unique")
+    }
+
+    func test_generateBookableDates_zeroCount_returnsEmpty() {
+        let dates = DateUtilities.generateBookableDates(count: 0, referenceDate: now)
+        XCTAssertTrue(dates.isEmpty)
+    }
 }

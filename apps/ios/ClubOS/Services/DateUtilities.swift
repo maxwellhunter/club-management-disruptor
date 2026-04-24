@@ -118,4 +118,108 @@ enum DateUtilities {
         formatter.dateFormat = "MMM d, yyyy"
         return formatter.string(from: date)
     }
+
+    // MARK: - Time Formatting (24h → 12h)
+
+    /// Convert a 24-hour time string ("HH:mm" or "HH:mm:ss") to 12-hour format ("h:mm AM/PM").
+    /// Returns the original string unchanged if parsing fails.
+    static func formatTime24to12(_ time: String) -> String {
+        let parts = time.split(separator: ":")
+        guard parts.count >= 2,
+              let hour = Int(parts[0]),
+              let minute = Int(parts[1]),
+              (0...23).contains(hour),
+              (0...59).contains(minute)
+        else { return time }
+        let hour12 = hour % 12 == 0 ? 12 : hour % 12
+        let ampm = hour < 12 ? "AM" : "PM"
+        return String(format: "%d:%02d %@", hour12, minute, ampm)
+    }
+
+    // MARK: - Date-only String Formatting
+
+    /// Parse a "yyyy-MM-dd" date string and format it as "EEE, MMM d" (e.g. "Mon, Jun 15").
+    /// Returns the original string if parsing fails.
+    static func formatShortWeekdayDate(_ dateStr: String) -> String {
+        let parser = DateFormatter()
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.dateFormat = "yyyy-MM-dd"
+        guard let date = parser.date(from: dateStr) else { return dateStr }
+        let out = DateFormatter()
+        out.locale = Locale(identifier: "en_US_POSIX")
+        out.dateFormat = "EEE, MMM d"
+        return out.string(from: date)
+    }
+
+    /// Parse a "yyyy-MM-dd" date string and format it as "EEEE, MMM d" (e.g. "Monday, Jun 15").
+    /// Returns the original string if parsing fails.
+    static func formatLongWeekdayDate(_ dateStr: String) -> String {
+        let parser = DateFormatter()
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.dateFormat = "yyyy-MM-dd"
+        guard let date = parser.date(from: dateStr) else { return dateStr }
+        let out = DateFormatter()
+        out.locale = Locale(identifier: "en_US_POSIX")
+        out.dateFormat = "EEEE, MMM d"
+        return out.string(from: date)
+    }
+
+    // MARK: - Bookable Date Generation
+
+    struct BookableDate: Sendable, Identifiable {
+        var id: String { dateString }
+        let dateString: String   // "yyyy-MM-dd"
+        let dayName: String      // "Mon" (or "Today"/"Tomorrow" if includeRelative)
+        let dayNum: String       // "15"
+        let monthName: String    // "Jun"
+    }
+
+    /// Generate an array of upcoming bookable dates.
+    ///
+    /// - Parameters:
+    ///   - startOffset: Days from `referenceDate` to begin (1 = tomorrow). Defaults to 1.
+    ///   - count: Number of dates to generate. Defaults to 14.
+    ///   - includeRelative: If true, uses "Today"/"Tomorrow" labels for offsets 0/1. Defaults to false.
+    ///   - referenceDate: The base date. Defaults to today.
+    static func generateBookableDates(
+        startOffset: Int = 1,
+        count: Int = 14,
+        includeRelative: Bool = false,
+        referenceDate: Date = Date()
+    ) -> [BookableDate] {
+        let calendar = Calendar.current
+        let baseDate = calendar.startOfDay(for: referenceDate)
+        let isoFormatter = DateFormatter()
+        isoFormatter.locale = Locale(identifier: "en_US_POSIX")
+        isoFormatter.dateFormat = "yyyy-MM-dd"
+        let weekdayFormatter = DateFormatter()
+        weekdayFormatter.locale = Locale(identifier: "en_US_POSIX")
+        weekdayFormatter.dateFormat = "EEE"
+        let dayFormatter = DateFormatter()
+        dayFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dayFormatter.dateFormat = "d"
+        let monthFormatter = DateFormatter()
+        monthFormatter.locale = Locale(identifier: "en_US_POSIX")
+        monthFormatter.dateFormat = "MMM"
+
+        var dates: [BookableDate] = []
+        for offset in startOffset..<(startOffset + count) {
+            guard let date = calendar.date(byAdding: .day, value: offset, to: baseDate) else { continue }
+            let dayName: String
+            if includeRelative && offset == 0 {
+                dayName = "Today"
+            } else if includeRelative && offset == 1 {
+                dayName = "Tomorrow"
+            } else {
+                dayName = weekdayFormatter.string(from: date)
+            }
+            dates.append(BookableDate(
+                dateString: isoFormatter.string(from: date),
+                dayName: dayName,
+                dayNum: dayFormatter.string(from: date),
+                monthName: monthFormatter.string(from: date)
+            ))
+        }
+        return dates
+    }
 }

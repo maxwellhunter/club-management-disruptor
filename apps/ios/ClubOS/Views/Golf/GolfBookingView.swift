@@ -172,54 +172,14 @@ private func timeCategory(for time: String) -> TimeCategory {
 
 // MARK: - Bookable Date
 
-struct BookableDate: Identifiable {
-    var id: String { dateString }
-    let dateString: String
-    let dayName: String
-    let dayNum: String
-    let monthName: String
-}
-
-private func generateBookableDates() -> [BookableDate] {
-    let calendar = Calendar.current
-    let formatter = DateFormatter()
-    var dates: [BookableDate] = []
-
-    for offset in 1...14 {
-        guard let date = calendar.date(byAdding: .day, value: offset, to: Date()) else { continue }
-
-        formatter.dateFormat = "yyyy-MM-dd"
-        let dateString = formatter.string(from: date)
-
-        formatter.dateFormat = "EEE"
-        let dayName = formatter.string(from: date)
-
-        formatter.dateFormat = "d"
-        let dayNum = formatter.string(from: date)
-
-        formatter.dateFormat = "MMM"
-        let monthName = formatter.string(from: date)
-
-        dates.append(BookableDate(dateString: dateString, dayName: dayName, dayNum: dayNum, monthName: monthName))
-    }
-    return dates
-}
+typealias BookableDate = DateUtilities.BookableDate
 
 private func formatTime(_ time: String) -> String {
-    let parts = time.split(separator: ":")
-    guard parts.count >= 2, let hour = Int(parts[0]) else { return time }
-    let minute = parts[1]
-    let ampm = hour >= 12 ? "PM" : "AM"
-    let display = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour)
-    return "\(display):\(minute) \(ampm)"
+    DateUtilities.formatTime24to12(time)
 }
 
 private func formatDate(_ dateStr: String) -> String {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "yyyy-MM-dd"
-    guard let date = formatter.date(from: dateStr) else { return dateStr }
-    formatter.dateFormat = "EEE, MMM d"
-    return formatter.string(from: date)
+    DateUtilities.formatShortWeekdayDate(dateStr)
 }
 
 // MARK: - Request payloads
@@ -328,7 +288,7 @@ struct GolfBookingView<PickerContent: View>: View {
     @State private var showEditSuccess = false
     @State private var showCancelFromEditAlert = false
 
-    private let bookableDates = generateBookableDates()
+    private let bookableDates = DateUtilities.generateBookableDates()
 
     var body: some View {
         myBookingsView

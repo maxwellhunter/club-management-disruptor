@@ -49,46 +49,8 @@ struct SpaceBookResponse: Decodable {
     let booking: BookedItem
 }
 
-private struct SpaceBookingDate: Identifiable {
-    let id = UUID()
-    let iso: String
-    let label: String
-    let sub: String
-}
-
-private func spaceBookingDates() -> [SpaceBookingDate] {
-    let today = Calendar.current.startOfDay(for: Date())
-    let isoFormatter = DateFormatter()
-    isoFormatter.dateFormat = "yyyy-MM-dd"
-    isoFormatter.calendar = Calendar(identifier: .gregorian)
-    isoFormatter.timeZone = TimeZone.current
-
-    let shortWeekday = DateFormatter()
-    shortWeekday.dateFormat = "EEE"
-
-    let monthDay = DateFormatter()
-    monthDay.dateFormat = "MMM d"
-
-    var out: [SpaceBookingDate] = []
-    for i in 0..<14 {
-        let d = Calendar.current.date(byAdding: .day, value: i, to: today)!
-        let label: String
-        switch i {
-        case 0: label = "Today"
-        case 1: label = "Tomorrow"
-        default: label = shortWeekday.string(from: d)
-        }
-        out.append(.init(iso: isoFormatter.string(from: d), label: label, sub: monthDay.string(from: d)))
-    }
-    return out
-}
-
 private func formatSpaceTime(_ t: String) -> String {
-    let parts = t.split(separator: ":")
-    guard parts.count >= 2, let h = Int(parts[0]), let m = Int(parts[1]) else { return t }
-    let hour12 = h % 12 == 0 ? 12 : h % 12
-    let ampm = h < 12 ? "AM" : "PM"
-    return String(format: "%d:%02d %@", hour12, m, ampm)
+    DateUtilities.formatTime24to12(t)
 }
 
 // MARK: - Main View
@@ -132,7 +94,7 @@ struct SpacesView<PickerContent: View>: View {
     @State private var showCancelAlert = false
     @State private var bookingToCancelId: String?
 
-    private let dates = spaceBookingDates()
+    private let dates = DateUtilities.generateBookableDates(startOffset: 0, count: 14, includeRelative: true)
 
     var body: some View {
         ZStack {
@@ -393,17 +355,17 @@ struct SpacesView<PickerContent: View>: View {
                         HStack(spacing: 8) {
                             ForEach(dates) { d in
                                 Button {
-                                    selectedDate = d.iso
+                                    selectedDate = d.dateString
                                     Task { await loadSlots(for: space) }
                                 } label: {
                                     VStack(spacing: 2) {
-                                        Text(d.label).font(.system(size: 12, weight: .semibold))
-                                        Text(d.sub).font(.system(size: 10))
+                                        Text(d.dayName).font(.system(size: 12, weight: .semibold))
+                                        Text("\(d.monthName) \(d.dayNum)").font(.system(size: 10))
                                             .opacity(0.8)
                                     }
                                     .frame(width: 72, height: 50)
                                     .background(
-                                        selectedDate == d.iso ? Color.club.primary : Color.club.surfaceContainerLowest,
+                                        selectedDate == d.dateString ? Color.club.primary : Color.club.surfaceContainerLowest,
                                         in: RoundedRectangle(cornerRadius: 10)
                                     )
                                     .overlay(
@@ -411,7 +373,7 @@ struct SpacesView<PickerContent: View>: View {
                                             .strokeBorder(Color.club.outline.opacity(0.3), lineWidth: 1)
                                     )
                                     .foregroundStyle(
-                                        selectedDate == d.iso ? Color.white : Color.club.foreground
+                                        selectedDate == d.dateString ? Color.white : Color.club.foreground
                                     )
                                 }
                                 .buttonStyle(.plain)
@@ -559,12 +521,7 @@ struct SpacesView<PickerContent: View>: View {
     }
 
     private func formatDateLong(_ iso: String) -> String {
-        let parser = DateFormatter()
-        parser.dateFormat = "yyyy-MM-dd"
-        guard let d = parser.date(from: iso) else { return iso }
-        let out = DateFormatter()
-        out.dateFormat = "EEEE, MMM d"
-        return out.string(from: d)
+        DateUtilities.formatLongWeekdayDate(iso)
     }
 
     // MARK: - API
