@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // MARK: - API Client for Next.js Backend
 
@@ -8,12 +9,24 @@ actor APIClient {
     private let baseURL: URL
     private let session: URLSession
     private var accessToken: String?
+    private let maxRetries: Int
+    private let initialRetryDelay: TimeInterval
+    private static let logger = Logger(subsystem: "com.clubos.app", category: "API")
 
     private init() {
         self.baseURL = AppConfig.apiBaseURL
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         self.session = URLSession(configuration: config)
+        self.maxRetries = 3
+        self.initialRetryDelay = 0.5
+    }
+
+    init(baseURL: URL, session: URLSession, maxRetries: Int = 3, initialRetryDelay: TimeInterval = 0.5) {
+        self.baseURL = baseURL
+        self.session = session
+        self.maxRetries = maxRetries
+        self.initialRetryDelay = initialRetryDelay
     }
 
     // MARK: - Token Management
@@ -44,10 +57,9 @@ actor APIClient {
         return try await execute(request)
     }
 
-    // Fire-and-forget PUT (no response body needed).
     func put(_ path: String, body: Encodable? = nil) async throws {
         let request = try buildRequest(path: path, method: "PUT", body: body)
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await performRequest(request)
         try validateResponse(response, data: data)
     }
 
@@ -59,19 +71,19 @@ actor APIClient {
     // Fire-and-forget variants (no response body needed)
     func post(_ path: String, body: Encodable? = nil) async throws {
         let request = try buildRequest(path: path, method: "POST", body: body)
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await performRequest(request)
         try validateResponse(response, data: data)
     }
 
     func patch(_ path: String, body: Encodable? = nil) async throws {
         let request = try buildRequest(path: path, method: "PATCH", body: body)
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await performRequest(request)
         try validateResponse(response, data: data)
     }
 
     func delete(_ path: String, body: Encodable? = nil) async throws {
         let request = try buildRequest(path: path, method: "DELETE", body: body)
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await performRequest(request)
         try validateResponse(response, data: data)
     }
 
@@ -96,7 +108,7 @@ actor APIClient {
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
         request.httpBody = body
 
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await performRequest(request)
         try validateResponse(response, data: data)
 
         let decoder = JSONDecoder()
@@ -108,14 +120,10 @@ actor APIClient {
 
     func getData(_ path: String, query: [String: String]? = nil) async throws -> (Data, HTTPURLResponse) {
         let request = try buildRequest(path: path, method: "GET", query: query)
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-        return (data, httpResponse)
+        return try await performRequest(request)
     }
 
-    // MARK: - Private Helpers
+    // MARK: - Request Building
 
     func buildRequest(
         path: String,
@@ -150,8 +158,42 @@ actor APIClient {
         return request
     }
 
+    // MARK: - Retry & Execution
+
+    private func performRequest(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        var lastError: Error?
+
+        for attempt in 0...maxRetries {
+            if attempt > 0 {
+                let delay = initialRetryDelay * pow(2.0, Double(attempt - 1))
+                Self.logger.info("Retry \(attempt)/\(self.maxRetries) — \(request.httpMethod ?? "?") \(request.url?.path ?? "?")")
+                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            }
+
+            do {
+                let (data, response) = try await session.data(for: request)
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw APIError.invalidResponse
+                }
+
+                if Self.isRetriableStatusCode(httpResponse.statusCode) && attempt < maxRetries {
+                    lastError = APIError.httpError(httpResponse.statusCode, extractErrorMessage(from: data))
+                    continue
+                }
+
+                return (data, httpResponse)
+            } catch let urlError as URLError where Self.isRetriableURLError(urlError) && attempt < maxRetries {
+                Self.logger.warning("Network error \(urlError.code.rawValue) — \(request.httpMethod ?? "?") \(request.url?.path ?? "?")")
+                lastError = urlError
+                continue
+            }
+        }
+
+        throw lastError ?? APIError.invalidResponse
+    }
+
     private func execute<T: Decodable>(_ request: URLRequest) async throws -> T {
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await performRequest(request)
         try validateResponse(response, data: data)
 
         let decoder = JSONDecoder()
@@ -159,17 +201,13 @@ actor APIClient {
         return try decoder.decode(T.self, from: data)
     }
 
-    /// Try to extract the "error" field from an API JSON error response.
-    private func extractErrorMessage(from data: Data) -> String? {
+    func extractErrorMessage(from data: Data) -> String? {
         struct ErrorBody: Decodable { let error: String }
         return try? JSONDecoder().decode(ErrorBody.self, from: data).error
     }
 
-    private func validateResponse(_ response: URLResponse, data: Data) throws {
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-        switch httpResponse.statusCode {
+    func validateResponse(_ response: HTTPURLResponse, data: Data) throws {
+        switch response.statusCode {
         case 200...299:
             return
         case 401:
@@ -183,14 +221,29 @@ actor APIClient {
             throw APIError.rateLimited
         default:
             let msg = extractErrorMessage(from: data)
-            throw APIError.httpError(httpResponse.statusCode, msg)
+            throw APIError.httpError(response.statusCode, msg)
+        }
+    }
+
+    // MARK: - Retry Helpers
+
+    static func isRetriableStatusCode(_ code: Int) -> Bool {
+        code == 429 || (500...504).contains(code)
+    }
+
+    static func isRetriableURLError(_ error: URLError) -> Bool {
+        switch error.code {
+        case .timedOut, .networkConnectionLost, .cannotConnectToHost:
+            return true
+        default:
+            return false
         }
     }
 }
 
 // MARK: - API Errors
 
-enum APIError: LocalizedError {
+enum APIError: LocalizedError, Equatable {
     case invalidURL(String)
     case invalidResponse
     case unauthorized
