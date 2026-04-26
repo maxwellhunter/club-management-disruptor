@@ -376,7 +376,7 @@ struct EventsView: View {
                         if event.priceValue == nil || event.priceValue == 0 {
                             tagBadge("FREE", color: Color.club.primary)
                         } else {
-                            tagBadge(formatPrice(event.priceValue!), color: Color(hex: "8b6914"))
+                            tagBadge(formatPrice(event.priceValue ?? 0), color: Color(hex: "8b6914"))
                         }
 
                         if let cap = event.capacity {
@@ -528,7 +528,7 @@ struct EventsView: View {
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(Color.club.primary)
                         } else {
-                            Text(formatPrice(event.priceValue!))
+                            Text(formatPrice(event.priceValue ?? 0))
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(Color.club.foreground)
                         }
@@ -565,7 +565,7 @@ struct EventsView: View {
                             if event.priceValue == nil || event.priceValue == 0 {
                                 tagBadge("FREE", color: Color.club.primary)
                             } else {
-                                tagBadge(formatPrice(event.priceValue!), color: Color(hex: "8b6914"))
+                                tagBadge(formatPrice(event.priceValue ?? 0), color: Color(hex: "8b6914"))
                             }
 
                             if let cap = event.capacity {

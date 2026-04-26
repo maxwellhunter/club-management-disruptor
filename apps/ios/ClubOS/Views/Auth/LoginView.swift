@@ -6,6 +6,7 @@ struct LoginView: View {
     @State private var password = ""
     @State private var rememberMe = false
     @State private var isLoading = false
+    @State private var emailTouched = false
 
     var body: some View {
         ScrollView {
@@ -70,14 +71,25 @@ struct LoginView: View {
                                 .keyboardType(.emailAddress)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
+                                .onChange(of: email) { _, _ in
+                                    if !emailTouched && !email.isEmpty { emailTouched = true }
+                                }
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 14)
                         .background(Color.club.surfaceContainerLowest)
                         .overlay(alignment: .bottom) {
                             Rectangle()
-                                .fill(Color.club.outlineVariant)
+                                .fill(emailValidationError != nil ? Color.club.destructive : Color.club.outlineVariant)
                                 .frame(height: 1)
+                        }
+
+                        if let error = emailValidationError {
+                            Text(error)
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color.club.destructive)
+                                .padding(.leading, 4)
+                                .padding(.top, 2)
                         }
                     }
 
@@ -158,8 +170,8 @@ struct LoginView: View {
                         .padding(.vertical, 16)
                         .background(Color.club.primaryContainer, in: RoundedRectangle(cornerRadius: 16))
                     }
-                    .disabled(isLoading || email.isEmpty || password.isEmpty)
-                    .opacity(email.isEmpty || password.isEmpty ? 0.5 : 1)
+                    .disabled(!canSubmitLogin)
+                    .opacity(canSubmitLogin ? 1 : 0.5)
                 }
 
                 // MARK: - Footer
@@ -271,10 +283,23 @@ struct LoginView: View {
     }
     #endif
 
+    // MARK: - Validation
+
+    private var emailValidationError: String? {
+        guard emailTouched else { return nil }
+        return InputValidation.emailError(email)
+    }
+
+    private var canSubmitLogin: Bool {
+        !isLoading
+        && InputValidation.isValidEmail(email)
+        && !password.isEmpty
+    }
+
     // MARK: - Actions
 
     private func handleLogin() async {
-        guard !email.isEmpty, !password.isEmpty else { return }
+        guard canSubmitLogin else { return }
         isLoading = true
         await auth.signIn(email: email, password: password)
         isLoading = false

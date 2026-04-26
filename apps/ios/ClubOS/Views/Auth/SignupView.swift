@@ -8,6 +8,9 @@ struct SignupView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var isLoading = false
+    @State private var nameTouched = false
+    @State private var emailTouched = false
+    @State private var passwordTouched = false
 
     var body: some View {
         ScrollView {
@@ -46,22 +49,50 @@ struct SignupView: View {
 
                 // Form
                 VStack(spacing: 20) {
-                    fieldGroup(label: "FULL NAME", icon: "person", placeholder: "John Smith") {
+                    fieldGroup(
+                        label: "FULL NAME",
+                        icon: "person",
+                        placeholder: "John Smith",
+                        error: nameTouched ? InputValidation.nameError(fullName) : nil
+                    ) {
                         TextField("John Smith", text: $fullName)
                             .textContentType(.name)
+                            .onChange(of: fullName) { _, _ in
+                                if !nameTouched && !fullName.isEmpty { nameTouched = true }
+                            }
                     }
 
-                    fieldGroup(label: "EMAIL ADDRESS", icon: "envelope", placeholder: "name@example.com") {
+                    fieldGroup(
+                        label: "EMAIL ADDRESS",
+                        icon: "envelope",
+                        placeholder: "name@example.com",
+                        error: emailTouched ? InputValidation.emailError(email) : nil
+                    ) {
                         TextField("name@example.com", text: $email)
                             .textContentType(.emailAddress)
                             .keyboardType(.emailAddress)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
+                            .onChange(of: email) { _, _ in
+                                if !emailTouched && !email.isEmpty { emailTouched = true }
+                            }
                     }
 
-                    fieldGroup(label: "PASSWORD", icon: "lock", placeholder: "••••••••") {
+                    fieldGroup(
+                        label: "PASSWORD",
+                        icon: "lock",
+                        placeholder: "••••••••",
+                        error: nil
+                    ) {
                         SecureField("••••••••", text: $password)
                             .textContentType(.newPassword)
+                            .onChange(of: password) { _, _ in
+                                if !passwordTouched && !password.isEmpty { passwordTouched = true }
+                            }
+                    }
+
+                    if passwordTouched {
+                        passwordRequirements
                     }
 
                     // Sign Up Button
@@ -82,8 +113,8 @@ struct SignupView: View {
                         .padding(.vertical, 16)
                         .background(Color.club.primaryContainer, in: RoundedRectangle(cornerRadius: 16))
                     }
-                    .disabled(isLoading || fullName.isEmpty || email.isEmpty || password.isEmpty)
-                    .opacity(fullName.isEmpty || email.isEmpty || password.isEmpty ? 0.5 : 1)
+                    .disabled(!canSubmitSignup)
+                    .opacity(canSubmitSignup ? 1 : 0.5)
                 }
 
                 // Back to Login
@@ -118,6 +149,7 @@ struct SignupView: View {
         label: String,
         icon: String,
         placeholder: String,
+        error: String? = nil,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -138,15 +170,55 @@ struct SignupView: View {
             .background(Color.club.surfaceContainerLowest)
             .overlay(alignment: .bottom) {
                 Rectangle()
-                    .fill(Color.club.outlineVariant)
+                    .fill(error != nil ? Color.club.destructive : Color.club.outlineVariant)
                     .frame(height: 1)
+            }
+
+            if let error {
+                Text(error)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.club.destructive)
+                    .padding(.leading, 4)
             }
         }
     }
 
+    // MARK: - Password Requirements
+
+    private var passwordRequirements: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            requirementRow("At least 8 characters", met: InputValidation.hasMinLength(password))
+            requirementRow("Contains a number", met: InputValidation.hasNumber(password))
+        }
+        .padding(.horizontal, 4)
+    }
+
+    private func requirementRow(_ text: String, met: Bool) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: met ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 12))
+                .foregroundStyle(met ? Color.club.primary : Color.club.outlineVariant)
+            Text(text)
+                .font(.system(size: 12))
+                .foregroundStyle(met ? Color.club.foreground : Color.club.onSurfaceVariant)
+        }
+    }
+
+    // MARK: - Validation
+
+    private var canSubmitSignup: Bool {
+        !isLoading
+        && InputValidation.isValidName(fullName)
+        && InputValidation.isValidEmail(email)
+        && InputValidation.passwordMeetsRequirements(password)
+    }
+
+    // MARK: - Actions
+
     private func handleSignUp() async {
+        guard canSubmitSignup else { return }
         isLoading = true
-        await auth.signUp(email: email, password: password, fullName: fullName)
+        await auth.signUp(email: email, password: password, fullName: fullName.trimmingCharacters(in: .whitespacesAndNewlines))
         isLoading = false
     }
 }

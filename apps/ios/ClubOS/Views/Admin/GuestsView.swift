@@ -627,7 +627,7 @@ struct GuestsView: View {
     private func initials(for name: String) -> String {
         let parts = name.components(separatedBy: " ")
         let first = parts.first?.prefix(1) ?? ""
-        let last = parts.count > 1 ? parts.last!.prefix(1) : ""
+        let last = parts.count > 1 ? (parts.last?.prefix(1) ?? "") : ""
         return "\(first)\(last)".uppercased()
     }
 
