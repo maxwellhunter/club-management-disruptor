@@ -47,8 +47,7 @@ actor APIClient {
     // Fire-and-forget PUT (no response body needed).
     func put(_ path: String, body: Encodable? = nil) async throws {
         let request = try buildRequest(path: path, method: "PUT", body: body)
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data)
+        try await executeVoid(request)
     }
 
     func delete<T: Decodable>(_ path: String) async throws -> T {
@@ -59,20 +58,17 @@ actor APIClient {
     // Fire-and-forget variants (no response body needed)
     func post(_ path: String, body: Encodable? = nil) async throws {
         let request = try buildRequest(path: path, method: "POST", body: body)
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data)
+        try await executeVoid(request)
     }
 
     func patch(_ path: String, body: Encodable? = nil) async throws {
         let request = try buildRequest(path: path, method: "PATCH", body: body)
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data)
+        try await executeVoid(request)
     }
 
     func delete(_ path: String, body: Encodable? = nil) async throws {
         let request = try buildRequest(path: path, method: "DELETE", body: body)
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data)
+        try await executeVoid(request)
     }
 
     // MARK: - Multipart Upload
@@ -96,12 +92,14 @@ actor APIClient {
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
         request.httpBody = body
 
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data)
+        return try await NetworkRetry.execute { [session] in
+            let (data, response) = try await session.data(for: request)
+            try self.validateResponse(response, data: data)
 
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try decoder.decode(T.self, from: data)
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            return try decoder.decode(T.self, from: data)
+        }
     }
 
     // MARK: - Raw data (for non-JSON responses)
@@ -151,12 +149,21 @@ actor APIClient {
     }
 
     private func execute<T: Decodable>(_ request: URLRequest) async throws -> T {
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data)
+        try await NetworkRetry.execute { [session] in
+            let (data, response) = try await session.data(for: request)
+            try self.validateResponse(response, data: data)
 
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try decoder.decode(T.self, from: data)
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            return try decoder.decode(T.self, from: data)
+        }
+    }
+
+    private func executeVoid(_ request: URLRequest) async throws {
+        try await NetworkRetry.execute { [session] in
+            let (data, response) = try await session.data(for: request)
+            try self.validateResponse(response, data: data)
+        }
     }
 
     /// Try to extract the "error" field from an API JSON error response.
