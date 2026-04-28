@@ -805,56 +805,31 @@ struct EventsView: View {
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // MARK: - Date Formatting
+    // MARK: - Date Formatting (delegates to DateUtilities)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    private func parseDate(_ iso: String) -> Date? {
-        let fmt = ISO8601DateFormatter()
-        fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = fmt.date(from: iso) { return d }
-        fmt.formatOptions = [.withInternetDateTime]
-        return fmt.date(from: iso)
-    }
-
     private func eventMonthLabel(_ iso: String) -> String {
-        guard let date = parseDate(iso) else { return "" }
-        let df = DateFormatter()
-        df.dateFormat = "MMM"
-        return df.string(from: date).uppercased()
+        DateUtilities.eventMonthLabel(iso)
     }
 
     private func eventDayLabel(_ iso: String) -> String {
-        guard let date = parseDate(iso) else { return "" }
-        let df = DateFormatter()
-        df.dateFormat = "d"
-        return df.string(from: date)
+        DateUtilities.eventDayLabel(iso)
     }
 
     private func eventDateLabel(_ iso: String) -> String {
-        guard let date = parseDate(iso) else { return "" }
-        let df = DateFormatter()
-        df.dateFormat = "EEEE, MMMM d"
-        return df.string(from: date)
+        DateUtilities.eventDateLabel(iso)
     }
 
     private func eventTimeLabel(_ iso: String) -> String {
-        guard let date = parseDate(iso) else { return "" }
-        let df = DateFormatter()
-        df.dateFormat = "h:mm a"
-        return df.string(from: date)
+        DateUtilities.eventTimeLabel(iso)
     }
 
     private func eventTimeRange(_ event: ClubEvent) -> String {
-        let start = eventTimeLabel(event.startDate)
-        if let end = event.endDate {
-            let endStr = eventTimeLabel(end)
-            return "\(start) – \(endStr)"
-        }
-        return start
+        DateUtilities.eventTimeRange(start: event.startDate, end: event.endDate)
     }
 
     private func formatPrice(_ price: Double) -> String {
-        String(format: "$%.0f", price)
+        DateUtilities.formatPrice(price)
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

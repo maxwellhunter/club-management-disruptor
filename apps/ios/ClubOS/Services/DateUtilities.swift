@@ -118,4 +118,78 @@ enum DateUtilities {
         formatter.dateFormat = "MMM d, yyyy"
         return formatter.string(from: date)
     }
+
+    // MARK: - Event Date Formatting
+    //
+    // Cached formatters for event-specific formatting. Previously duplicated
+    // (and uncached) inside EventsView.
+
+    private static let monthFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "MMM"
+        return f
+    }()
+
+    private static let dayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "d"
+        return f
+    }()
+
+    private static let fullDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "EEEE, MMMM d"
+        return f
+    }()
+
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "h:mm a"
+        return f
+    }()
+
+    /// Abbreviated uppercase month: "JUN", "DEC".
+    static func eventMonthLabel(_ iso: String) -> String {
+        guard let date = parseISODate(iso) else { return "" }
+        return monthFormatter.string(from: date).uppercased()
+    }
+
+    /// Day of month: "15", "3".
+    static func eventDayLabel(_ iso: String) -> String {
+        guard let date = parseISODate(iso) else { return "" }
+        return dayFormatter.string(from: date)
+    }
+
+    /// Full human date: "Sunday, June 15".
+    static func eventDateLabel(_ iso: String) -> String {
+        guard let date = parseISODate(iso) else { return "" }
+        return fullDateFormatter.string(from: date)
+    }
+
+    /// 12-hour time: "3:00 PM".
+    static func eventTimeLabel(_ iso: String) -> String {
+        guard let date = parseISODate(iso) else { return "" }
+        return timeFormatter.string(from: date)
+    }
+
+    /// Time range: "3:00 PM – 5:00 PM" or just "3:00 PM" if no end.
+    static func eventTimeRange(start: String, end: String?) -> String {
+        let startStr = eventTimeLabel(start)
+        if let end, !end.isEmpty {
+            let endStr = eventTimeLabel(end)
+            if !endStr.isEmpty {
+                return "\(startStr) – \(endStr)"
+            }
+        }
+        return startStr
+    }
+
+    /// Dollar-formatted price with no cents: "$25".
+    static func formatPrice(_ price: Double) -> String {
+        String(format: "$%.0f", price)
+    }
 }
