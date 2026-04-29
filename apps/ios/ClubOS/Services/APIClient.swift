@@ -1,19 +1,39 @@
 import Foundation
 
+// MARK: - URLSession Abstraction (for testability)
+
+protocol URLSessionProtocol: Sendable {
+    func data(for request: URLRequest) async throws -> (Data, URLResponse)
+}
+
+extension URLSession: URLSessionProtocol {}
+
 // MARK: - API Client for Next.js Backend
 
 actor APIClient {
     static let shared = APIClient()
 
     private let baseURL: URL
-    private let session: URLSession
+    private let session: URLSessionProtocol
     private var accessToken: String?
+
+    let maxRetries: Int
+    let initialBackoff: TimeInterval
 
     private init() {
         self.baseURL = AppConfig.apiBaseURL
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         self.session = URLSession(configuration: config)
+        self.maxRetries = 3
+        self.initialBackoff = 0.5
+    }
+
+    init(baseURL: URL, session: URLSessionProtocol, maxRetries: Int = 3, initialBackoff: TimeInterval = 0.5) {
+        self.baseURL = baseURL
+        self.session = session
+        self.maxRetries = maxRetries
+        self.initialBackoff = initialBackoff
     }
 
     // MARK: - Token Management
@@ -22,57 +42,55 @@ actor APIClient {
         self.accessToken = token
     }
 
+    func getToken() -> String? {
+        self.accessToken
+    }
+
     // MARK: - HTTP Methods
 
     func get<T: Decodable>(_ path: String, query: [String: String]? = nil) async throws -> T {
         let request = try buildRequest(path: path, method: "GET", query: query)
-        return try await execute(request)
+        return try await executeWithRetry(request)
     }
 
     func post<T: Decodable>(_ path: String, body: Encodable? = nil) async throws -> T {
         let request = try buildRequest(path: path, method: "POST", body: body)
-        return try await execute(request)
+        return try await executeWithRetry(request)
     }
 
     func patch<T: Decodable>(_ path: String, query: [String: String]? = nil, body: Encodable? = nil) async throws -> T {
         let request = try buildRequest(path: path, method: "PATCH", query: query, body: body)
-        return try await execute(request)
+        return try await executeWithRetry(request)
     }
 
     func put<T: Decodable>(_ path: String, body: Encodable? = nil) async throws -> T {
         let request = try buildRequest(path: path, method: "PUT", body: body)
-        return try await execute(request)
+        return try await executeWithRetry(request)
     }
 
-    // Fire-and-forget PUT (no response body needed).
     func put(_ path: String, body: Encodable? = nil) async throws {
         let request = try buildRequest(path: path, method: "PUT", body: body)
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data)
+        try await executeFireAndForgetWithRetry(request)
     }
 
     func delete<T: Decodable>(_ path: String) async throws -> T {
         let request = try buildRequest(path: path, method: "DELETE")
-        return try await execute(request)
+        return try await executeWithRetry(request)
     }
 
-    // Fire-and-forget variants (no response body needed)
     func post(_ path: String, body: Encodable? = nil) async throws {
         let request = try buildRequest(path: path, method: "POST", body: body)
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data)
+        try await executeFireAndForgetWithRetry(request)
     }
 
     func patch(_ path: String, body: Encodable? = nil) async throws {
         let request = try buildRequest(path: path, method: "PATCH", body: body)
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data)
+        try await executeFireAndForgetWithRetry(request)
     }
 
     func delete(_ path: String, body: Encodable? = nil) async throws {
         let request = try buildRequest(path: path, method: "DELETE", body: body)
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data)
+        try await executeFireAndForgetWithRetry(request)
     }
 
     // MARK: - Multipart Upload
@@ -115,7 +133,7 @@ actor APIClient {
         return (data, httpResponse)
     }
 
-    // MARK: - Private Helpers
+    // MARK: - Request Building
 
     func buildRequest(
         path: String,
@@ -150,6 +168,55 @@ actor APIClient {
         return request
     }
 
+    // MARK: - Execution with Retry
+
+    private func executeWithRetry<T: Decodable>(_ request: URLRequest) async throws -> T {
+        var lastError: Error?
+        for attempt in 0...maxRetries {
+            if attempt > 0 {
+                let delay = initialBackoff * pow(2.0, Double(attempt - 1))
+                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            }
+            do {
+                return try await execute(request)
+            } catch {
+                lastError = error
+                if !isRetryable(error) { throw error }
+            }
+        }
+        throw lastError!
+    }
+
+    private func executeFireAndForgetWithRetry(_ request: URLRequest) async throws {
+        var lastError: Error?
+        for attempt in 0...maxRetries {
+            if attempt > 0 {
+                let delay = initialBackoff * pow(2.0, Double(attempt - 1))
+                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            }
+            do {
+                let (data, response) = try await session.data(for: request)
+                try validateResponse(response, data: data)
+                return
+            } catch {
+                lastError = error
+                if !isRetryable(error) { throw error }
+            }
+        }
+        throw lastError!
+    }
+
+    func isRetryable(_ error: Error) -> Bool {
+        if let apiError = error as? APIError {
+            switch apiError {
+            case .rateLimited: return true
+            case .httpError(let code, _): return code >= 500 && code <= 599
+            default: return false
+            }
+        }
+        return (error as? URLError) != nil
+    }
+
     private func execute<T: Decodable>(_ request: URLRequest) async throws -> T {
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data)
@@ -159,13 +226,12 @@ actor APIClient {
         return try decoder.decode(T.self, from: data)
     }
 
-    /// Try to extract the "error" field from an API JSON error response.
     private func extractErrorMessage(from data: Data) -> String? {
         struct ErrorBody: Decodable { let error: String }
         return try? JSONDecoder().decode(ErrorBody.self, from: data).error
     }
 
-    private func validateResponse(_ response: URLResponse, data: Data) throws {
+    func validateResponse(_ response: URLResponse, data: Data) throws {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }
@@ -190,7 +256,7 @@ actor APIClient {
 
 // MARK: - API Errors
 
-enum APIError: LocalizedError {
+enum APIError: LocalizedError, Equatable {
     case invalidURL(String)
     case invalidResponse
     case unauthorized
@@ -214,8 +280,8 @@ enum APIError: LocalizedError {
 
 // MARK: - Type Erasure for Encodable
 
-private struct AnyEncodable: Encodable {
-    private let _encode: (Encoder) throws -> Void
+struct AnyEncodable: Encodable {
+    private let _encode: @Sendable (Encoder) throws -> Void
 
     init(_ wrapped: Encodable) {
         _encode = wrapped.encode
