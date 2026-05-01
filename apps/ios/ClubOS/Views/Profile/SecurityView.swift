@@ -137,7 +137,12 @@ struct SecurityView: View {
 
     private var passwordRequirements: some View {
         VStack(alignment: .leading, spacing: 4) {
-            requirementRow("At least 8 characters", met: newPassword.count >= 8)
+            requirementRow("At least \(FormValidation.minimumPasswordLength) characters",
+                          met: newPassword.count >= FormValidation.minimumPasswordLength)
+            requirementRow("Contains an uppercase letter",
+                          met: newPassword.rangeOfCharacter(from: .uppercaseLetters) != nil)
+            requirementRow("Contains a lowercase letter",
+                          met: newPassword.rangeOfCharacter(from: .lowercaseLetters) != nil)
             requirementRow("Contains a number", met: newPassword.contains(where: \.isNumber))
             requirementRow("Passwords match", met: !confirmPassword.isEmpty && newPassword == confirmPassword)
         }
@@ -158,8 +163,7 @@ struct SecurityView: View {
 
     private var canSubmitPassword: Bool {
         !currentPassword.isEmpty &&
-        newPassword.count >= 8 &&
-        newPassword.contains(where: \.isNumber) &&
+        FormValidation.validatePassword(newPassword).isValid &&
         newPassword == confirmPassword
     }
 

@@ -46,9 +46,11 @@ struct AddMemberSheet: View {
     @State private var createdSummary: String?
 
     private var canSubmit: Bool {
-        !firstName.trimmingCharacters(in: .whitespaces).isEmpty
-            && !lastName.trimmingCharacters(in: .whitespaces).isEmpty
-            && email.contains("@")
+        FormValidation.validateName(firstName, field: "First name").isValid
+            && FormValidation.validateName(lastName, field: "Last name").isValid
+            && FormValidation.validateEmail(email).isValid
+            && FormValidation.validatePhone(phone).isValid
+            && FormValidation.validateMemberNumber(memberNumber).isValid
             && !submitting
     }
 
@@ -563,9 +565,11 @@ struct MemberEditSheet: View {
 
     private var canSubmit: Bool {
         !submitting
-            && !firstName.trimmingCharacters(in: .whitespaces).isEmpty
-            && !lastName.trimmingCharacters(in: .whitespaces).isEmpty
-            && email.contains("@")
+            && FormValidation.validateName(firstName, field: "First name").isValid
+            && FormValidation.validateName(lastName, field: "Last name").isValid
+            && FormValidation.validateEmail(email).isValid
+            && FormValidation.validatePhone(phone).isValid
+            && FormValidation.validateMemberNumber(memberNumber).isValid
     }
 
     var body: some View {
