@@ -150,13 +150,27 @@ actor APIClient {
         return request
     }
 
-    private func execute<T: Decodable>(_ request: URLRequest) async throws -> T {
-        let (data, response) = try await session.data(for: request)
-        try validateResponse(response, data: data)
-
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try decoder.decode(T.self, from: data)
+    private func execute<T: Decodable>(_ request: URLRequest, retryPolicy: RetryPolicy = .default) async throws -> T {
+        var lastError: Error?
+        for attempt in 0..<retryPolicy.maxAttempts {
+            if attempt > 0 {
+                let delay = retryPolicy.delay(forAttempt: attempt)
+                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            }
+            do {
+                let (data, response) = try await session.data(for: request)
+                try validateResponse(response, data: data)
+                let decoder = JSONDecoder()
+                decoder.keyDecodingStrategy = .convertFromSnakeCase
+                return try decoder.decode(T.self, from: data)
+            } catch {
+                lastError = error
+                if !retryPolicy.shouldRetry(attempt: attempt + 1, error: error) {
+                    throw error
+                }
+            }
+        }
+        throw lastError!
     }
 
     /// Try to extract the "error" field from an API JSON error response.

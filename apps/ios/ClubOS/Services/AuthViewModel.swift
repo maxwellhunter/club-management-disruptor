@@ -50,6 +50,18 @@ final class AuthViewModel {
 
     func signIn(email: String, password: String) async {
         errorMessage = nil
+
+        let emailResult = InputValidator.validateEmail(email)
+        if !emailResult.isValid {
+            errorMessage = emailResult.error
+            return
+        }
+
+        if password.isEmpty {
+            errorMessage = "Password is required."
+            return
+        }
+
         isLoading = true
         defer { isLoading = false }
 
@@ -70,6 +82,24 @@ final class AuthViewModel {
 
     func signUp(email: String, password: String, fullName: String) async {
         errorMessage = nil
+
+        if let nameError = InputValidator.validateName(fullName) {
+            errorMessage = nameError
+            return
+        }
+
+        let emailResult = InputValidator.validateEmail(email)
+        if !emailResult.isValid {
+            errorMessage = emailResult.error
+            return
+        }
+
+        let passwordResult = InputValidator.validatePassword(password)
+        if !passwordResult.isValid {
+            errorMessage = passwordResult.errors.first
+            return
+        }
+
         isLoading = true
         defer { isLoading = false }
 

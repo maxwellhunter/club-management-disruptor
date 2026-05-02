@@ -64,6 +64,24 @@ struct SignupView: View {
                             .textContentType(.newPassword)
                     }
 
+                    if !password.isEmpty {
+                        let result = InputValidator.validatePassword(password)
+                        if !result.isValid {
+                            VStack(alignment: .leading, spacing: 4) {
+                                ForEach(result.errors, id: \.self) { error in
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.system(size: 12))
+                                        Text(error)
+                                            .font(.system(size: 12))
+                                    }
+                                    .foregroundStyle(.red.opacity(0.8))
+                                }
+                            }
+                            .padding(.leading, 4)
+                        }
+                    }
+
                     // Sign Up Button
                     Button {
                         Task { await handleSignUp() }
@@ -82,8 +100,8 @@ struct SignupView: View {
                         .padding(.vertical, 16)
                         .background(Color.club.primaryContainer, in: RoundedRectangle(cornerRadius: 16))
                     }
-                    .disabled(isLoading || fullName.isEmpty || email.isEmpty || password.isEmpty)
-                    .opacity(fullName.isEmpty || email.isEmpty || password.isEmpty ? 0.5 : 1)
+                    .disabled(isLoading || !isFormValid)
+                    .opacity(isFormValid ? 1 : 0.5)
                 }
 
                 // Back to Login
@@ -142,6 +160,12 @@ struct SignupView: View {
                     .frame(height: 1)
             }
         }
+    }
+
+    private var isFormValid: Bool {
+        InputValidator.validateName(fullName) == nil
+            && InputValidator.validateEmail(email).isValid
+            && InputValidator.validatePassword(password).isValid
     }
 
     private func handleSignUp() async {
